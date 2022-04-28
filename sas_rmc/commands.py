@@ -1,0 +1,378 @@
+from abc import ABC, abstractmethod
+from collections import defaultdict
+from dataclasses import dataclass, field
+from typing import List, Callable
+
+import numpy as np
+
+from .acceptance_scheme import AcceptanceScheme
+from .scattering_simulation import ScatteringSimulation
+from .box_simulation import Box
+from .particle import Particle
+from .scattering_simulation import SimulationParams
+from .vector import Vector
+
+
+rng = np.random.default_rng()
+
+def small_angle_change(vector: Vector, angle_change: float, reference_vector: Vector = None) -> Vector:
+    ref_vec = reference_vector if reference_vector is not None else Vector.null_vector()
+    delta_vector = vector - ref_vec
+    angle = np.arctan2(delta_vector.y, delta_vector.x)
+    mag = np.sqrt(delta_vector.x**2 + delta_vector.y**2 )
+    new_angle = angle + angle_change
+    new_vector = Vector(x = mag * np.cos(new_angle), y = mag * np.sin(new_angle), z = delta_vector.z)
+    return new_vector + ref_vec
+
+
+@dataclass
+class Command(ABC):
+    data: dict = field(default_factory = dict, init = False, repr = False)
+
+    @abstractmethod
+    def execute(self) -> None:
+        pass
+
+    @abstractmethod
+    def _cls_specific_loggable_data(self) -> dict:
+        return {}
+
+    def update_loggable_data(self, data: dict) -> None:
+        self.data.update(data)
+
+    def get_loggable_data(self) -> dict:
+        return {
+            **self.data,
+            **self._cls_specific_loggable_data(),
+        }
+
+    @abstractmethod
+    def physical_acceptance_weak(self) -> bool:
+        '''A weak physical acceptance test only tests the most recent command. It assumes all prior allowed commands are also physically acceptable'''
+        pass
+
+
+
+@dataclass
+class ParticleCommand(Command):
+    box: Box
+    particle_index: int
+
+    @property
+    def particle(self) -> Particle:
+        return self.box[self.particle_index]
+
+    @abstractmethod
+    def execute(self) -> None:
+        return super().execute()
+
+    def _cls_specific_loggable_data(self):
+        particle = self.particle
+        return {
+            "Particle Index": self.particle_index,
+            "Action": type(self).__name__,
+            "Particle": type(particle).__name__,
+            "Position.X": particle.position.x,
+            "Position.Y": particle.position.y,
+            "Position.Z": particle.position.z,
+            "Orientation.X": particle.orientation.x,
+            "Orientation.Y": particle.orientation.y,
+            "Orientation.Z": particle.orientation.z,
+            "Magnetization.X": particle._magnetization.x,
+            "Magnetization.Y": particle._magnetization.y,
+            "Magnetization.Z": particle._magnetization.z,
+            "Volume": particle.volume,
+            "Scattering Length": particle.scattering_length,
+        }
+
+    def physical_acceptance_weak(self) -> bool:
+        return not self.box.wall_or_particle_collision(self.particle_index)
+        
+        
+def set_particle_position(particle: Particle, position: Vector) -> None:
+    particle.position = position
+
+def set_particle_orientation(particle: Particle, orientation: Vector) -> None:
+    particle.orientation = orientation
+
+def set_particle_magnetization(particle: Particle, magnetization: Vector) -> None:
+    particle.magnetization = magnetization
+
+def check_and_set(attr_getter: Callable[[None], object], attr_setter: Callable[[object], None], value: object) -> None:
+    if attr_getter() != value:
+        attr_setter(value)
+
+
+@dataclass
+class SetParticleState(ParticleCommand):
+    position: Vector
+    orientation: Vector
+    magnetization: Vector
+
+    def execute(self) -> None:
+        particle = self.particle
+        getters = [lambda : particle.position, lambda : particle.orientation, lambda : particle.magnetization]
+        setters = [
+            lambda position : set_particle_position(particle, position), 
+            lambda orientation : set_particle_orientation(particle, orientation), 
+            lambda magnetization : set_particle_magnetization(particle, magnetization)
+            ]
+        values = [self.position, self.orientation, self.magnetization]
+        for getter, setter, value in zip(getters, setters, values):
+            check_and_set(getter, setter, value)
+
+    @classmethod
+    def gen_from_particle(cls, box: Box, particle_index: int):
+        particle = box.particles[particle_index]
+        return cls(
+            box = box,
+            particle_index = particle_index,
+            position = particle.position,
+            orientation = particle.orientation,
+            magnetization = particle.magnetization
+        )
+
+
+@dataclass
+class MoveParticleTo(ParticleCommand):
+    position_new: Vector
+
+    def execute(self) -> None:
+        particle = self.particle
+        check_and_set(
+            lambda : particle.position,
+            lambda position : set_particle_position(particle, position),
+            self.position_new)
+        
+
+
+@dataclass
+class MoveParticleBy(ParticleCommand):
+    position_delta: Vector
+
+    def execute(self) -> None:
+        particle = self.particle
+        position_new = particle.position + self.position_delta
+        MoveParticleTo(self.box, self.particle_index, position_new).execute()
+
+
+@dataclass
+class JumpParticleTo(ParticleCommand):
+    reference_particle_index: int
+
+    def execute(self) -> None:
+        MAX_MOVE = 1.00000005
+        particle = self.particle
+        reference_particle = self.box[self.reference_particle_index]
+        jump_vector = Vector(np.inf, np.inf, np.inf)
+        for shape in particle.shapes:
+            for shape_2 in reference_particle.shapes:
+                pointing_vector = shape_2.closest_surface_position(shape.central_position)
+                reference_particle_dimension = (pointing_vector - shape_2.central_position).mag
+                reverse_pointing_vector = shape.closest_surface_position(shape_2.central_position)
+                particle_dimension = (reverse_pointing_vector - shape.central_position).mag
+                gap_distance = MAX_MOVE * (reference_particle_dimension + particle_dimension)
+                absolute_pointing_vector = shape_2.central_position - shape.central_position
+                target_position = shape_2.central_position - gap_distance * (absolute_pointing_vector.unit_vector)
+                jump_vector_new = target_position - shape.central_position
+                jump_vector = jump_vector if jump_vector.mag < jump_vector_new.mag else jump_vector_new
+        particle_move_command = MoveParticleBy(self.box, self.particle_index, position_delta=jump_vector)
+        particle_move_command.execute()
+
+
+@dataclass
+class OrbitParticle(ParticleCommand):
+    relative_angle: float
+
+    def execute(self) -> None:
+        particle = self.particle
+        reference_particle = self.box.get_nearest_particle(particle)
+        position_new = small_angle_change(particle.position, self.relative_angle, reference_particle.position)
+        MoveParticleTo(self.box, self.particle_index, position_new).execute()
+
+
+@dataclass
+class ReorientateParticle(ParticleCommand):
+    orientation_new: Vector
+
+    def execute(self) -> None:
+        particle = self.particle
+        check_and_set(
+            lambda : particle.orientation,
+            lambda orientation : set_particle_orientation(particle, orientation),
+            self.orientation_new)
+        
+
+@dataclass
+class RotateParticle(ParticleCommand):
+    relative_angle: float
+
+    def execute(self) -> None:
+        orientation_old = self.particle.orientation
+        orientation_new = small_angle_change(orientation_old, self.relative_angle)
+        ReorientateParticle(self.box, self.particle_index, orientation_new).execute()
+
+@dataclass
+class MagnetizeParticle(ParticleCommand):
+    magnetization: Vector
+
+    def execute(self) -> None:
+        particle = self.particle
+        check_and_set(
+            lambda : particle.magnetization,
+            lambda magnetization : set_particle_magnetization(particle, magnetization),
+            self.magnetization)
+
+
+@dataclass
+class RotateMagnetization(ParticleCommand):
+    relative_angle: float
+
+    def execute(self) -> None:
+        magnetization_old = self.particle.magnetization
+        magnetization_new = small_angle_change(magnetization_old, self.relative_angle)
+        MagnetizeParticle(self.box, self.particle_index, magnetization_new).execute()
+
+
+@dataclass
+class RescaleMagnetization(ParticleCommand):
+    change_by_factor: float = 1
+
+    def execute(self) -> None:
+        magnetization_old = self.particle.magnetization
+        magnetization_new = (self.change_by_factor * magnetization_old.mag) * magnetization_old.unit_vector
+        MagnetizeParticle(self.box, self.particle_index, magnetization_new).execute()
+
+
+@dataclass
+class ScaleCommand(Command):
+    simulation_params: SimulationParams
+
+    @abstractmethod
+    def execute(self) -> None:
+        return super().execute()
+
+    def _cls_specific_loggable_data(self) -> dict:
+        return {
+            "Particle Index": -1,
+            "Action": type(self).__name__,
+            "Nuclear rescale": self.simulation_params.rescale_factor,
+            "Magnetic rescale": self.simulation_params.magnetic_rescale,
+
+        }
+
+    def physical_acceptance_weak(self) -> bool:
+        return self.simulation_params.get_physical_acceptance()
+
+
+@dataclass
+class NuclearScale(ScaleCommand):
+    change_to_factor: float
+
+    def execute(self) -> None:
+        self.simulation_params.rescale_factor = self.change_to_factor
+
+
+@dataclass
+class MagneticScale(ScaleCommand):
+    change_to_factor: float
+
+    def execute(self) -> None:
+        self.simulation_params.magnetic_rescale = self.change_to_factor
+
+
+@dataclass
+class NuclearRescale(ScaleCommand):
+    change_by_factor: float = 1
+
+    def execute(self) -> None:
+        new_scale = self.simulation_params.rescale_factor * self.change_by_factor
+        NuclearScale(self.simulation_params, change_to_factor=new_scale).execute()
+        
+
+@dataclass
+class MagneticRescale(ScaleCommand):
+    change_by_factor: float = 1
+
+    def execute(self) -> None:
+        new_scale = self.simulation_params.magnetic_rescale * self.change_by_factor
+        MagneticScale(self.simulation_params, change_to_factor=new_scale).execute()
+
+@dataclass
+class NuclearMagneticScale(ScaleCommand):
+    change_to_factor: float
+
+    def execute(self) -> None:
+        NuclearScale(self.simulation_params, change_to_factor=self.change_to_factor).execute()
+        MagneticScale(self.simulation_params, change_to_factor=self.change_to_factor).execute()
+
+
+@dataclass
+class NuclearMagneticRescale(ScaleCommand):
+    change_by_factor: float = 1
+
+    def execute(self) -> None:
+        new_scale_factor = self.simulation_params.rescale_factor * self.change_by_factor
+        NuclearMagneticScale(self.simulation_params, change_to_factor=new_scale_factor).execute()
+
+
+@dataclass
+class SetSimulationState(Command):
+    simulation_params: SimulationParams
+    _command_ledger: List[Command]
+
+    def execute(self) -> None:
+        for command in self._command_ledger:
+            command.execute()
+
+    def physical_acceptance_weak(self) -> bool:
+        return self.simulation_params.get_physical_acceptance()
+
+    def _cls_specific_loggable_data(self) -> dict:
+        return super()._cls_specific_loggable_data() # I want to implement this, but it has to return a "square" dict
+
+    @classmethod
+    def gen_from_simulation(cls, simulation_params: SimulationParams, box_list: List[Box]):
+        command_ledger = []
+        command_ledger.append(NuclearScale(simulation_params, change_to_factor=simulation_params.rescale_factor))
+        command_ledger.append(MagneticScale(simulation_params, change_to_factor=simulation_params.magnetic_rescale))
+        for box in box_list:
+            for particle_index, _ in enumerate(box.particles):
+                command_ledger.append(
+                    SetParticleState.gen_from_particle(
+                        box = box,
+                        particle_index=particle_index
+                    )
+                )
+        return cls(simulation_params = simulation_params, _command_ledger = command_ledger)
+
+
+
+@dataclass
+class AcceptableCommand:
+    base_command: Command
+    acceptance_scheme: AcceptanceScheme
+    
+    def execute(self) -> None:
+        acceptable = True if self.acceptance_scheme is None else self.acceptance_scheme.is_acceptable() # This is the only thing that justifies this class' existance
+        if acceptable:
+            self.base_command.execute()
+
+    def _cls_specific_loggable_data(self) -> dict:
+        return {
+            **self.base_command.get_loggable_data(),
+            **self.acceptance_scheme.get_loggable_data(),
+        }
+
+    def get_loggable_data(self) -> dict:
+        return self._cls_specific_loggable_data()
+
+    def update_loggable_data(self, data: dict) -> None:
+        self.base_command.update_loggable_data(data)
+
+    def physical_acceptance_weak(self) -> bool:
+        return self.base_command.physical_acceptance_weak()
+
+    def handle_simulation(self, simulation: ScatteringSimulation) -> None:
+        self.acceptance_scheme.set_physical_acceptance(self.physical_acceptance_weak())
+        self.acceptance_scheme.handle_simulation(simulation=simulation)

@@ -1,0 +1,6 @@
+
+input_config_source : CoreShell Simulation Input - Copy.xlsx
+
+# if you write "generate core shell template" as the value for input_config_source, the algorithm will create a new "CoreShell Simulation Input" template Excel file in this folder with a current timestamp
+
+output_folder : ./results
