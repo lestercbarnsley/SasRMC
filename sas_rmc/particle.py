@@ -18,7 +18,6 @@ GAMMA_N = np.abs(get_physical_constant('neutron mag. mom. to nuclear magneton ra
 R_0 = get_physical_constant('classical electron radius')
 BOHR_MAG = get_physical_constant('Bohr magneton')
 B_H_IN_INVERSE_AMP_METRES = (GAMMA_N * R_0 / 2) / BOHR_MAG
-MAX_SIZE = 3
 
 sphere_volume = lambda radius: (4 * PI / 3) * radius**3
 theta = lambda qR: np.where(qR == 0, 1, 3 * (np.sin(qR) - qR* np.cos(qR)) / (qR**3))
@@ -30,44 +29,6 @@ def magnetic_sld_in_angstrom_minus_2(magnetization_vector_in_amp_per_metre: Vect
     magnetization = magnetization_vector_in_amp_per_metre
     sld_vector = B_H_IN_INVERSE_AMP_METRES * magnetization / (1e10**2)
     return sld_vector.x, sld_vector.y, sld_vector.z
-
-
-
-
-@dataclass
-class FormCache:
-    _form_array: dict = field(default_factory=dict)
-    _modulated_form_array: dict = field(default_factory=dict)
-    _magnetic_form_array: dict = field(default_factory=dict)
-    _modulated_magnetic_array: dict = field(default_factory=dict)
-
-    def reset_form(self) -> None: #I'm not sure I need this anymore
-        self._form_array = {}
-        self._modulated_form_array = {}
-        self._magnetic_form_array = {}
-        self._modulated_magnetic_array = {}
-
-    @staticmethod
-    def access_array(access_dict: dict, arr_tuple: Tuple, calculator_func: Callable[[], object], max_size: int = MAX_SIZE) -> object:
-        if arr_tuple not in access_dict:
-            if len(access_dict) >= max_size:
-                access_dict.pop(list(access_dict.keys())[0])
-            form_array_new = calculator_func()
-            access_dict[arr_tuple] = form_array_new
-        return access_dict[arr_tuple]
-
-    def form_array(self, arr_tuple, form_arr_calculator_func: Callable[[], np.ndarray]):
-        return FormCache.access_array(self._form_array, arr_tuple, calculator_func=form_arr_calculator_func)
-
-    def modulated_form_array(self, arr_tuple, modulated_arr_calculator_func: Callable[[], np.ndarray]):
-        return FormCache.access_array(self._modulated_form_array, arr_tuple, calculator_func=modulated_arr_calculator_func)
-
-    def magnetic_form_array(self, arr_tuple, magnetic_arr_calculator_func: Callable[[], np.ndarray]):
-        return FormCache.access_array(self._magnetic_form_array, arr_tuple, calculator_func=magnetic_arr_calculator_func)
-
-    def modulated_magnetic_array(self, arr_tuple, modulated_magnetic_arr_calculator_func: Callable[[], List[np.ndarray]]):
-        return FormCache.access_array(self._modulated_magnetic_array, arr_tuple, calculator_func=modulated_magnetic_arr_calculator_func)
-
 
 @dataclass
 class FormResult:

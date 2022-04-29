@@ -1,6 +1,5 @@
 #%%
 
-from dataclasses import dataclass
 from functools import wraps
 from typing import Tuple
 from enum import Enum
@@ -35,39 +34,20 @@ def array_cache(func, max_size: int = MAX_SIZE):
     def wrapper(*args, **kwargs):
         kwarg_tuple = tuple((k, pass_arg(v)) for k, v in kwargs.items())
         argument_tuple = tuple(pass_arg(arg) for arg in args) + kwarg_tuple
-        object_id = argument_tuple[0]
+        object_id, cache_key = argument_tuple[0], argument_tuple[1:]
         if object_id not in cache:
             cache[object_id] = {}
         object_cache = cache[object_id]
-        if argument_tuple not in object_cache:
+        if cache_key not in object_cache:
             if len(object_cache) >= max_size:
-                object_cache.pop(list(object_cache.keys())[0])
+                keys = list(object_cache.keys())
+                [object_cache.pop(key) for key in keys[:-2]]
             result = func(*args, **kwargs)
-            object_cache[argument_tuple] = result
-        return object_cache[argument_tuple]
+            object_cache[cache_key] = result
+        return object_cache[cache_key]
       
     return wrapper
 
-
-@array_cache
-def say(val):
-    print(val)
-    return val
-
-@array_cache
-def say_2(val):
-    print(val)
-    print(val)
-    return 2 * val
-
-@dataclass
-class TestClass:
-    a: float = 0
-
-    @array_cache
-    def show_a(self):
-        print(self.a)
-        return self.a
 
 
 if __name__ == "__main__":
