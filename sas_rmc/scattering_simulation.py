@@ -51,16 +51,6 @@ class BoxIntensityCalculator(IntensityCalculator):
             magnetic_rescale=magnetic_rescale,
             polarization=polarization
         )
-        '''np.average(
-            [box_intensity(
-                box = box, 
-                qx = self.qx_array, 
-                qy = self.qy_array, 
-                rescale_factor=rescale_factor, 
-                magnetic_rescale=magnetic_rescale, 
-                polarization=polarization) for box in self.box_list],
-            axis=0
-        )'''
         return intensity
 
     def _intensity_no_smear(self, rescale_factor: float = 1, magnetic_rescale: float = 1, detector_image: DetectorImage = None) -> np.ndarray:
@@ -73,16 +63,6 @@ class BoxIntensityCalculator(IntensityCalculator):
             magnetic_rescale=magnetic_rescale,
             polarization=polarization
         )
-        ''' intensity = np.average(
-            [box_intensity(
-                box = box,
-                qx = qx, 
-                qy = qy, 
-                rescale_factor=rescale_factor, 
-                magnetic_rescale=magnetic_rescale, 
-                polarization=polarization) for box in self.box_list],
-            axis=0
-        )'''
         return intensity
 
     def calculate_intensity(self, simulation_params: SimulationParams, detector_image: DetectorImage = None) -> np.ndarray:

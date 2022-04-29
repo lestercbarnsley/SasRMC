@@ -4,6 +4,7 @@ from typing import Callable, List
 
 import numpy as np
 
+from .array_cache import array_cache
 from .box_simulation import Box
 from .particle import FormResult
 from .detector import Polarization
@@ -13,22 +14,23 @@ PI = np.pi
 
 mod = lambda arr: np.real(arr * np.conj(arr))
 
-form_result_adder = lambda form_results, getter_fn, rescale = 1: np.sqrt(rescale) * np.sum([getter_fn(form_result) for form_result in form_results], axis = 0)
+#form_result_adder = lambda form_results, getter_fn, rescale = 1: np.sqrt(rescale) * np.sum([getter_fn(form_result) for form_result in form_results], axis = 0)
 
-def form_result_adder_faster(form_results: List[FormResult], getter_fn: Callable[[FormResult], np.ndarray], rescale: float = 1) -> np.ndarray:
-    shape = getter_fn(form_results[0]).shape
-    arr = np.zeros((len(form_results), shape[0], shape[1]))
-    for i, form_result in enumerate(form_results):
-        arr[i,:,:] = getter_fn(form_result)
-    return np.sqrt(rescale) * np.sum(arr, axis = 0)
-    # Mark this for deletion. It might be faster, but it's a less elegant piece of code
+@array_cache
+def sum_array_list(array_list: List[np.ndarray]) -> np.ndarray:
+    return np.sum(array_list, axis = 0)
 
+def form_result_adder(form_results: List[FormResult], getter_fn: Callable[[FormResult], np.ndarray], rescale: float = 1) -> np.ndarray:
+    array_list = [getter_fn(form_result) for form_result in form_results]
+    divisions = int(np.sqrt(len(array_list)))
+    partial_sums = [sum_array_list(array_list[i::divisions]) for i in range(divisions)]
+    return np.sqrt(rescale) * sum_array_list(partial_sums)#sum_array_list(array_list)
 
-def nuclear_amplitude(form_results: List[FormResult], rescale_factor = 1):
+def nuclear_amplitude(form_results: List[FormResult], rescale_factor: float = 1) -> np.ndarray:
     form_nuclear_getter =  lambda form_result: form_result.form_nuclear
     return form_result_adder(form_results, form_nuclear_getter, rescale=rescale_factor)
 
-def magnetic_amplitude(form_results: List[FormResult], qx, qy, magnetic_rescale = 1):
+def magnetic_amplitude(form_results: List[FormResult], qx: np.ndarray, qy: np.ndarray, magnetic_rescale:float = 1) -> List[np.ndarray]:
     getters = [
         lambda form_result: form_result.form_magnetic_x, 
         lambda form_result: form_result.form_magnetic_y, 
@@ -40,7 +42,7 @@ def magnetic_amplitude(form_results: List[FormResult], qx, qy, magnetic_rescale 
     mqm = cross(q, cross([fm_x, fm_y, fm_z], q))
     return [mq_comp / q_squared for mq_comp in mqm]
 
-def intensity_polarization(fn: np.ndarray, fmx: np.ndarray, fmy: np.ndarray, fmz: np.ndarray, polarization: Polarization):
+def intensity_polarization(fn: np.ndarray, fmx: np.ndarray, fmy: np.ndarray, fmz: np.ndarray, polarization: Polarization) -> np.ndarray:
     minus_minus_fn = lambda : fn + fmy
     plus_plus_fn = lambda : fn - fmy
     minus_plus_fn = lambda : -fmx - 1j * fmz
@@ -57,13 +59,13 @@ def intensity_polarization(fn: np.ndarray, fmx: np.ndarray, fmy: np.ndarray, fmz
     polarization_functions = polarization_splitter[polarization]
     return np.sum([mod(polarization_fn()) for polarization_fn in polarization_functions], axis=0) / (2 if polarization == Polarization.UNPOLARIZED else 1)
 
-def box_intensity(box: Box, qx, qy, rescale_factor = 1, magnetic_rescale = 1, polarization: Polarization = Polarization.UNPOLARIZED):
+def box_intensity(box: Box, qx: np.ndarray, qy: np.ndarray, rescale_factor: float = 1, magnetic_rescale: float = 1, polarization: Polarization = Polarization.UNPOLARIZED) -> np.ndarray:
     form_results = [particle.form_result(qx, qy) for particle in box.particles]
     fn = nuclear_amplitude(form_results, rescale_factor=rescale_factor)
     fmx, fmy, fmz = magnetic_amplitude(form_results, qx, qy, magnetic_rescale=magnetic_rescale)
     return 1e8 * intensity_polarization(fn, fmx, fmy, fmz, polarization) / box.volume
 
-def box_intensity_average(box_list: List[Box], qx, qy, rescale_factor = 1, magnetic_rescale = 1, polarization: Polarization = Polarization.UNPOLARIZED):
+def box_intensity_average(box_list: List[Box], qx: np.ndarray, qy: np.ndarray, rescale_factor: float = 1, magnetic_rescale: float = 1, polarization: Polarization = Polarization.UNPOLARIZED) -> np.ndarray:
     return np.average(
         [box_intensity(
             box, qx, qy,

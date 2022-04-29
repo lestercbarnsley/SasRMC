@@ -7,6 +7,8 @@ import numpy as np
 from matplotlib import pyplot as plt
 import pandas as pd
 
+
+from .array_cache import array_cache
 from .vector import Vector, broadcast_to_numpy_array
 from .particle import MAX_SIZE, FormCache, modulus_array 
 
@@ -14,6 +16,7 @@ from .particle import MAX_SIZE, FormCache, modulus_array
 PI = np.pi
 DEFAULT_SLICING_FRACTION_DENOM = 4 # This considers 6.25% of the detector (i.e, 1/4^2) per pixel, which is more than sufficient
 
+@array_cache
 def get_slicing_func_from_gaussian(gaussian: np.ndarray, slicing_range: int = 0) -> Callable[[np.ndarray], np.ndarray]:
     arg_of_max = np.where(gaussian == np.amax(gaussian)) # I really don't understand this line of code but apparently it works
     slicing_range_use = slicing_range if slicing_range else int(np.max(gaussian.shape) / DEFAULT_SLICING_FRACTION_DENOM) 
@@ -25,6 +28,11 @@ def get_slicing_func_from_gaussian(gaussian: np.ndarray, slicing_range: int = 0)
     j_max = np.min([j_min + slicing_range_use, gaussian.shape[1] - 1])
     if j_max == gaussian.shape[1] - 1:
         j_min = j_max - slicing_range_use
+
+    '''@array_cache
+    def slice_array(arr: np.ndarray):
+        return arr[i_min:i_max, j_min:j_max]
+    return slice_array'''#
     return lambda arr: arr[i_min:i_max, j_min:j_max]
 
 
@@ -58,6 +66,7 @@ class DetectorPixel:
         return Vector(self.qX, self.qY, self.qZ)
 
     # I'd rather calculate this differently, using a pyfunc, but this has been the fastest method I've come up with to do this calculation
+    @array_cache
     def _resolution_function_calculator(self, qx_array: np.ndarray, qy_array: np.ndarray) -> np.ndarray:
         qx_offset = qx_array - self.qX
         qy_offset = qy_array - self.qY
@@ -78,20 +87,26 @@ class DetectorPixel:
         gaussian = self._resolution_function_calculator(qx_array=qx_array, qy_array=qy_array)
         return gaussian, get_slicing_func_from_gaussian(gaussian, slicing_range=slicing_range)
     
+    @array_cache
     def get_resolution_function_and_slicing_func(self, qx_array: np.ndarray, qy_array: np.ndarray, slicing_range: int = 0) -> Tuple[np.ndarray, Callable[[np.ndarray], np.ndarray]]:
-        arr_tuple = id(qx_array), id(qy_array), slicing_range
+        resolution_function = self._resolution_function_calculator(qx_array, qy_array)
+        slicing_func = get_slicing_func_from_gaussian(resolution_function, slicing_range=slicing_range)
+        return resolution_function, slicing_func
+        '''arr_tuple = id(qx_array), id(qy_array), slicing_range
         return FormCache.access_array(
             access_dict = self._resolution_function_dictionary,
             arr_tuple = arr_tuple,
             calculator_func = lambda : self._get_resolution_function_and_slicing_func(qx_array=qx_array, qy_array=qy_array, slicing_range=slicing_range),
             max_size=MAX_SIZE
-        )
+        )'''
         
     def smear_pixel(self, simulated_intensity_array: np.ndarray, qx_array: np.ndarray, qy_array: np.ndarray, shadow_is_zero: bool = True, slicing_range: int = 0) -> None:
         if shadow_is_zero and not self.shadow_factor:#(self.shadow_factor == False) and shadow_is_zero:
             self.simulated_intensity = 0
         else:
-            resolution_function, slicing_func = self.get_resolution_function_and_slicing_func(qx_array, qy_array, slicing_range) # This also returns a slicing func to make the processed arrays smaller. Note, slicing a numpy array is much faster than filtering
+            #resolution_function, slicing_func = self.get_resolution_function_and_slicing_func(qx_array, qy_array, slicing_range) # This also returns a slicing func to make the processed arrays smaller. Note, slicing a numpy array is much faster than filtering
+            resolution_function = self._resolution_function_calculator(qx_array, qy_array)
+            slicing_func = get_slicing_func_from_gaussian(resolution_function)
             resolution_func_subset = slicing_func(resolution_function)
             intensity_subset = slicing_func(simulated_intensity_array)
             self.simulated_intensity = np.sum(intensity_subset * resolution_func_subset)

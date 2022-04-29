@@ -7,6 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import constants
 
+from .array_cache import array_cache, round_vector
 from .vector import Vector, VectorElement, VectorSpace
 from .shapes import Shape, Sphere, Cylinder
 
@@ -25,16 +26,13 @@ modulus_array = lambda x_arr, y_arr: np.sqrt(x_arr**2 + y_arr**2)
 
 
 def magnetic_sld_in_angstrom_minus_2(magnetization_vector_in_amp_per_metre: Vector) -> Tuple[float, float, float]:
-
     # Let us do all calculations in metres, then convert to Angstrom^-2 as the last step
     magnetization = magnetization_vector_in_amp_per_metre
     sld_vector = B_H_IN_INVERSE_AMP_METRES * magnetization / (1e10**2)
     return sld_vector.x, sld_vector.y, sld_vector.z
 
 
-def round_vector(vector: Vector) -> Tuple[int, int, int]:
-    round_vector_comp = lambda comp: int(comp * (2**20))
-    return round_vector_comp(vector.x), round_vector_comp(vector.y), round_vector_comp(vector.z)
+
 
 @dataclass
 class FormCache:
@@ -83,7 +81,8 @@ class FormResult:
 class Particle(ABC):
     _magnetization: Vector = Vector.null_vector()
     shapes: List[Shape] = field(default_factory = list)
-    form_cache: FormCache = field(default_factory= FormCache, repr = False)
+    #form_cache: FormCache = field(default_factory= FormCache, repr = False)
+    solvent_sld: float = 0
 
     @property
     def volume(self) -> float:
@@ -92,9 +91,8 @@ class Particle(ABC):
     def is_magnetic(self) -> bool:
         return self._magnetization.mag != 0
 
-    @abstractmethod
-    def is_spherical(self) -> bool: # Don't allow orientation changes to a spherical particle
-        pass
+    def delta_sld(self, sld: float):
+        return (sld - self.solvent_sld) * 1e-6
 
     @property
     @abstractmethod
@@ -104,6 +102,13 @@ class Particle(ABC):
     @property
     def position(self) -> Vector:
         return self.shapes[0].central_position
+
+    def is_spherical(self) -> bool: # Don't allow orientation changes to a spherical particle
+        # Default implementation, override if necessary
+        same_location = lambda location_vector : round_vector(location_vector) == round_vector(self.position)
+        if all([isinstance(shape, Sphere) for shape in self.shapes]) and all([same_location(shape.central_position) for shape in self.shapes]):
+            return True
+        return False
 
     @position.setter
     def position(self, position_new):
@@ -146,39 +151,50 @@ class Particle(ABC):
         return shape.random_position_inside()
 
     @abstractmethod
-    def _form_array_calculator(self, qx_array: np.ndarray, qy_array: np.ndarray) -> np.ndarray:
+    def _form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector) -> np.ndarray:
         pass
 
-    def form_array(self, qx_array: np.ndarray, qy_array: np.ndarray) -> np.ndarray:
-        form_array_calculator = lambda : self._form_array_calculator(qx_array, qy_array)
-        arr_tuple = (id(qx_array), id(qy_array)) + round_vector(self.orientation)
-        return self.form_cache.form_array(arr_tuple, form_arr_calculator_func=form_array_calculator)
+    @array_cache
+    def form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector) -> np.ndarray:
+        return self._form_array(qx_array, qy_array, orientation)
+        # form_array_calculator = lambda : self._form_array_calculator(qx_array, qy_array)
+        # arr_tuple = (id(qx_array), id(qy_array)) + round_vector(self.orientation)
+        # return self.form_cache.form_array(arr_tuple, form_arr_calculator_func=form_array_calculator)
 
-    def modulated_form_array(self, qx_array, qy_array) -> np.ndarray:
-        def modulated_form_array_calc() -> np.ndarray:
-            return self.form_array(qx_array, qy_array) * np.exp(1j * (qx_array * self.position.x + qy_array * self.position.y))
-        arr_tuple = (id(qx_array), id(qy_array)) + round_vector(self.orientation) + round_vector(self.position)
-        return self.form_cache.modulated_form_array(arr_tuple, modulated_arr_calculator_func=modulated_form_array_calc)
+    @array_cache
+    def modulated_form_array(self, qx_array, qy_array, position: Vector, orientation: Vector) -> np.ndarray:
+        return self.form_array(qx_array, qy_array, orientation) * np.exp(1j * (qx_array * position.x + qy_array * position.y))
+        # def modulated_form_array_calc() -> np.ndarray:
+        #     return self.form_array(qx_array, qy_array) * np.exp(1j * (qx_array * self.position.x + qy_array * self.position.y))
+        # arr_tuple = (id(qx_array), id(qy_array)) + round_vector(self.orientation) + round_vector(self.position)
+        # return self.form_cache.modulated_form_array(arr_tuple, modulated_arr_calculator_func=modulated_form_array_calc)
 
     @abstractmethod
-    def _magnetic_array_calculator(self, qx_array: np.ndarray, qy_array: np.ndarray) -> np.ndarray:
+    def _magnetic_form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector, magnetization: Vector) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         pass
     
-    def magnetic_form_array(self, qx_array, qy_array) -> np.ndarray:
-        magnetic_array_calculator = lambda : self._magnetic_array_calculator(qx_array, qy_array)
-        arr_tuple = (id(qx_array), id(qy_array)) + round_vector(self.orientation) + round_vector(self.magnetization)
-        return self.form_cache.magnetic_form_array(arr_tuple, magnetic_arr_calculator_func=magnetic_array_calculator)
+    @array_cache
+    def magnetic_form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector, magnetization: Vector)-> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        return self._magnetic_form_array(qx_array, qy_array, orientation, magnetization)
+        # magnetic_array_calculator = lambda : self._magnetic_array_calculator(qx_array, qy_array)
+        # arr_tuple = (id(qx_array), id(qy_array)) + round_vector(self.orientation) + round_vector(self.magnetization)
+        # return self.form_cache.magnetic_form_array(arr_tuple, magnetic_arr_calculator_func=magnetic_array_calculator)
     
-    def magnetic_modulated_array(self, qx_array, qy_array) -> np.ndarray:
-        def magnetic_modulated_calc() -> List[np.ndarray]:
-            modulated_array = np.exp(1j * (qx_array * self.position.x + qy_array * self.position.y))
-            return [f_m * modulated_array for f_m in self.magnetic_form_array(qx_array, qy_array)]
-        arr_tuple = (id(qx_array), id(qy_array)) + round_vector(self.orientation) + round_vector(self.magnetization) + round_vector(self.position)
-        return self.form_cache.modulated_magnetic_array(arr_tuple, modulated_magnetic_arr_calculator_func=magnetic_modulated_calc)# modulated_arr_calculator_func=magnetic_modulated_calc)
+    @array_cache
+    def magnetic_modulated_array(self, qx_array, qy_array, position: Vector, orientation: Vector, magnetization: Vector) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        modulated_array = np.exp(1j * (qx_array * position.x + qy_array * position.y))
+        return [fm * modulated_array for fm in self.magnetic_form_array(qx_array, qy_array, orientation, magnetization)]
+        # def magnetic_modulated_calc() -> List[np.ndarray]:
+        #     modulated_array = np.exp(1j * (qx_array * self.position.x + qy_array * self.position.y))
+        #     return [f_m * modulated_array for f_m in self.magnetic_form_array(qx_array, qy_array)]
+        # arr_tuple = (id(qx_array), id(qy_array)) + round_vector(self.orientation) + round_vector(self.magnetization) + round_vector(self.position)
+        # return self.form_cache.modulated_magnetic_array(arr_tuple, modulated_magnetic_arr_calculator_func=magnetic_modulated_calc)# modulated_arr_calculator_func=magnetic_modulated_calc)
 
     def form_result(self, qx_array, qy_array) -> FormResult:
-        form_nuclear = self.modulated_form_array(qx_array=qx_array, qy_array=qy_array)
-        form_magnetic_x, form_magnetic_y, form_magnetic_z = self.magnetic_modulated_array(qx_array=qx_array, qy_array=qy_array)
+        #form_nuclear = self.modulated_form_array(qx_array=qx_array, qy_array=qy_array)
+        #form_magnetic_x, form_magnetic_y, form_magnetic_z = self.magnetic_modulated_array(qx_array=qx_array, qy_array=qy_array)
+        form_nuclear = self.modulated_form_array(qx_array=qx_array, qy_array=qy_array, position=self.position, orientation=self.orientation)
+        form_magnetic_x, form_magnetic_y, form_magnetic_z = self.magnetic_modulated_array(qx_array=qx_array, qy_array=qy_array, position=self.position, orientation=self.orientation, magnetization=self.magnetization)
         return FormResult(
             form_nuclear=form_nuclear,
             form_magnetic_x=form_magnetic_x,
@@ -190,6 +206,12 @@ class Particle(ABC):
         return f'{type(self).__name__}(position = {self.position}, orientation = {self.orientation}, magnetization = {self._magnetization}, volume = {self.volume}, scattering_length = {self.scattering_length})'
 
 
+def form_array_sphere(radius: float, sld: float, q_array: np.ndarray) -> np.ndarray:
+    volume = sphere_volume(radius)
+    theta_arr = theta(q_array * radius)
+    return sld * volume * theta_arr
+
+
 @dataclass
 class CoreShellParticle(Particle):
     shapes: List[Sphere] = field(
@@ -197,7 +219,6 @@ class CoreShellParticle(Particle):
     )
     core_sld: float = 0
     shell_sld: float = 0
-    solvent_sld: float = 0
     
     @property
     def volume(self):
@@ -209,8 +230,7 @@ class CoreShellParticle(Particle):
     @property
     def scattering_length(self):
         core_sphere = self.shapes[0]
-        delta_sld = lambda sld: (sld - self.solvent_sld) * 1e-6
-        return delta_sld(self.core_sld - self.shell_sld) * core_sphere.volume + delta_sld(self.shell_sld) * self.volume
+        return self.delta_sld(self.core_sld - self.shell_sld) * core_sphere.volume + self.delta_sld(self.shell_sld) * self.volume
  
     @property
     def position(self) -> Vector:
@@ -221,28 +241,29 @@ class CoreShellParticle(Particle):
         for shape in self.shapes:
             shape.central_position = new_vector
 
-    def _form_array_calculator(self, qx_array, qy_array):
+    def _form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector) -> np.ndarray:
         core_sphere = self.shapes[0]
         core_shell_sphere = self.shapes[1]
-        delta_sld = lambda sld: (sld - self.solvent_sld) * 1e-6
-        volume_inner = core_sphere.volume
-        volume_outer = self.volume
         q = modulus_array(qx_array, qy_array)
-        theta_inner = theta(q * core_sphere.radius)
-        theta_outer = theta(q * core_shell_sphere.radius)
-        form_amplitude = volume_inner * delta_sld(self.core_sld - self.shell_sld) * theta_inner + volume_outer * delta_sld(self.shell_sld) * theta_outer
-        return form_amplitude
+        core_form = form_array_sphere(
+            radius = core_sphere.radius, 
+            sld = self.delta_sld(self.core_sld - self.shell_sld), 
+            q_array=q)
+        shell_form = form_array_sphere(
+            radius = core_shell_sphere.radius, 
+            sld = self.delta_sld(self.shell_sld), 
+            q_array = q)
+        return core_form + shell_form
+        #return form_amplitude
 
-    def _magnetic_array_calculator(self, qx_array, qy_array):
+    def _magnetic_form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector, magnetization: Vector) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         q = modulus_array(qx_array, qy_array)
         if not self.is_magnetic():
             return [np.zeros(q.shape) for _ in range(3)]
         core_sphere = self.shapes[0]
-        volume_inner = core_sphere.volume
-        theta_inner = theta(q * core_sphere.radius)
-        return [volume_inner * magnetic_sld * theta_inner for magnetic_sld in magnetic_sld_in_angstrom_minus_2(self._magnetization)]
+        return [form_array_sphere(core_sphere.radius, magnetic_sld, q) for magnetic_sld in magnetic_sld_in_angstrom_minus_2(magnetization)]
 
-    def collision_detected(self, other_particle) -> bool:
+    def collision_detected(self, other_particle: Particle) -> bool:
         biggest_shape = self.shapes[np.argmax([shape.volume for shape in self.shapes])]
         for other_shape in other_particle.shapes:
             if biggest_shape.collision_detected(other_shape):
@@ -359,32 +380,37 @@ class Dumbbell(Particle):
             [particle.random_position_inside() for particle in [self.particle_1, self.particle_2]]
         )
 
-    def _form_array_calculator(self, qx_array, qy_array):
-        form_1 = self.particle_1.form_array(qx_array, qy_array)
-        form_2 = self.particle_2.form_array(qx_array, qy_array)
+    def _form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector) -> np.ndarray:
+        # This will never actually be called because we override modulated form array
+        form_1 = self.particle_1.form_array(qx_array, qy_array, orientation=self.particle_1.orientation)
+        form_2 = self.particle_2.form_array(qx_array, qy_array, orientation=self.particle_2.orientation)
         return form_1 + form_2
 
-    def modulated_form_array(self, qx_array, qy_array) -> np.ndarray:
-        def modulated_form_array_calcluator():
-            form_1 = self.particle_1.modulated_form_array(qx_array, qy_array)
-            form_2 = self.particle_2.modulated_form_array(qx_array, qy_array)
-            return form_1 + form_2
-        arr_tuple = (id(qx_array), id(qy_array)) + round_vector(self.particle_1.position) + round_vector(self.particle_2.position)
-        return self.form_cache.modulated_form_array(arr_tuple, modulated_arr_calculator_func=modulated_form_array_calcluator)
-        #return form_1 + form_2
+    @array_cache
+    def modulated_form_array(self, qx_array, qy_array, position: Vector, orientation: Vector) -> np.ndarray:
+        form_1 = self.particle_1.modulated_form_array(qx_array, qy_array, position=self.particle_1.position, orientation=self.particle_1.orientation)
+        form_2 = self.particle_2.modulated_form_array(qx_array, qy_array, position=self.particle_2.position, orientation=self.particle_2.orientation)
+        return form_1 + form_2
 
-    def _magnetic_array_calculator(self, qx_array, qy_array):
-        magnetic_1 = self.particle_1.magnetic_form_array(qx_array, qy_array)
-        magnetic_2 = self.particle_2.magnetic_form_array(qx_array, qy_array)
-        return magnetic_1 + magnetic_2
+    def _magnetic_form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector, magnetization: Vector) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        # This will never actually be called because we override modulated form array
+        magnetic_1 = self.particle_1.magnetic_form_array(qx_array, qy_array, orientation=self.particle_1.orientation, magnetization=self.particle_1.magnetization)
+        magnetic_2 = self.particle_2.magnetic_form_array(qx_array, qy_array, orientation=self.particle_2.orientation, magnetization=self.particle_2.magnetization)
+        return [m1 + m2 for m1, m2 in zip(magnetic_1, magnetic_2)]
 
-    def magnetic_modulated_array(self, qx_array, qy_array) -> np.ndarray:
-        def modulated_magnetic_array_calcluator():
-            magnetic_1 = self.particle_1.magnetic_modulated_array(qx_array, qy_array)
-            magnetic_2 = self.particle_2.magnetic_modulated_array(qx_array, qy_array)
-            return [m_1 + m_2 for m_1, m_2 in zip(magnetic_1, magnetic_2)]
-        arr_tuple = (id(qx_array), id(qy_array)) + round_vector(self.particle_1.magnetization) + round_vector(self.particle_2.magnetization) + round_vector(self.particle_1.position) + round_vector(self.particle_2.position)
-        return self.form_cache.modulated_magnetic_array(arr_tuple, modulated_magnetic_arr_calculator_func=modulated_magnetic_array_calcluator)
+    @array_cache
+    def magnetic_modulated_array(self, qx_array, qy_array, position: Vector, orientation: Vector, magnetization: Vector) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        magnetic_1 = self.particle_1.magnetic_modulated_array(qx_array, qy_array, position=self.particle_1.position, orientation=self.particle_1.orientation, magnetization=self.particle_1.magnetization)
+        magnetic_2 = self.particle_2.magnetic_modulated_array(qx_array, qy_array, position=self.particle_2.position, orientation=self.particle_2.orientation, magnetization=self.particle_2.magnetization)
+        return [m1 + m2 for m1, m2 in zip(magnetic_1, magnetic_2)]
+
+    # def magnetic_modulated_array(self, qx_array, qy_array) -> np.ndarray:
+    #     def modulated_magnetic_array_calcluator():
+    #         magnetic_1 = self.particle_1.magnetic_modulated_array(qx_array, qy_array)
+    #         magnetic_2 = self.particle_2.magnetic_modulated_array(qx_array, qy_array)
+    #         return [m_1 + m_2 for m_1, m_2 in zip(magnetic_1, magnetic_2)]
+    #     arr_tuple = (id(qx_array), id(qy_array)) + round_vector(self.particle_1.magnetization) + round_vector(self.particle_2.magnetization) + round_vector(self.particle_1.position) + round_vector(self.particle_2.position)
+    #     return self.form_cache.modulated_magnetic_array(arr_tuple, modulated_magnetic_arr_calculator_func=modulated_magnetic_array_calcluator)
         
     @classmethod
     def gen_from_parameters(cls, core_radius, seed_radius, shell_thickness, core_sld, seed_sld, shell_sld, solvent_sld, position = Vector.null_vector(), orientation = Vector(0,0,1)):
@@ -413,6 +439,11 @@ class Dumbbell(Particle):
         return dumbell
 
 
+def numerical_form_array(flat_sld: np.ndarray, x_arr: np.ndarray, y_arr: np.ndarray, qx: float, qy: float) -> float:
+    return np.sum(
+        flat_sld * np.exp(1j * (qx * x_arr + qy * y_arr))
+        )
+
 
 @dataclass
 class NumericalParticle(Particle):
@@ -426,10 +457,6 @@ class NumericalParticle(Particle):
         return super().volume
 
     @abstractmethod
-    def is_spherical(self) -> bool:
-        pass
-
-    @abstractmethod
     def get_sld(self, position: Vector) -> float:
         pass
 
@@ -439,10 +466,6 @@ class NumericalParticle(Particle):
         return sld * element.volume
 
     def sld_from_vector_space(self, vector_space: VectorSpace = None) -> np.ndarray:
-        '''def get_scattering_length(element: VectorElement) -> float:
-            position = element.position
-            sld = self.get_sld(position)
-            return sld * element.volume'''
         vector_space_elements = self.vector_space if vector_space is None else vector_space
         return vector_space_elements.array_from_elements(lambda element : self.get_scattering_length(element))
 
@@ -450,16 +473,13 @@ class NumericalParticle(Particle):
     @abstractmethod
     def scattering_length(self):
         return np.sum(self.sld_from_vector_space())
-       
-    def _form_array_calculator(self, qx_array, qy_array):
+
+    def _form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector) -> np.ndarray:
         xy_axis = 2
         flat_sld = np.sum(self.sld_from_vector_space(), axis=xy_axis)
         x = np.average(self.vector_space.x, axis = xy_axis)
         y = np.average(self.vector_space.y, axis = xy_axis)
-        def form_f(qx, qy):
-            return np.sum(
-                flat_sld * np.exp(1j * (qx * x + qy * y))
-                )
+        form_f = lambda qx, qy: numerical_form_array(flat_sld, x, y, qx, qy)
         form_calculator = np.frompyfunc(form_f, 2, 1)
         return form_calculator(qx_array, qy_array).astype(np.complex128)
 
@@ -470,7 +490,8 @@ class NumericalParticle(Particle):
         plt.imshow(flat_sld)
         plt.show()
 
-    def _magnetic_array_calculator(self, qx_array, qy_array):
+    def _magnetic_form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector, magnetization: Vector) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        # I need to think about how to implement this properly
         q = modulus_array(qx_array, qy_array)
         if not self.is_magnetic():
             return [np.zeros(q.shape) for _ in range(3)]
@@ -478,7 +499,7 @@ class NumericalParticle(Particle):
         is_inside_fn = np.frompyfunc(is_inside_magnet, 3, 1)
         theta = _form_array_numerical(self.vector_space, qx_array=qx_array, qy_array=qy_array, sld_from_vs_fn=is_inside_fn)
         #return [b_H * self.volume * theta for b_H in b_H_vec_from_moment(self._magnetization, self.volume)]
-        return [self.volume * magnetic_sld * theta for magnetic_sld in magnetic_sld_in_angstrom_minus_2(self._magnetization)]
+        return [self.volume * magnetic_sld * theta for magnetic_sld in magnetic_sld_in_angstrom_minus_2(magnetization)]
 
     
 @dataclass
@@ -487,7 +508,6 @@ class SphereNumerical(NumericalParticle):
         default_factory=lambda : [Sphere()]
     )
     sphere_sld: float = 0
-    solvent_sld: float = 0
 
     @property
     def volume(self):
@@ -498,11 +518,11 @@ class SphereNumerical(NumericalParticle):
 
     @property
     def scattering_length(self):
-        return (self.sphere_sld - self.solvent_sld) * self.volume
+        return self.delta_sld(self.sphere_sld) * self.volume
 
     def get_sld(self, position: Vector) -> float:
-        relative_position = position# - self.position
-        return (self.sphere_sld - self.solvent_sld) * 1e-6 if self.is_inside(relative_position) else 0
+        relative_position = position - self.position
+        return self.delta_sld(self.sphere_sld) if self.is_inside(relative_position) else self.delta_sld(self.solvent_sld)
 
     @classmethod
     def gen_from_parameters(cls, radius, sphere_sld, solvent_sld, pixel_size = None, position = Vector.null_vector(), max_size = None, vector_space = None):
@@ -522,7 +542,6 @@ class CylinderNumerical(NumericalParticle):
         default_factory=lambda : [Cylinder()]
     )
     cylinder_sld: float = 0
-    solvent_sld: float = 0
 
     @property
     def volume(self):
@@ -533,11 +552,11 @@ class CylinderNumerical(NumericalParticle):
 
     @property
     def scattering_length(self):
-        return (self.cylinder_sld - self.solvent_sld) * self.volume
+        return self.delta_sld(self.cylinder_sld) * self.volume
 
     def get_sld(self, position: Vector) -> float:
         relative_position = position - self.position
-        return (self.cylinder_sld - self.solvent_sld) * 1e-6 if self.is_inside(relative_position) else 0
+        return self.delta_sld(self.cylinder_sld) if self.is_inside(relative_position) else self.delta_sld(self.solvent_sld)
 
     @classmethod
     def gen_from_parameters(cls, radius, height, cylinder_sld, solvent_sld, pixel_size = None, position = Vector.null_vector(), orientation = Vector(0,0,1), max_size = None, vector_space = None):
