@@ -7,6 +7,7 @@ from typing import Any, Callable, List, Optional, Tuple, Type, Union
 import numpy as np
 import pandas as pd
 
+from .array_cache import array_cache
 from . import commands
 from .acceptance_scheme import MetropolisAcceptance
 from .viewer import CLIViewer
@@ -21,11 +22,26 @@ from .controller import Controller
 
 rng = np.random.default_rng()
 PI = np.pi
+RANGE_FACTOR = 1.2
 
 Reader = Callable[[str, Optional[Type], Optional[Any]], Any]
 ParticleFactory = Callable[[], Particle]
 BoxFactory = Callable[[int,ParticleFactory], Box]
 
+DEFAULT_VAL_TYPES =  {
+    str: "",
+    int: 0,
+    float: 0.0,
+    bool: False,
+    Polarization: Polarization.UNPOLARIZED
+}
+
+def is_float(s: str) -> bool:
+    try:
+        float(s)
+        return True
+    except ValueError: # This is the only time I would ever except an error, why on earth does Python not have a built-in isfloat method?
+        return False
 
 def add_row_to_dict(d: dict, param_name: str, param_value: str) -> None:
     if not param_name.strip():
@@ -36,9 +52,16 @@ def add_row_to_dict(d: dict, param_name: str, param_value: str) -> None:
         return
     d[param_name] = param_value.strip()
 
-def dict_reader(config_dict: dict, key: str, t: Type = float, default_value: Any = 0) -> Any:
+def dict_reader(config_dict: dict, key: str, t: Type = float, default_value: Any = None) -> Any:
+    type_in_default_dict = lambda : DEFAULT_VAL_TYPES[t] if t in DEFAULT_VAL_TYPES else 0 # lambda to delay calculation
+    default_value_to_use = default_value if default_value else type_in_default_dict()
+    print('key', key, 'value', 'not in dict' if key not in config_dict else config_dict[key])
     if (key not in config_dict) or not config_dict[key]:
-        return t(default_value)
+        if key == "Data Source":
+            print("Data source",t(default_value_to_use))
+        return t(default_value_to_use)
+    if key == "Data Source":
+        print("Data source",t(config_dict[key]))
     return t(config_dict[key])
 
 def dataframe_to_config_dict_with_reader(dataframe: pd.DataFrame) -> Tuple[dict, Reader]:
@@ -47,12 +70,6 @@ def dataframe_to_config_dict_with_reader(dataframe: pd.DataFrame) -> Tuple[dict,
         param_name = row.iloc[0]
         param_value = row.iloc[1]
         add_row_to_dict(config_dict, param_name, param_value)
-        
-    '''def d_reader(key: str, t: Type = float, default_value: Any = 0) -> Any:
-        #key_lower = key.strip()
-        if (key not in d) or not d[key]:
-            return t(default_value)
-        return t(d[key])'''
     return config_dict, lambda key, t = float, default_value = 0 : dict_reader(config_dict, key, t, default_value)
 
 def different_random_int(n: int, number_to_avoid: int) -> int:
@@ -62,21 +79,29 @@ def different_random_int(n: int, number_to_avoid: int) -> int:
             return x
     return -1
 
-def qxqy_array_from_detector_list(detector_list: List[DetectorImage]) -> Tuple[np.ndarray, np.ndarray]:
-    funciest_in_detector_list = lambda ufunc, detector_func: ufunc([ufunc(detector_func(detector)) for detector in detector_list])
-    get_qX = lambda detector : detector.qX
-    get_qY = lambda detector : detector.qY
-    qx_delta_min = np.min([detector.qx_delta for detector in detector_list])
-    qy_delta_min = np.min([detector.qy_delta for detector in detector_list])
-    qx_min = funciest_in_detector_list(np.min, get_qX)
-    qy_min = funciest_in_detector_list(np.min, get_qY)
-    qx_max = funciest_in_detector_list(np.max, get_qX)
-    qy_max = funciest_in_detector_list(np.max, get_qY)
+@array_cache
+def qxqy_array_from_ranges(qx_min: float, qx_max: float, qx_delta: float, qy_min: float, qy_max: float, qy_delta: float, range_factor: float = RANGE_FACTOR, resolution_increase_factor: float = 1):
     qX, qY = np.meshgrid(
-        np.arange(start = qx_min, stop = qx_max, step = qx_delta_min),
-        np.arange(start = qy_min, stop = qy_max, step = qy_delta_min)
+        np.arange(start = range_factor * qx_min, stop = range_factor * qx_max, step = qx_delta / resolution_increase_factor),
+        np.arange(start = range_factor * qy_min, stop = range_factor * qy_max, step = qy_delta / resolution_increase_factor)
     )
     return qX, qY
+
+def qxqy_array_from_detectorimage(detector_image: DetectorImage, range_factor: float = RANGE_FACTOR, resolution_increase_factor: float = 1) -> Tuple[np.ndarray, np.ndarray]:
+    qx_max = np.max(detector_image.qX)
+    qx_min = np.min(detector_image.qX)
+    delta_qx = detector_image.qx_delta
+    qy_max = np.max(detector_image.qY)
+    qy_min = np.min(detector_image.qY)
+    delta_qy = detector_image.qy_delta
+    qX, qY = qxqy_array_from_ranges(qx_min, qx_max, delta_qx, qy_min, qy_max, delta_qy, range_factor=range_factor, resolution_increase_factor=resolution_increase_factor)
+    print('id qx', id(qX))
+    print('id qy', id(qY))
+    return qX, qY
+
+
+def qxqy_array_list_from_detector_list(detector_list: List[DetectorImage], range_factor: float = RANGE_FACTOR, resolution_increase_factor: float = 1) -> List[Tuple[np.ndarray, np.ndarray]]:
+    return [qxqy_array_from_detectorimage(detector_image, range_factor=range_factor, resolution_increase_factor=resolution_increase_factor) for detector_image in detector_list]
 
 def command_factory(nominal_step_size: float, box: Box, particle_index: int, temperature: float, simulation_params: SimulationParams, spherical_particle: bool = False, magnetic_simulation: bool = False) -> commands.AcceptableCommand:
     nominal_angle_change = PI/8
@@ -258,7 +283,7 @@ class DetectorDataConfig:
     def _generate_buffer_array(self, data_frames: dict) -> Union[np.ndarray, float]:
         if not self.buffer_source:
             return 0
-        if self.buffer_source.isnumeric():
+        if is_float(self.buffer_source):
             return float(self.buffer_source)
         return detector_from_dataframe(
             data_source=self.buffer_source,
@@ -297,14 +322,10 @@ class DetectorDataConfig:
 
     @classmethod
     def generate_detectorconfig_list_from_dataframe(cls, dataframe_2: pd.DataFrame) -> List:
-        def get_row_reader(df_row, key, t = float):
-            if df_row not in dataframe_2.columns:
-                return t()
-            val = df_row[key].strip().lower()
-            if not val:
-                return t()
-            return t(val)
-        return [cls.generate_detectorconfig_from_dict(lambda key, t = float : get_row_reader(row, key, t)) for _, row in dataframe_2.iterrows()]
+        '''def get_row_reader(df_row, key, t = float, default_value = None):
+            df_dict = df_row.to_dict()
+            return dict_reader(df_dict, key, t, default_value=default_value)'''
+        return [cls.generate_detectorconfig_from_dict(lambda key, t = float, default_value = None : dict_reader(row.to_dict(), key, t, default_value)) for _, row in dataframe_2.iterrows()]
 
 
 def generate_box_factory(box_template: Tuple[float, float, float],  detector_list: List[DetectorImage]) -> BoxFactory:
@@ -371,7 +392,8 @@ class SimulationConfig:
             particle_volume = np.sum([particle_factory().volume for _ in range(self.particle_number)])
             particle_conc = particle_volume / box_volume
             box_number = int(particle_conc / self.nominal_concentration) + 1
-            particle_number_per_box = int(self.particle_number / box_number)
+            average_particle_volume = particle_volume / self.particle_number
+            particle_number_per_box = int(self.nominal_concentration * box_volume / average_particle_volume)
             return [box_factory(particle_number_per_box, particle_factory) for _ in range(box_number)]
         if not self.particle_number:
             box_volume = box_factory(0, lambda : None).cube.volume
@@ -386,12 +408,11 @@ class SimulationConfig:
         return output_folder / Path(f"{datetime.now().strftime(datetime_format)}_{self.simulation_title}.xlsx")
 
     def generate_scattering_simulation(self, detector_list: List[DetectorImage], box_list: List[Box]) -> ScatteringSimulation:
-        qx, qy = qxqy_array_from_detector_list(detector_list)
+        qxqy_list = qxqy_array_list_from_detector_list(detector_list, range_factor=RANGE_FACTOR)
         fitter = Fitter2D.generate_standard_fitter(
             simulated_detectors=detector_list,
-            box_list=box_list, 
-            qx_array=qx,
-            qy_array=qy,
+            box_list=box_list,
+            qxqy_list=qxqy_list
         ) if self.detector_smearing else Fitter2D.generate_no_smear_fitter(
             simulated_detectors=detector_list,
             box_list=box_list
@@ -461,7 +482,7 @@ class SimulationConfig:
             anneal_fall_rate=dict_reader("anneal_fall_rate"),
             annealing_stop_cycle_number=annealing_stop_cycle_as_read
         )
-        detector_data_configs = [DetectorDataConfig.generate_detectorconfig_from_dict(dict_reader)] if dict_reader("Data Source", str) else DetectorDataConfig.generate_detectorconfig_list_from_dataframe(dataframe_2)
+        detector_data_configs = [DetectorDataConfig.generate_detectorconfig_from_dict(dict_reader)] if dict_reader("Data Source", str, "") else DetectorDataConfig.generate_detectorconfig_list_from_dataframe(dataframe_2)
         return cls(
             simulation_title = dict_reader("simulation_title", str),
             particle_config = ParticleConfig.gen_from_d_reader(dict_reader),

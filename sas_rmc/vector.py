@@ -15,9 +15,14 @@ def cross(a: Tuple, b: Tuple) -> Tuple:
     cz = ax*by-ay*bx
     return cx, cy, cz
 
+def broadcast_array_function(getter_function: Callable[[object], object], output_dtype: Type = np.float64) -> Callable[[np.ndarray],np.ndarray]:
+    numpy_ufunc = np.frompyfunc(getter_function, 1, 1)
+    return lambda arr : numpy_ufunc(arr).astype(output_dtype)
+
 def broadcast_to_numpy_array(object_array: np.ndarray, getter_function: Callable[[object], object], output_dtype: Type = np.float64) -> np.ndarray:
-    pixel_numpy_function = np.frompyfunc(getter_function, 1, 1)
-    return pixel_numpy_function(object_array).astype(output_dtype)
+    array_function = broadcast_array_function(getter_function=getter_function, output_dtype=output_dtype)
+    return array_function(object_array)
+
 
 @dataclass
 class Vector:
@@ -140,7 +145,8 @@ class VectorSpace:
     _vector_elements: np.ndarray
 
     def array_from_elements(self, element_function: Callable[[VectorElement], float], output_type = np.float64):
-        return broadcast_to_numpy_array(self._vector_elements, element_function, output_type=output_type)
+        array_function = broadcast_array_function(element_function, output_dtype=output_type)
+        return array_function(self._vector_elements)
         
     @property
     def position(self) -> np.ndarray:

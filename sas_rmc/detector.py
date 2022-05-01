@@ -1,22 +1,22 @@
 #%%
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Callable, List, Tuple
+from typing import Any, Callable, List, Tuple
 
 import numpy as np
 from matplotlib import pyplot as plt
 import pandas as pd
 
 
-from .array_cache import array_cache
-from .vector import Vector, broadcast_to_numpy_array
+from .array_cache import method_array_cache
+from .vector import Vector, broadcast_array_function
 from .particle import modulus_array 
 
 
 PI = np.pi
 DEFAULT_SLICING_FRACTION_DENOM = 4 # This considers 6.25% of the detector (i.e, 1/4^2) per pixel, which is more than sufficient
 
-#@array_cache
+
 def get_slicing_func_from_gaussian(gaussian: np.ndarray, slicing_range: int = 0) -> Callable[[np.ndarray], np.ndarray]:
     arg_of_max = np.where(gaussian == np.amax(gaussian)) # I really don't understand this line of code but apparently it works
     slicing_range_use = slicing_range if slicing_range else int(np.max(gaussian.shape) / DEFAULT_SLICING_FRACTION_DENOM) 
@@ -76,11 +76,11 @@ class DetectorPixel:
 
         return gaussian / np.sum(gaussian)
 
-    @array_cache
+    @method_array_cache
     def precompute_pixel_smearer(self, qx_array: np.ndarray, qy_array: np.ndarray, slicing_range: int = 0) -> Callable[[np.ndarray], float]:
         resolution_function = self._resolution_function_calculator(qx_array, qy_array)
         slicing_func = get_slicing_func_from_gaussian(resolution_function, slicing_range=slicing_range)
-        resolution_subset = slicing_func(resolution_function) # Leave this in the scope
+        resolution_subset = slicing_func(resolution_function) / np.sum(slicing_func(resolution_function)) # Leave this in the scope
         return lambda simulated_intensity : np.sum(resolution_subset * slicing_func(simulated_intensity))
 
     def smear_pixel(self, simulated_intensity_array: np.ndarray, qx_array: np.ndarray, qy_array: np.ndarray, shadow_is_zero: bool = True, slicing_range: int = 0) -> None:
@@ -140,15 +140,19 @@ class DetectorImage:
     _detector_pixels: np.ndarray
     polarization: Polarization = Polarization.UNPOLARIZED
 
+    def array_from_pixels(self, pixel_func: Callable[[DetectorPixel], Any], output_dtype = np.float64) -> np.ndarray:
+        broadcast_function = broadcast_array_function(pixel_func, output_dtype=output_dtype)
+        return broadcast_function(self._detector_pixels)
+
     @property
     def qX(self) -> np.ndarray:
         get_qxi = lambda pixel: pixel.qX
-        return broadcast_to_numpy_array(self._detector_pixels, get_qxi)
+        return self.array_from_pixels(get_qxi)
 
     @property
     def qY(self) -> np.ndarray:
         get_qyi = lambda pixel: pixel.qY
-        return broadcast_to_numpy_array(self._detector_pixels, get_qyi)
+        return self.array_from_pixels(get_qyi)
 
     @property
     def q(self) -> np.ndarray:
@@ -157,7 +161,7 @@ class DetectorImage:
     @property
     def intensity(self) -> np.ndarray:
         get_intensity = lambda pixel: pixel.intensity
-        return broadcast_to_numpy_array(self._detector_pixels, get_intensity)
+        return self.array_from_pixels(get_intensity)
 
     @intensity.setter
     def intensity(self, new_intensity: np.ndarray) -> None:
@@ -169,28 +173,27 @@ class DetectorImage:
     @property
     def intensity_err(self) -> np.ndarray:
         get_intensity_err = lambda pixel: pixel.intensity_err
-        return broadcast_to_numpy_array(self._detector_pixels, get_intensity_err)
+        return self.array_from_pixels(get_intensity_err)
 
     @property
     def qZ(self) -> np.ndarray:
         get_qzi = lambda pixel: pixel.qZ
-        return broadcast_to_numpy_array(self._detector_pixels, get_qzi)
+        return self.array_from_pixels(get_qzi)
 
     @property
     def sigma_para(self) -> np.ndarray:
         get_sigma_para = lambda pixel: pixel.sigma_para
-        return broadcast_to_numpy_array(self._detector_pixels, get_sigma_para)
+        return self.array_from_pixels(get_sigma_para)
 
     @property
     def sigma_perp(self) -> np.ndarray:
         get_sigma_perp = lambda pixel: pixel.sigma_perp
-        return broadcast_to_numpy_array(self._detector_pixels, get_sigma_perp)
+        return self.array_from_pixels(get_sigma_perp)
 
     @property
     def shadow_factor(self) -> np.ndarray:
         get_shadow_factor = lambda pixel: pixel.shadow_factor
-        shadow_factor_function = np.frompyfunc(get_shadow_factor, 1, 1)
-        return shadow_factor_function(self._detector_pixels).astype(bool)
+        return self.array_from_pixels(get_shadow_factor, output_dtype=bool)
 
     @property
     def qx_delta(self) -> float:
@@ -298,15 +301,19 @@ class DetectorImage:
         all_data = np.genfromtxt(file_location, skip_header = skip_header)
         rows, cols = all_data.shape
         fil_all_data = lambda column_index: np.zeros(rows) if column_index >= cols else all_data[:, column_index]
+        intensity_col = all_data[:, 2]
+        shadow_factor = fil_all_data(7)
+        if not np.sum(shadow_factor**2):
+            shadow_factor = intensity_col != 0
         data_dict = {
             'qX' : all_data[:, 1] if transpose else all_data[:, 0],
             'qY' : all_data[:, 0] if transpose else all_data[:, 1],
-            'intensity' : all_data[:, 2],
+            'intensity' : intensity_col,
             'intensity_error' : fil_all_data(3),
             'qZ' : fil_all_data(4),
             'sigma_para' : fil_all_data(5),
             'sigma_perp' : fil_all_data(6),
-            'shadow_factor' : fil_all_data(7)
+            'shadow_factor' : shadow_factor
         }
         return cls.gen_from_data(data_dict=data_dict, detector_config=detector_config)
 
@@ -329,6 +336,8 @@ class DetectorImage:
         all_sigma_para = filter_optional_column('sigma_para')
         all_sigma_perp = filter_optional_column('sigma_perp')
         all_shadow_factor = filter_optional_column('shadow_factor')
+        if not np.sum(all_shadow_factor**2):
+            all_shadow_factor = all_intensity != 0
         data_dict = {
             'qX' : all_qx,
             'qY' : all_qy,
@@ -353,8 +362,8 @@ class SimulatedDetectorImage(DetectorImage):
 
     @property
     def simulated_intensity(self) -> np.ndarray:
-        get_simulated_intensity = lambda pixel: pixel.simulated_intensity
-        return broadcast_to_numpy_array(self._detector_pixels, get_simulated_intensity)
+        get_simulated_intensity =  lambda pixel: pixel.simulated_intensity
+        return self.array_from_pixels(get_simulated_intensity)
 
     @simulated_intensity.setter
     def simulated_intensity(self, new_simulated_intensity: np.ndarray) -> None:
@@ -366,14 +375,13 @@ class SimulatedDetectorImage(DetectorImage):
     @property
     def simulated_intensity_err(self) -> np.ndarray:
         get_simulated_intensity_err = lambda pixel: pixel.simulated_intensity_err
-        return broadcast_to_numpy_array(self._detector_pixels, get_simulated_intensity_err)
+        return self.array_from_pixels(get_simulated_intensity_err)
 
     def smear(self, intensity: np.ndarray, qx_array: np.ndarray, qy_array: np.ndarray, shadow_is_zero: bool = True) -> np.ndarray:
-        def smear_pixel(pixel: DetectorPixel) -> None:
+        def smear_pixel(pixel: DetectorPixel) -> float:
             pixel.smear_pixel(intensity, qx_array, qy_array, shadow_is_zero)
-        smeared_intensity = np.frompyfunc(smear_pixel, 1, 0)
-        smeared_intensity(self._detector_pixels)
-        return self.simulated_intensity
+            return pixel.simulated_intensity
+        return self.array_from_pixels(smear_pixel)
 
     def plot_intensity(self, mode: int = 2, log_intensity: bool = True, show_crosshair: bool = True, levels: int = 30, cmap: str = 'jet'):
         intensity_matrix = {

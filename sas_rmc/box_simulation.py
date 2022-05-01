@@ -63,11 +63,11 @@ class Box:
         particle = self.particles[i]
         position = self.cube.random_position_inside()
         if in_plane:
-            particle.position = Vector(position.x, position.y, z = 0)
-            particle.orientation = Vector.random_vector_xy()
+            particle.set_position(Vector(position.x, position.y, z = 0))
+            particle.set_orientation(Vector.random_vector_xy())
         else:
-            particle.position = position
-            particle.orientation = Vector.random_vector()
+            particle.set_position(position)
+            particle.set_orientation(Vector.random_vector())
 
     def _force_particle_inside_box(self, i, half_test = False, in_plane = False) -> None:
         for _ in range(100000):

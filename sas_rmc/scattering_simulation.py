@@ -2,14 +2,14 @@
 
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Callable, List, Protocol
-from abc import ABC, abstractmethod
+from typing import Callable, List, Protocol, Tuple
 
 import numpy as np
 
 from .box_simulation import Box
-from .detector import DetectorImage, SimulatedDetectorImage, Polarization
+from .detector import DetectorImage, SimulatedDetectorImage
 from .form_calculator import box_intensity_average
+
 
 
 @dataclass
@@ -20,8 +20,18 @@ class SimulationParams:
     def get_physical_acceptance(self):
         return self.rescale_factor > 0 and self.magnetic_rescale > 0
 
+IntensityCalculator = Callable[[SimulationParams], Tuple[np.ndarray, np.ndarray, np.ndarray]]
 
-@dataclass
+def create_intensity_calculator(box_list: List[Box], qx_array, qy_array, detector_image: DetectorImage) -> IntensityCalculator:
+    def intensity_calculator(simulation_params: SimulationParams):
+        rescale_factor = simulation_params.rescale_factor
+        magnetic_rescale = simulation_params.magnetic_rescale
+        polarization = detector_image.polarization
+        intensity = box_intensity_average(box_list, qx_array, qy_array, rescale_factor=rescale_factor, magnetic_rescale=magnetic_rescale, polarization=polarization)
+        return intensity, qx_array, qy_array
+    return intensity_calculator
+
+'''@dataclass
 class IntensityCalculator(ABC):
     qx_array: np.ndarray
     qy_array: np.ndarray
@@ -29,14 +39,14 @@ class IntensityCalculator(ABC):
     @abstractmethod
     def calculate_intensity(self, simulation_params: SimulationParams, detector_image: DetectorImage = None)  -> np.ndarray:
         pass
+'''
 
-
-class SmearingMode(Enum):
+'''class SmearingMode(Enum):
     SMEAR = auto()
-    NOSMEAR = auto()
+    NOSMEAR = auto()'''
 
 
-@dataclass
+'''@dataclass
 class BoxIntensityCalculator(IntensityCalculator):
     box_list: List[Box]
     smearing_mode: SmearingMode = SmearingMode.SMEAR
@@ -74,7 +84,7 @@ class BoxIntensityCalculator(IntensityCalculator):
             rescale_factor=simulation_params.rescale_factor,
             magnetic_rescale=simulation_params.magnetic_rescale,
             detector_image=detector_image,
-        )
+        )'''
 
 
 class Fitter(Protocol):
@@ -133,19 +143,19 @@ chi_squared_fit_with_default_uncertainty = lambda experimental_detector, smeared
 @dataclass
 class Fitter2D:
     simulated_detectors: List[DetectorImage]
-    intensity_calculator: IntensityCalculator
+    intensity_calculators: List[IntensityCalculator]
     smear: Callable[[np.ndarray, np.ndarray, np.ndarray, DetectorImage], SimulatedDetectorImage]
     fit_detector: Callable[[DetectorImage, SimulatedDetectorImage], float]
 
-    def _smeared_intensity(self, simulation_params: SimulationParams, detector_image: DetectorImage) -> SimulatedDetectorImage:
-        simulated_intensity = self.intensity_calculator.calculate_intensity(simulation_params, detector_image)
-        qx_array, qy_array = self.intensity_calculator.qx_array, self.intensity_calculator.qy_array
+    def _smeared_intensity(self, simulation_params: SimulationParams, detector_image: DetectorImage, intensity_calculator: IntensityCalculator) -> SimulatedDetectorImage:
+        simulated_intensity, qx_array, qy_array = intensity_calculator(simulation_params)
         return self.smear(simulated_intensity, qx_array, qy_array, detector_image)
         
-    def _fit_detector_template(self, simulation_params: SimulationParams, detector_image: DetectorImage) -> float:
+    def _fit_detector_template(self, simulation_params: SimulationParams, detector_image: DetectorImage, intensity_calculator: IntensityCalculator) -> float:
         smeared_intensity = self._smeared_intensity(
             simulation_params=simulation_params,
-            detector_image=detector_image
+            detector_image=detector_image,
+            intensity_calculator=intensity_calculator
         )
         return self.fit_detector(detector_image, smeared_intensity)
 
@@ -153,33 +163,26 @@ class Fitter2D:
         return np.average(
             [self._fit_detector_template(
                 simulation_params = simulation_params, 
-                detector_image = simulated_detector) for simulated_detector in self.simulated_detectors]
+                detector_image = simulated_detector,
+                intensity_calculator=intensity_calculator) for simulated_detector, intensity_calculator in zip(self.simulated_detectors, self.intensity_calculators)]
         )
 
     @classmethod
-    def generate_standard_fitter(cls, simulated_detectors: List[DetectorImage], box_list: List[Box], qx_array: np.ndarray, qy_array: np.ndarray):
+    def generate_standard_fitter(cls, simulated_detectors: List[DetectorImage], box_list: List[Box], qxqy_list: List[Tuple[np.ndarray, np.ndarray]]):
+        intensity_calculators = [create_intensity_calculator(box_list, qx, qy, detector_image) for (qx, qy), detector_image in zip(qxqy_list, simulated_detectors)]
         return cls(
             simulated_detectors=simulated_detectors,
-            intensity_calculator=BoxIntensityCalculator(
-                qx_array=qx_array,
-                qy_array=qy_array,
-                box_list=box_list
-            ),
+            intensity_calculators=intensity_calculators,
             smear=detector_smearer,
             fit_detector=chi_squared_fit_with_default_uncertainty
         )
 
     @classmethod
     def generate_no_smear_fitter(cls, simulated_detectors: List[DetectorImage], box_list: List[Box]):
-        qx, qy = simulated_detectors[0].qX, simulated_detectors[0].qY # these are actually never used in no smear mode
-        return Fitter2D(
+        intensity_calculators = [create_intensity_calculator(box_list, detector_image.qX, detector_image.qY, detector_image) for detector_image in simulated_detectors]
+        return cls(
             simulated_detectors=simulated_detectors,
-            intensity_calculator=BoxIntensityCalculator(
-                qx_array=qx,
-                qy_array=qy,
-                box_list=box_list,
-                smearing_mode=SmearingMode.NOSMEAR
-            ),
+            intensity_calculator=intensity_calculators,
             smear=no_smearer,
             fit_detector=chi_squared_fit_with_default_uncertainty
         )

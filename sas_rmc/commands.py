@@ -87,16 +87,7 @@ class ParticleCommand(Command):
 
     def physical_acceptance_weak(self) -> bool:
         return not self.box.wall_or_particle_collision(self.particle_index)
-        
-        
-def set_particle_position(particle: Particle, position: Vector) -> None:
-    particle.position = position
 
-def set_particle_orientation(particle: Particle, orientation: Vector) -> None:
-    particle.orientation = orientation
-
-def set_particle_magnetization(particle: Particle, magnetization: Vector) -> None:
-    particle.magnetization = magnetization
 
 def check_and_set(attr_getter: Callable[[None], object], attr_setter: Callable[[object], None], value: object) -> None:
     if attr_getter() != value:
@@ -113,9 +104,9 @@ class SetParticleState(ParticleCommand):
         particle = self.particle
         getters = [lambda : particle.position, lambda : particle.orientation, lambda : particle.magnetization]
         setters = [
-            lambda position : set_particle_position(particle, position), 
-            lambda orientation : set_particle_orientation(particle, orientation), 
-            lambda magnetization : set_particle_magnetization(particle, magnetization)
+            lambda position : particle.set_position(position), 
+            lambda orientation : particle.set_orientation(orientation), 
+            lambda magnetization : particle.set_magnetization(magnetization)
             ]
         values = [self.position, self.orientation, self.magnetization]
         for getter, setter, value in zip(getters, setters, values):
@@ -141,10 +132,9 @@ class MoveParticleTo(ParticleCommand):
         particle = self.particle
         check_and_set(
             lambda : particle.position,
-            lambda position : set_particle_position(particle, position),
+            lambda position : particle.set_position(position),
             self.position_new)
         
-
 
 @dataclass
 class MoveParticleBy(ParticleCommand):
@@ -199,7 +189,7 @@ class ReorientateParticle(ParticleCommand):
         particle = self.particle
         check_and_set(
             lambda : particle.orientation,
-            lambda orientation : set_particle_orientation(particle, orientation),
+            lambda orientation : particle.set_orientation(orientation),
             self.orientation_new)
         
 
@@ -220,7 +210,7 @@ class MagnetizeParticle(ParticleCommand):
         particle = self.particle
         check_and_set(
             lambda : particle.magnetization,
-            lambda magnetization : set_particle_magnetization(particle, magnetization),
+            lambda magnetization : particle.set_magnetization(magnetization),
             self.magnetization)
 
 

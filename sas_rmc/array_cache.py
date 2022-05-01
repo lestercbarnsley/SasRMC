@@ -8,9 +8,10 @@ import numpy as np
 
 from .vector import Vector
 
-MAX_SIZE = 5
+CLASS_MAX_SIZE = 18
+MAX_SIZE = 50
 
-immutable_types = (str, float, int, Enum)
+immutable_types = (str, float, int, Enum, np.float64)
 
 def round_vector(vector: Vector) -> Tuple[int, int, int]:
     round_vector_comp = lambda comp: int(comp * (2**20))
@@ -24,10 +25,27 @@ def pass_arg(arg):
     if isinstance(arg, Vector):
         return round_vector(arg)
     if isinstance(arg, list):
-        return tuple((pass_arg(a) for a in arg))
+        return tuple((pass_arg(a) for a in arg)) # I finally found a use case for recursion
     return id(arg)
 
 def array_cache(func, max_size: int = MAX_SIZE):
+    cache = {}
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        kwarg_tuple = tuple((k, pass_arg(v)) for k, v in kwargs.items())
+        argument_tuple = tuple(pass_arg(arg) for arg in args) + kwarg_tuple
+        if argument_tuple not in cache:
+            if len(cache) >= max_size:
+                keys = list(cache.keys())
+                [cache.pop(key) for key in keys[:-int(MAX_SIZE / 2)]]
+            result = func(*args, **kwargs)
+            cache[argument_tuple] = result
+        return cache[argument_tuple]
+      
+    return wrapper
+
+def method_array_cache(func, max_size: int = CLASS_MAX_SIZE):
     cache = {}
 
     @wraps(func)

@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import constants
 
-from .array_cache import array_cache, round_vector
+from .array_cache import method_array_cache, round_vector
 from .vector import Vector, VectorElement, VectorSpace
 from .shapes import Shape, Sphere, Cylinder
 
@@ -71,9 +71,8 @@ class Particle(ABC):
             return True
         return False
 
-    @position.setter
-    def position(self, position_new):
-        position_delta = position_new - self.position
+    def set_position(self, position: Vector) -> None:
+        position_delta = position - self.position
         for shape in self.shapes:
             shape.central_position = shape.central_position + position_delta
 
@@ -81,19 +80,17 @@ class Particle(ABC):
     def orientation(self) -> Vector:
         return self.shapes[0].orientation
 
-    @orientation.setter
-    def orientation(self, orientaton_new):
+    def set_orientation(self, orientation: Vector) -> None:
         if not self.is_spherical(): # Don't allow orientation changes to a spherical particle
             for shape in self.shapes:
-                shape.orientation = orientaton_new
+                shape.orientation = orientation
 
     @property
     def magnetization(self) -> Vector:
         return self._magnetization
 
-    @magnetization.setter
-    def magnetization(self, magnetization_new: Vector):
-        self._magnetization = magnetization_new
+    def set_magnetization(self, magnetization: Vector) -> None:
+        self._magnetization = magnetization
 
     def is_inside(self, position: Vector) -> bool:
         return any(
@@ -115,14 +112,14 @@ class Particle(ABC):
     def _form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector) -> np.ndarray:
         pass
 
-    @array_cache
+    @method_array_cache
     def form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector) -> np.ndarray:
         return self._form_array(qx_array, qy_array, orientation)
         # form_array_calculator = lambda : self._form_array_calculator(qx_array, qy_array)
         # arr_tuple = (id(qx_array), id(qy_array)) + round_vector(self.orientation)
         # return self.form_cache.form_array(arr_tuple, form_arr_calculator_func=form_array_calculator)
 
-    @array_cache
+    @method_array_cache
     def modulated_form_array(self, qx_array, qy_array, position: Vector, orientation: Vector) -> np.ndarray:
         return self.form_array(qx_array, qy_array, orientation) * np.exp(1j * (qx_array * position.x + qy_array * position.y))
         # def modulated_form_array_calc() -> np.ndarray:
@@ -134,14 +131,14 @@ class Particle(ABC):
     def _magnetic_form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector, magnetization: Vector) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         pass
     
-    @array_cache
+    @method_array_cache
     def magnetic_form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector, magnetization: Vector)-> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         return self._magnetic_form_array(qx_array, qy_array, orientation, magnetization)
         # magnetic_array_calculator = lambda : self._magnetic_array_calculator(qx_array, qy_array)
         # arr_tuple = (id(qx_array), id(qy_array)) + round_vector(self.orientation) + round_vector(self.magnetization)
         # return self.form_cache.magnetic_form_array(arr_tuple, magnetic_arr_calculator_func=magnetic_array_calculator)
     
-    @array_cache
+    @method_array_cache
     def magnetic_modulated_array(self, qx_array, qy_array, position: Vector, orientation: Vector, magnetization: Vector) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         modulated_array = np.exp(1j * (qx_array * position.x + qy_array * position.y))
         return [fm * modulated_array for fm in self.magnetic_form_array(qx_array, qy_array, orientation, magnetization)]
@@ -197,10 +194,12 @@ class CoreShellParticle(Particle):
     def position(self) -> Vector:
         return super().position
 
-    @position.setter
-    def position(self, new_vector: Vector) -> None:
+    def set_position(self, position: Vector) -> None:
         for shape in self.shapes:
-            shape.central_position = new_vector
+            shape.central_position = position
+
+    def set_orientation(self, orientation: Vector) -> None:
+        return super().set_orientation(self.orientation) # This will block changes to orientation
 
     def _form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector) -> np.ndarray:
         core_sphere = self.shapes[0]
@@ -278,22 +277,20 @@ class Dumbbell(Particle):
     def position(self) -> Vector:
         return self.particle_1.position
 
-    @position.setter
-    def position(self, new_vector: Vector) -> None:
-        delta_position = new_vector - self.position
-        self.particle_1.position = self.particle_1.position + delta_position
-        self.particle_2.position = self.particle_2.position + delta_position
+    def set_position(self, position: Vector) -> None:
+        delta_position = position - self.position
+        self.particle_1.set_position(self.particle_1.position + delta_position)
+        self.particle_2.set_position(self.particle_2.position + delta_position)
 
     @property
     def orientation(self) -> Vector:
         return (self.particle_2.position - self.particle_1.position).unit_vector
 
-    @orientation.setter
-    def orientation(self, new_vector: Vector) -> Vector:
-        orientation_new = new_vector.unit_vector
+    def set_orientation(self, orientation: Vector) -> None:
+        orientation_new = orientation.unit_vector
         outer_radius = lambda particle : particle.shapes[1].radius
         distance = outer_radius(self.particle_1) + outer_radius(self.particle_2)
-        self.particle_2.position = self.particle_1.position + distance * orientation_new
+        self.particle_2.set_position(self.particle_1.position + distance * orientation_new)
 
     @property
     def magnetization(self) -> Vector:
@@ -307,23 +304,21 @@ class Dumbbell(Particle):
         mag_2 = self.particle_2.magnetization
         return mag_2 if mag_1.mag > mag_2.mag else mag_1
 
-    @magnetization.setter
-    def magnetization(self, magnetization_new):
+    def set_magnetization(self, magnetization: Vector) -> None:
         mag_1 = self.particle_1.magnetization
         mag_2 = self.particle_2.magnetization
         if mag_1.mag > mag_2.mag:
-            self.particle_1.magnetization = magnetization_new
+            self.particle_1.set_magnetization(magnetization)
         else:
-            self.particle_2.magnetization = magnetization_new
+            self.particle_2.set_magnetization(magnetization)
 
-    @magnetization_minor.setter
-    def magnetization_minor(self, magnetization_new):
+    def set_magnetization_minor(self, magnetization_minor: Vector) -> None:
         mag_1 = self.particle_1.magnetization
         mag_2 = self.particle_2.magnetization
         if mag_1.mag > mag_2.mag:
-            self.particle_2.magnetization = magnetization_new
+            self.particle_2.set_magnetization(magnetization_minor)
         else:
-            self.particle_1.magnetization = magnetization_new
+            self.particle_1.set_magnetization(magnetization_minor)
 
     def is_inside(self, position: Vector) -> bool:
         return any(
@@ -347,7 +342,7 @@ class Dumbbell(Particle):
         form_2 = self.particle_2.form_array(qx_array, qy_array, orientation=self.particle_2.orientation)
         return form_1 + form_2
 
-    @array_cache
+    @method_array_cache
     def modulated_form_array(self, qx_array, qy_array, position: Vector, orientation: Vector) -> np.ndarray:
         form_1 = self.particle_1.modulated_form_array(qx_array, qy_array, position=self.particle_1.position, orientation=self.particle_1.orientation)
         form_2 = self.particle_2.modulated_form_array(qx_array, qy_array, position=self.particle_2.position, orientation=self.particle_2.orientation)
@@ -359,7 +354,7 @@ class Dumbbell(Particle):
         magnetic_2 = self.particle_2.magnetic_form_array(qx_array, qy_array, orientation=self.particle_2.orientation, magnetization=self.particle_2.magnetization)
         return [m1 + m2 for m1, m2 in zip(magnetic_1, magnetic_2)]
 
-    @array_cache
+    @method_array_cache
     def magnetic_modulated_array(self, qx_array, qy_array, position: Vector, orientation: Vector, magnetization: Vector) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         magnetic_1 = self.particle_1.magnetic_modulated_array(qx_array, qy_array, position=self.particle_1.position, orientation=self.particle_1.orientation, magnetization=self.particle_1.magnetization)
         magnetic_2 = self.particle_2.magnetic_modulated_array(qx_array, qy_array, position=self.particle_2.position, orientation=self.particle_2.orientation, magnetization=self.particle_2.magnetization)

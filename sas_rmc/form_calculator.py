@@ -14,7 +14,6 @@ PI = np.pi
 
 mod = lambda arr: np.real(arr * np.conj(arr))
 
-#form_result_adder = lambda form_results, getter_fn, rescale = 1: np.sqrt(rescale) * np.sum([getter_fn(form_result) for form_result in form_results], axis = 0)
 
 @array_cache
 def sum_array_list(array_list: List[np.ndarray]) -> np.ndarray:
