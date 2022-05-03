@@ -38,7 +38,7 @@ def array_cache(func, max_size: int = MAX_SIZE):
         if argument_tuple not in cache:
             if len(cache) >= max_size:
                 keys = list(cache.keys())
-                [cache.pop(key) for key in keys[:-int(MAX_SIZE / 2)]]
+                [cache.pop(key) for key in keys[:-int(max_size / 2)]]
             result = func(*args, **kwargs)
             cache[argument_tuple] = result
         return cache[argument_tuple]

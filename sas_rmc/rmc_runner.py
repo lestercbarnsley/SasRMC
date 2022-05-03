@@ -60,5 +60,8 @@ class RmcRunner: # Not a dataclass
             logger.watch_simulation(self.simulator)
 
 
+def load_config(config_file: str) -> RmcRunner:
+    return RmcRunner(config_file)
+
 if __name__ == "__main__":
     pass

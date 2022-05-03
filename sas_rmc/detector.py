@@ -80,8 +80,9 @@ class DetectorPixel:
     def precompute_pixel_smearer(self, qx_array: np.ndarray, qy_array: np.ndarray, slicing_range: int = 0) -> Callable[[np.ndarray], float]:
         resolution_function = self._resolution_function_calculator(qx_array, qy_array)
         slicing_func = get_slicing_func_from_gaussian(resolution_function, slicing_range=slicing_range)
-        resolution_subset = slicing_func(resolution_function) / np.sum(slicing_func(resolution_function)) # Leave this in the scope
-        return lambda simulated_intensity : np.sum(resolution_subset * slicing_func(simulated_intensity))
+        resolution_subset = slicing_func(resolution_function)# Leave this in the scope
+        normalized_resolution_subset = resolution_subset / np.sum(resolution_subset)
+        return lambda simulated_intensity : np.sum(normalized_resolution_subset * slicing_func(simulated_intensity))
 
     def smear_pixel(self, simulated_intensity_array: np.ndarray, qx_array: np.ndarray, qy_array: np.ndarray, shadow_is_zero: bool = True, slicing_range: int = 0) -> None:
         if shadow_is_zero and not self.shadow_factor:
@@ -243,6 +244,7 @@ class DetectorImage:
         sigma_para = get_element('sigma_para') if detector_config is None else detector_config.get_sigma_parallel(qx_i, qy_i)
         sigma_perp = get_element('sigma_perp') if detector_config is None else detector_config.get_sigma_geometric()
         shadow_factor = bool(get_element('shadow_factor', default_v=bool(intensity)))
+        simulated_intensity = get_element('simulated_intensity')
         return DetectorPixel(
             qX=qx_i,
             qY=qy_i,
@@ -251,7 +253,8 @@ class DetectorImage:
             qZ=qZ,
             sigma_para=sigma_para,
             sigma_perp=sigma_perp,
-            shadow_factor=shadow_factor
+            shadow_factor=shadow_factor,
+            simulated_intensity=simulated_intensity,
             )
 
     @classmethod
@@ -283,7 +286,8 @@ class DetectorImage:
                 'qZ': get_item('qZ'),
                 'sigma_para': get_item('sigma_para'),
                 'sigma_perp': get_item('sigma_perp'),
-                'shadow_factor': get_item('shadow_factor')
+                'shadow_factor': get_item('shadow_factor'),
+                'simulated_intensity': get_item('simulated_intensity')
             }
             i = qX_1d.index(qX)
             j = qY_1d.index(qY)
@@ -313,7 +317,9 @@ class DetectorImage:
             'qZ' : fil_all_data(4),
             'sigma_para' : fil_all_data(5),
             'sigma_perp' : fil_all_data(6),
-            'shadow_factor' : shadow_factor
+            'shadow_factor' : shadow_factor,
+            'simulated_intensity' : fil_all_data(8),
+            'simulated_intensity_err' : fil_all_data(9),
         }
         return cls.gen_from_data(data_dict=data_dict, detector_config=detector_config)
 
@@ -336,6 +342,7 @@ class DetectorImage:
         all_sigma_para = filter_optional_column('sigma_para')
         all_sigma_perp = filter_optional_column('sigma_perp')
         all_shadow_factor = filter_optional_column('shadow_factor')
+        all_simulated_intensity = filter_optional_column('simulated_intensity')
         if not np.sum(all_shadow_factor**2):
             all_shadow_factor = all_intensity != 0
         data_dict = {
@@ -346,7 +353,8 @@ class DetectorImage:
             'qZ' : all_qz,
             'sigma_para' : all_sigma_para,
             'sigma_perp' : all_sigma_perp,
-            'shadow_factor' : all_shadow_factor
+            'shadow_factor' : all_shadow_factor,
+            'simulated_intensity' : all_simulated_intensity
         }
         if np.sum(all_sigma_para**2) and np.sum(all_sigma_perp**2):
             return cls.gen_from_data(data_dict = data_dict) # Don't pass the detector config if sigma_para and sigma_perp are present
@@ -391,7 +399,8 @@ class SimulatedDetectorImage(DetectorImage):
         }[mode]
         type(self).plot_intensity_matrix(intensity_matrix, self.qX, self.qY, log_intensity=log_intensity, show_crosshair=show_crosshair, levels = levels, cmap = cmap)
 
-  
+
+
 
 if __name__ == "__main__":
     pass

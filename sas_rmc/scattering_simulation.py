@@ -1,13 +1,12 @@
 #%%
 
 from dataclasses import dataclass, field
-from enum import Enum, auto
 from typing import Callable, List, Protocol, Tuple
 
 import numpy as np
 
 from .box_simulation import Box
-from .detector import DetectorImage, SimulatedDetectorImage
+from .detector import DetectorImage, Polarization, SimulatedDetectorImage
 from .form_calculator import box_intensity_average
 
 
@@ -22,69 +21,15 @@ class SimulationParams:
 
 IntensityCalculator = Callable[[SimulationParams], Tuple[np.ndarray, np.ndarray, np.ndarray]]
 
+def intensity_calculator(box_list: List[Box], qx_array: np.ndarray, qy_array: np.ndarray, simulation_params: SimulationParams, polarization: Polarization) -> np.ndarray:
+    rescale_factor = simulation_params.rescale_factor
+    magnetic_rescale = simulation_params.magnetic_rescale
+    intensity = box_intensity_average(box_list, qx_array, qy_array, rescale_factor=rescale_factor, magnetic_rescale=magnetic_rescale, polarization=polarization)
+    return intensity
+
 def create_intensity_calculator(box_list: List[Box], qx_array, qy_array, detector_image: DetectorImage) -> IntensityCalculator:
-    def intensity_calculator(simulation_params: SimulationParams):
-        rescale_factor = simulation_params.rescale_factor
-        magnetic_rescale = simulation_params.magnetic_rescale
-        polarization = detector_image.polarization
-        intensity = box_intensity_average(box_list, qx_array, qy_array, rescale_factor=rescale_factor, magnetic_rescale=magnetic_rescale, polarization=polarization)
-        return intensity, qx_array, qy_array
-    return intensity_calculator
-
-'''@dataclass
-class IntensityCalculator(ABC):
-    qx_array: np.ndarray
-    qy_array: np.ndarray
-
-    @abstractmethod
-    def calculate_intensity(self, simulation_params: SimulationParams, detector_image: DetectorImage = None)  -> np.ndarray:
-        pass
-'''
-
-'''class SmearingMode(Enum):
-    SMEAR = auto()
-    NOSMEAR = auto()'''
-
-
-'''@dataclass
-class BoxIntensityCalculator(IntensityCalculator):
-    box_list: List[Box]
-    smearing_mode: SmearingMode = SmearingMode.SMEAR
-
-    def _intensity_with_smear(self, rescale_factor: float = 1, magnetic_rescale: float = 1, detector_image: DetectorImage = None) -> np.ndarray:
-        polarization = Polarization.UNPOLARIZED if detector_image is None else detector_image.polarization
-        intensity = box_intensity_average(
-            self.box_list,
-            self.qx_array,
-            self.qy_array,
-            rescale_factor=rescale_factor,
-            magnetic_rescale=magnetic_rescale,
-            polarization=polarization
-        )
-        return intensity
-
-    def _intensity_no_smear(self, rescale_factor: float = 1, magnetic_rescale: float = 1, detector_image: DetectorImage = None) -> np.ndarray:
-        qx, qy, polarization = (self.qx_array, self.qy_array, Polarization.UNPOLARIZED) if detector_image is None else (detector_image.qX, detector_image.qY, detector_image.polarization)
-        intensity = box_intensity_average(
-            self.box_list,
-            qx,
-            qy,
-            rescale_factor=rescale_factor,
-            magnetic_rescale=magnetic_rescale,
-            polarization=polarization
-        )
-        return intensity
-
-    def calculate_intensity(self, simulation_params: SimulationParams, detector_image: DetectorImage = None) -> np.ndarray:
-        intensity_method = {
-            SmearingMode.SMEAR : self._intensity_with_smear,
-            SmearingMode.NOSMEAR : self._intensity_no_smear
-        }[self.smearing_mode]
-        return intensity_method(
-            rescale_factor=simulation_params.rescale_factor,
-            magnetic_rescale=simulation_params.magnetic_rescale,
-            detector_image=detector_image,
-        )'''
+    polarization = detector_image.polarization
+    return lambda simulation_params : (intensity_calculator(box_list, qx_array, qy_array, simulation_params, polarization), qx_array, qy_array)
 
 
 class Fitter(Protocol):
