@@ -1,14 +1,22 @@
 #%%
-from typing import Tuple
+from pathlib import Path
+from typing import List, Tuple
 
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy import interpolate, optimize
+import pandas as pd
 
 import sas_rmc
 
 from sas_rmc import DetectorImage, Vector, VectorSpace, SimulatedDetectorImage, DetectorConfig, Polarization
-from sas_rmc.particle import CoreShellParticle, NumericalParticle, NumericalParticleCustom
+from sas_rmc.box_simulation import Box
+from sas_rmc.form_calculator import box_intensity_average
+from sas_rmc.particle import CoreShellParticle, NumericalParticle, NumericalParticleCustom, Particle
+from sas_rmc.scattering_simulation import SimulationParams
+from sas_rmc.shapes import Cube
+from sas_rmc.simulator_factory import is_float, subtract_buffer_intensity
+from sas_rmc.scattering_simulation import detector_smearer
 
 
 
@@ -628,7 +636,7 @@ def angle_subfigure(ax, detector_up: SimulatedDetectorImage, detector_down:Simul
         ax.plot(angles, i_v_alpha, ['r-', 'b-', 'g-', 'k-'][i])
 
     ax.set_xlabel(r'Angle (rad)',fontsize =  FONT_SIZE)#'x-large')
-    ax.set_ylabel(r'Intensity (cm$^{-1}$)',fontsize =  FONT_SIZE)#'x-large')
+    ax.set_ylabel(r'I$_{\uparrow}-$I$_{\downarrow}$ (cm$^{-1}$)',fontsize =  FONT_SIZE)#'x-large')
     ax.set_xticks([-PI, -PI/2, 0, +PI/2, +PI])
     ax.set_xticklabels([r'$-\pi$',r'$-\pi/2$','0', r'$\pi/2$', r'$\pi$'])
     ax.legend(loc = "upper right", fontsize = 'x-small')
@@ -639,12 +647,12 @@ def figure_polarization():
     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
 
     detector_up = SimulatedDetectorImage.gen_from_txt(
-        file_location=r'J:\Uni\Programming\SANS_Numerical_Simulation_v2\Results\Analyzed data\Up_polarized_simulated.txt',
+        file_location=r'J:\Uni\Programming\SANS_Numerical_Simulation_v2\Results\Analyzed data\F20_Up_simulated.txt',
         skip_header=1,
     )
 
     detector_down = SimulatedDetectorImage.gen_from_txt(
-        file_location=r'J:\Uni\Programming\SANS_Numerical_Simulation_v2\Results\Analyzed data\Down_polarized_simulated.txt',
+        file_location=r"J:\Uni\Programming\SANS_Numerical_Simulation_v2\Results\Analyzed data\F20_Down_simulated.txt",
         skip_header=1,
     )
 
@@ -782,13 +790,291 @@ def figure_polarization():
 
     fig_2.tight_layout()
 
+
+def row_to_particle(row: pd.Series) -> Particle:
+    if row['Particle type'] == 'CoreShellParticle':
+        return CoreShellParticle.gen_from_parameters(
+            position=Vector(float(row['Position.X']), float(row['Position.Y']), float(row['Position.Z'])),
+            magnetization=Vector(float(row['Magnetization.X']),float(row['Magnetization.Y']),float(row['Magnetization.Z'])),
+            core_radius=float(row['Core radius']),
+            thickness=float(row['Shell thickness']),
+            core_sld=float(row['Core SLD']),
+            shell_sld=float(row['Shell SLD']),
+            solvent_sld=float(row['Solvent SLD'])
+        )
+    return None
+
+def dataframe_to_particle_list(data_frame: pd.DataFrame) -> List[Particle]:
+    return [row_to_particle(row) for _, row in data_frame.iterrows()]
+
+def box_from_detector(detector_list: DetectorImage, particle_list: List[Particle]) -> Box:
+    dimension_0 = np.max([2 * PI / detector.qx_delta for detector in detector_list])
+    dimension_1 = np.max([2 * PI / detector.qy_delta for detector in detector_list])
+    dimension_2 = dimension_0
+    return Box(
+        particles=particle_list,
+        cube = Cube(
+            dimension_0=dimension_0,
+            dimension_1=dimension_1,
+            dimension_2=dimension_2
+        )
+    )
+
+def read_simulation_output(file_path: Path) -> Tuple[List[DetectorImage], List[Box], SimulationParams]:
+    data_dict = pd.read_excel(
+        file_path,
+        sheet_name=None,
+        keep_default_na=False
+    )
+    detector_list = []
+    for i in range(100_000):
+        key = f'Final detector image {i}'
+        if key not in data_dict:
+            break
+        else:
+            detector_list.append(DetectorImage.gen_from_pandas(
+                dataframe=data_dict[key]))
+    box_list = []
+    for j in range(100_000):
+        key = f'Box {j} Final Particle States'
+        if key not in data_dict:
+            break
+        else:
+            dataframe = data_dict[key]
+            particle_list = dataframe_to_particle_list(dataframe)
+            box_list.append(box_from_detector(detector_list, particle_list))
+    simulation_data = data_dict['Simulation Data']
+    nuclear_rescale, magnetic_rescale = 1,1
+    for _, simulation_row in simulation_data.iterrows():
+        if simulation_row['Acceptable Move'] == 'TRUE' or simulation_row['Acceptable Move'] == True:
+            #print(simulation_row['Acceptable Move'])
+            if is_float(simulation_row['Nuclear rescale']) and float(simulation_row['Nuclear rescale']):
+                nuclear_rescale = float(simulation_row['Nuclear rescale'])
+            if is_float(simulation_row['Magnetic rescale']) and float(simulation_row['Magnetic rescale']):
+                magnetic_rescale = float(simulation_row['Magnetic rescale'])
+    simulation_params = SimulationParams(
+        rescale_factor=nuclear_rescale,
+        magnetic_rescale=magnetic_rescale
+    )
+    print(simulation_params)
+    return detector_list, box_list, simulation_params
+
+def figure_polarization_v2():
+
+    fig, (ax1,ax2,ax3) = plt.subplots(1,3)
+    fig.set_size_inches((3.5 * 3,3 * 1))
+    _, box_list, simulation_params = read_simulation_output(r"J:\Uni\Programming\SasRMC\data\results\20220503204445_this_is_a_test.xlsx")
+    #qx_large, qy_large = np.meshgrid(np.linspace(-0.5, +0.5, 400),np.linspace(-0.5, +0.5, 400))
+    config_20m_down = DetectorConfig(
+        detector_distance_in_m=20,
+        collimation_distance_in_m=20,
+        collimation_aperture_area_in_m2=30e-3*30e-3,
+        sample_aperture_area_in_m2=6e-3*10e-3,
+        detector_pixel_size_in_m=5.6e-3,
+        wavelength_in_angstrom=5,
+        polarization=Polarization.SPIN_DOWN
+    )
+    detector_20_down = SimulatedDetectorImage.gen_from_txt(
+        file_location=r"J:\Uni\Sorted results\User Experiments\p14961 - Nandakumaran\Reduced\Polarized\ASCII-I\I-SM-35808-M3-h-toluene-3000mT-polDown-KWS1.DAT",
+        detector_config=config_20m_down,
+        transpose=True
+    )
+    config_20m_up = DetectorConfig(
+        detector_distance_in_m=20,
+        collimation_distance_in_m=20,
+        collimation_aperture_area_in_m2=30e-3*30e-3,
+        sample_aperture_area_in_m2=6e-3*10e-3,
+        detector_pixel_size_in_m=5.6e-3,
+        wavelength_in_angstrom=5,
+        polarization=Polarization.SPIN_UP
+    )
+    detector_20_up = SimulatedDetectorImage.gen_from_txt(
+        file_location=r"J:\Uni\Sorted results\User Experiments\p14961 - Nandakumaran\Reduced\Polarized\ASCII-I\I-SM-35809-M3-h-toluene-3000mT-polUp-KWS1.DAT",
+        detector_config=config_20m_up,
+        transpose=True
+    )
+    config_8_down = DetectorConfig(
+        detector_distance_in_m=8,
+        collimation_distance_in_m=8,
+        collimation_aperture_area_in_m2=30e-3*30e-3,
+        sample_aperture_area_in_m2=6e-3*10e-3,
+        detector_pixel_size_in_m=5.6e-3,
+        wavelength_in_angstrom=5,
+        polarization=Polarization.SPIN_DOWN
+    )
+    detector_8_down = SimulatedDetectorImage.gen_from_txt(
+        file_location=r"J:\Uni\Sorted results\User Experiments\p14961 - Nandakumaran\Reduced\Polarized\ASCII-I\I-SM-35810-M3-h-toluene-3000mT-polDown-KWS1.DAT",
+        detector_config=config_8_down,
+        transpose=True
+    )
+    config_8_up = DetectorConfig(
+        detector_distance_in_m=8,
+        collimation_distance_in_m=8,
+        collimation_aperture_area_in_m2=30e-3*30e-3,
+        sample_aperture_area_in_m2=6e-3*10e-3,
+        detector_pixel_size_in_m=5.6e-3,
+        wavelength_in_angstrom=5,
+        polarization=Polarization.SPIN_UP
+    )
+    detector_8_up = SimulatedDetectorImage.gen_from_txt(
+        file_location=r"J:\Uni\Sorted results\User Experiments\p14961 - Nandakumaran\Reduced\Polarized\ASCII-I\I-SM-35811-M3-h-toluene-3000mT-polUp-KWS1.DAT",
+        detector_config=config_8_up,
+        transpose=True
+    )
+    config_2_down = DetectorConfig(
+        detector_distance_in_m=1.5,
+        collimation_distance_in_m=8,
+        collimation_aperture_area_in_m2=30e-3*30e-3,
+        sample_aperture_area_in_m2=6e-3*10e-3,
+        detector_pixel_size_in_m=5.6e-3,
+        wavelength_in_angstrom=5,
+        polarization=Polarization.SPIN_DOWN
+    )
+    detector_2_down = SimulatedDetectorImage.gen_from_txt(
+        file_location=r"J:\Uni\Sorted results\User Experiments\p14961 - Nandakumaran\Reduced\Polarized\ASCII-I\I-SM-35812-M3-h-toluene-3000mT-polDown-KWS1.DAT",
+        detector_config=config_2_down,
+        transpose=True
+    )
+    config_2_up = DetectorConfig(
+        detector_distance_in_m=1.5,
+        collimation_distance_in_m=8,
+        collimation_aperture_area_in_m2=30e-3*30e-3,
+        sample_aperture_area_in_m2=6e-3*10e-3,
+        detector_pixel_size_in_m=5.6e-3,
+        wavelength_in_angstrom=5,
+        polarization=Polarization.SPIN_UP
+    )
+    detector_2_up = SimulatedDetectorImage.gen_from_txt(
+        file_location=r"J:\Uni\Sorted results\User Experiments\p14961 - Nandakumaran\Reduced\Polarized\ASCII-I\I-SM-35813-M3-h-toluene-3000mT-polUp-KWS1.DAT",
+        detector_config=config_2_up,
+        transpose=True
+    )
+    toluene_20 = DetectorImage.gen_from_txt(r"J:\Uni\Sorted results\User Experiments\p14961 - Nandakumaran\Reduced\Polarized\ASCII-I\I-SM-35702-h-toluene-pol-KWS1.DAT", transpose=True)
+    toluene_8 = DetectorImage.gen_from_txt(r"J:\Uni\Sorted results\User Experiments\p14961 - Nandakumaran\Reduced\Polarized\ASCII-I\I-SM-35704-h-toluene-pol-KWS1.DAT", transpose=True)
+    toluene_2 = DetectorImage.gen_from_txt(r"J:\Uni\Sorted results\User Experiments\p14961 - Nandakumaran\Reduced\Polarized\ASCII-I\I-SM-35706-h-toluene-pol-KWS1.DAT", transpose=True)
+    subtract_buffer_intensity(detector_20_down, toluene_20)
+    subtract_buffer_intensity(detector_20_up, toluene_20)
+    subtract_buffer_intensity(detector_8_down, toluene_8)
+    subtract_buffer_intensity(detector_8_up, toluene_8)
+    subtract_buffer_intensity(detector_2_down, toluene_2)
+    subtract_buffer_intensity(detector_2_up, toluene_2)
+
+    for detector in [detector_20_down, detector_20_up, detector_8_down, detector_8_up, detector_2_down, detector_2_up]:
+        simulated_intensity = box_intensity_average(box_list, detector.qX, detector.qY, simulation_params.rescale_factor, simulation_params.magnetic_rescale, detector.polarization)
+        simulated_detector = detector_smearer(simulated_intensity, detector.qX, detector.qY, detector)
+        
+    angle_subfigure(ax1, detector_8_up, detector_8_down)
+    ax1.text(0.05, 0.92, r'(a)', color = "black", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=ax1.transAxes)
     
+
+    #for detector_up, detector_down in zip([detector_20_up, detector_8_up,detector_2_up ], [detector_20_down, detector_8_down,detector_2_down]):
+    q, fn, cross, fm = unpol_analysis(
+        detector_20_up,
+        detector_20_down,
+        intensity_getter= lambda d: d.intensity
+    )
+    exp_filter = lambda arr : arr[10:-20:4]
+    ax2.loglog(exp_filter(q), exp_filter(fn), 'b.', label = 'F$_{N}^2$')
+    ax2.loglog(exp_filter(q), exp_filter(cross), 'r.', label = 'F$_{N}$F$_{M}$')
+    ax2.loglog(exp_filter(q), exp_filter(fm), 'g.', label = 'F$_{M}^2$')
+
+    q_sim, fn_sim, cross_sim, fm_sim = unpol_analysis(
+        detector_20_up,
+        detector_20_down,
+        intensity_getter= lambda d: d.simulated_intensity
+    )
+    sim_filter = lambda arr: arr[10:-20]
+    ax2.loglog(sim_filter(q_sim), sim_filter(fn_sim), 'b-')
+    ax2.loglog(sim_filter(q_sim), sim_filter(cross_sim), 'r-')
+    ax2.loglog(sim_filter(q_sim), sim_filter(fm_sim), 'g-')
+    q, fn, cross, fm = unpol_analysis(
+        detector_8_up,
+        detector_8_down,
+        intensity_getter= lambda d: d.intensity
+    )
+    exp_filter = lambda arr : arr[10:-6:4]
+    ax2.loglog(exp_filter(q), exp_filter(fn), 'b.')#, label = 'F$_{N}^2$')
+    ax2.loglog(exp_filter(q), exp_filter(cross), 'r.')#, label = 'F$_{N}$F$_{M}$')
+    ax2.loglog(exp_filter(q), exp_filter(fm), 'g.')#, label = 'F$_{M}^2$')
+
+    q_sim, fn_sim, cross_sim, fm_sim = unpol_analysis(
+        detector_8_up,
+        detector_8_down,
+        intensity_getter= lambda d: d.simulated_intensity
+    )
+    sim_filter = lambda arr: arr[10:-6]
+    ax2.loglog(sim_filter(q_sim), sim_filter(fn_sim), 'b-')
+    ax2.loglog(sim_filter(q_sim), sim_filter(cross_sim), 'r-')
+    ax2.loglog(sim_filter(q_sim), sim_filter(fm_sim), 'g-')
+    q, fn, cross, fm = unpol_analysis(
+        detector_2_up,
+        detector_2_down,
+        intensity_getter= lambda d: d.intensity
+    )
+    exp_filter = lambda arr : arr[10:-15:4]
+    ax2.loglog(exp_filter(q), exp_filter(fn), 'b.')#, label = 'F$_{N}^2$')
+    ax2.loglog(exp_filter(q), exp_filter(cross), 'r.')#, label = 'F$_{N}$F$_{M}$')
+    ax2.loglog(exp_filter(q), exp_filter(fm), 'g.')#, label = 'F$_{M}^2$')
+
+    q_sim, fn_sim, cross_sim, fm_sim = unpol_analysis(
+        detector_2_up,
+        detector_2_down,
+        intensity_getter= lambda d: d.simulated_intensity
+    )
+    sim_filter = lambda arr: arr[10:-15]
+    ax2.loglog(sim_filter(q_sim), sim_filter(fn_sim), 'b-')
+    ax2.loglog(sim_filter(q_sim), sim_filter(cross_sim), 'r-')
+    ax2.loglog(sim_filter(q_sim), sim_filter(fm_sim), 'g-')
+
+    ax2.set_xlabel(r'Q ($\AA^{-1}$)',fontsize =  FONT_SIZE)#'x-large')
+    ax2.set_ylabel(r'Intensity (cm$^{-1}$)',fontsize =  FONT_SIZE)#'x-large')
+    bottom, top = ax2.get_ylim()
+    ax2.set_ylim(bottom, 9 * top)
+
+    ax2.text(0.05, 0.92, r'(b)', color = "black", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=ax2.transAxes)
+    #ax2.text(0.05, 0.92, r'(b)', color = "red", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=ax2.transAxes)
+    ax2.legend(loc = "lower left", fontsize = 'small')
+
+    get_from_box_list = lambda getter_fn: np.array([getter_fn(particle) for particle in box_list[0].particles])
+    pos_x = get_from_box_list(lambda particle: particle.position.x)
+    pos_y = get_from_box_list(lambda particle: particle.position.y)
+    mag_x = get_from_box_list(lambda particle: particle.magnetization.x)
+    mag_y = get_from_box_list(lambda particle: particle.magnetization.y)
+    radius = get_from_box_list(lambda particle: particle.shapes[1].radius)
+
+   
+
+    #pos_x, pos_y, mag_x, mag_y, radius = [particle.position.x, particle.po for particle in box_list[0].particles]magnetic_particle_configs[:,2], magnetic_particle_configs[:,3], magnetic_particle_configs[:,8], magnetic_particle_configs[:,9], magnetic_particle_configs[:,11]
+    a_x, a_y = radius* mag_x / np.sqrt(mag_x**2 + mag_y**2), radius* mag_y / np.sqrt(mag_x**2 + mag_y**2)
+    ax3.scatter(pos_x / 10, pos_y / 10, s = 2 * (radius/10)**1, facecolors='none', edgecolors='b')
+    ARROW_MAGNIFIER = 3
+    for x, y, dx, dy in zip(pos_x, pos_y, a_x, a_y):
+        ax3.arrow(x/10, y/10,ARROW_MAGNIFIER * dx/10,ARROW_MAGNIFIER* dy/10,
+        color= 'r', width = 3,head_width = 5 * 3)
+
+    ax3.set_xlabel(r'X (nm)',fontsize =  FONT_SIZE)#'x-large')
+    ax3.set_ylabel(r'Y (nm)',fontsize =  FONT_SIZE)#'x-large')
+    
+    left, right = ax3.get_xlim()
+    bottom, top = ax3.get_xlim()
+
+    new_lims = -550, +550#np.min([left, down]), np.max([up, right])
+
+    ax3.set_xlim(new_lims[0], new_lims[1])
+    ax3.set_ylim(new_lims[0], new_lims[1])
+    ax3.text(0.05, 0.92, r'(c)', color = "black", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=ax3.transAxes)
+    
+    ax3.set_box_aspect(1)
+
+    fig.tight_layout()
+
 
 def main():
     figure_form_factors()
     figure_particle_maps()
     figure_algorithm_performance()
     figure_polarization()
+    figure_polarization_v2()
 
 if __name__ == "__main__":
     main()

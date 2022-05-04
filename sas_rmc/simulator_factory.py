@@ -264,6 +264,14 @@ def detector_from_dataframe(data_source: str, data_frames: dict, detector_config
         return detector
     raise Exception(f"Detector named {data_source} could not be found")
 
+def subtract_buffer_intensity(detector: DetectorImage, buffer: Union[float, DetectorImage]) -> DetectorImage:
+    if isinstance(buffer, DetectorImage):
+        detector.intensity = detector.intensity - buffer.intensity
+        detector.intensity_err = np.sqrt(detector.intensity_err**2 + buffer.intensity_err**2)
+    elif isinstance(buffer, float):
+        detector.intensity = detector.intensity - buffer
+    return detector
+
 polarization_dict = {
     "down" : Polarization.SPIN_DOWN,
     "up" : Polarization.SPIN_UP,
@@ -280,7 +288,7 @@ class DetectorDataConfig:
     detector_config: DetectorConfig = None
     buffer_source: str = ""
 
-    def _generate_buffer_array(self, data_frames: dict) -> Union[np.ndarray, float]:
+    def _generate_buffer(self, data_frames: dict) -> Union[float, DetectorImage]:
         if not self.buffer_source:
             return 0
         if is_float(self.buffer_source):
@@ -289,7 +297,9 @@ class DetectorDataConfig:
             data_source=self.buffer_source,
             detector_config=self.detector_config,
             data_frames=data_frames
-        ).intensity
+        )
+
+   
 
     def generate_detector(self, data_frames: dict) -> SimulatedDetectorImage:
         detector = detector_from_dataframe(
@@ -297,9 +307,8 @@ class DetectorDataConfig:
             detector_config=self.detector_config,
             data_frames=data_frames
         )
-        buffer_array = self._generate_buffer_array(data_frames)
-        detector.intensity = detector.intensity - buffer_array
-        return detector
+        buffer = self._generate_buffer(data_frames)
+        return subtract_buffer_intensity(detector, buffer)
 
     @classmethod
     def generate_detectorconfig_from_dict(cls, d_reader: Reader):

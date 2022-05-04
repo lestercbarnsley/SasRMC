@@ -73,14 +73,22 @@ def no_smearer(simulated_intensity_array: np.ndarray, simulated_qx: np.ndarray, 
     experimental_intensity.simulated_intensity = simulated_intensity_array
     return experimental_intensity
 
+def reduced_chi_squared(experimental_intensity: np.ndarray, simulated_intensity: np.ndarray, experimental_uncertainty: np.ndarray, mask: np.ndarray) -> float:
+    reduced_array = np.where(mask, (experimental_intensity - simulated_intensity)**2 / experimental_uncertainty**2, 0)
+    return np.average(reduced_array, weights = mask)
+
 def chi_squared_fit(experimental_detector: DetectorImage, smeared_detector: SimulatedDetectorImage, weighting_function: Callable[[DetectorImage], np.ndarray]) -> float:
     weight = weighting_function(experimental_detector)
     experimental_intensity = experimental_detector.intensity
     simulated_smeared_intensity = smeared_detector.simulated_intensity
     shadow_factor = experimental_detector.shadow_factor
-    chi_squared_getter = lambda : (simulated_smeared_intensity - experimental_intensity)**2 / weight**2
+    return reduced_chi_squared(experimental_intensity, simulated_smeared_intensity, weight, shadow_factor)
+    '''chi_squared_getter = lambda : (simulated_smeared_intensity - experimental_intensity)**2 / weight**2
     reduced_array = np.where(shadow_factor, chi_squared_getter(), 0)
-    return np.average(reduced_array, weights = shadow_factor)
+    return np.average(reduced_array, weights = shadow_factor)'''
+
+
+
 
 chi_squared_fit_with_default_uncertainty = lambda experimental_detector, smeared_detector: chi_squared_fit(experimental_detector, smeared_detector, weighting_function=default_detector_to_weighting_function)
 

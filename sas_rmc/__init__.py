@@ -1,6 +1,6 @@
 from .rmc_runner import RmcRunner, load_config
 
-from . import commands, particle, scattering_simulation, simulator, acceptance_scheme, viewer, shapes, array_cache
+from . import commands, particle, scattering_simulation, simulator, acceptance_scheme, viewer, shapes, array_cache, simulator_factory
 
 
 # Only very import classes should be directly imported

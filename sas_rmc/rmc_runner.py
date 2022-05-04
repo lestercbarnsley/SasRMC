@@ -4,7 +4,6 @@ import yaml
 import pandas as pd
 
 from .logger import Logger
-from .command_writer import ParticleWriter
 from .simulator_factory import SimulationConfig
 
 class RmcRunner: # Not a dataclass
@@ -36,7 +35,6 @@ class RmcRunner: # Not a dataclass
             simulation=scattering_sim,
             box_list=self.box_list
         )
-        self.command_writer = ParticleWriter.standard_particle_writer()
         self.force_log = simulator_config.force_log
 
     def run(self) -> None:
@@ -44,7 +42,6 @@ class RmcRunner: # Not a dataclass
             with Logger(
                 box_list = self.box_list,
                 controller=self.simulator.controller,
-                command_writer=self.command_writer,
                 save_file_path=self.save_file_path ,
                 detector_list=self.detector_list
             ):
@@ -53,7 +50,6 @@ class RmcRunner: # Not a dataclass
             logger = Logger(
                 box_list = self.box_list,
                 controller=self.simulator.controller,
-                command_writer=self.command_writer,
                 save_file_path=self.save_file_path ,
                 detector_list=self.detector_list
             )

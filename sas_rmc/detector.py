@@ -59,7 +59,6 @@ class DetectorPixel:
         return Vector(self.qX, self.qY, self.qZ)
 
     # I'd rather calculate this differently, using a pyfunc, but this has been the fastest method I've come up with to do this calculation
-    #@array_cache
     def _resolution_function_calculator(self, qx_array: np.ndarray, qy_array: np.ndarray) -> np.ndarray:
         qx_offset = qx_array - self.qX
         qy_offset = qy_array - self.qY
@@ -176,6 +175,13 @@ class DetectorImage:
         get_intensity_err = lambda pixel: pixel.intensity_err
         return self.array_from_pixels(get_intensity_err)
 
+    @intensity_err.setter
+    def intensity_err(self, new_intensity_err: np.ndarray) -> None:
+        def set_intensity_err(pixel: DetectorPixel, new_err: float):
+            pixel.intensity_err = new_err
+        set_intensity_err_matrix = np.frompyfunc(set_intensity_err, 2, 0)
+        set_intensity_err_matrix(self._detector_pixels, new_intensity_err)
+
     @property
     def qZ(self) -> np.ndarray:
         get_qzi = lambda pixel: pixel.qZ
@@ -229,8 +235,11 @@ class DetectorImage:
     
     def get_pandas(self):
         d = []
-        for pixel in self._detector_pixels.flatten():
-            d.append(pixel.to_dict())
+        for i, pixel in enumerate(self._detector_pixels.flatten()):
+            pixel_data = pixel.to_dict()
+            if i == 0:
+                pixel_data.update({"Polarization": str(self.polarization)})
+            d.append(pixel_data)
         return pd.DataFrame(d)
 
     @classmethod
