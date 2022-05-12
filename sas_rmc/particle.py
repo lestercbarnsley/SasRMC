@@ -30,6 +30,7 @@ def magnetic_sld_in_angstrom_minus_2(magnetization_vector_in_amp_per_metre: Vect
     sld_vector = B_H_IN_INVERSE_AMP_METRES * magnetization / (1e10**2)
     return sld_vector.x, sld_vector.y, sld_vector.z
 
+
 @dataclass
 class FormResult:
     form_nuclear: np.ndarray
@@ -40,9 +41,8 @@ class FormResult:
 
 @dataclass
 class Particle(ABC):
-    _magnetization: Vector = Vector.null_vector()
+    _magnetization: Vector = field(default_factory = Vector.null_vector)
     shapes: List[Shape] = field(default_factory = list)
-    #form_cache: FormCache = field(default_factory= FormCache, repr = False)
     solvent_sld: float = 0
 
     @property
@@ -64,17 +64,15 @@ class Particle(ABC):
     def position(self) -> Vector:
         return self.shapes[0].central_position
 
-    def is_spherical(self) -> bool: # Don't allow orientation changes to a spherical particle
-        # Default implementation, override if necessary
-        same_location = lambda location_vector : round_vector(location_vector) == round_vector(self.position)
-        if all([isinstance(shape, Sphere) for shape in self.shapes]) and all([same_location(shape.central_position) for shape in self.shapes]):
-            return True
-        return False
-
     def set_position(self, position: Vector) -> None:
         position_delta = position - self.position
         for shape in self.shapes:
             shape.central_position = shape.central_position + position_delta
+
+    def is_spherical(self) -> bool: # Don't allow orientation changes to a spherical particle
+        # Default implementation, override if necessary
+        same_location = lambda location_vector : round_vector(location_vector) == round_vector(self.position)
+        return all([isinstance(shape, Sphere) for shape in self.shapes]) and all([same_location(shape.central_position) for shape in self.shapes])
 
     @property
     def orientation(self) -> Vector:
@@ -115,18 +113,11 @@ class Particle(ABC):
     @method_array_cache
     def form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector) -> np.ndarray:
         return self._form_array(qx_array, qy_array, orientation)
-        # form_array_calculator = lambda : self._form_array_calculator(qx_array, qy_array)
-        # arr_tuple = (id(qx_array), id(qy_array)) + round_vector(self.orientation)
-        # return self.form_cache.form_array(arr_tuple, form_arr_calculator_func=form_array_calculator)
-
+        
     @method_array_cache
     def modulated_form_array(self, qx_array, qy_array, position: Vector, orientation: Vector) -> np.ndarray:
         return self.form_array(qx_array, qy_array, orientation) * np.exp(1j * (qx_array * position.x + qy_array * position.y))
-        # def modulated_form_array_calc() -> np.ndarray:
-        #     return self.form_array(qx_array, qy_array) * np.exp(1j * (qx_array * self.position.x + qy_array * self.position.y))
-        # arr_tuple = (id(qx_array), id(qy_array)) + round_vector(self.orientation) + round_vector(self.position)
-        # return self.form_cache.modulated_form_array(arr_tuple, modulated_arr_calculator_func=modulated_form_array_calc)
-
+        
     @abstractmethod
     def _magnetic_form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector, magnetization: Vector) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         pass
@@ -134,23 +125,13 @@ class Particle(ABC):
     @method_array_cache
     def magnetic_form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector, magnetization: Vector)-> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         return self._magnetic_form_array(qx_array, qy_array, orientation, magnetization)
-        # magnetic_array_calculator = lambda : self._magnetic_array_calculator(qx_array, qy_array)
-        # arr_tuple = (id(qx_array), id(qy_array)) + round_vector(self.orientation) + round_vector(self.magnetization)
-        # return self.form_cache.magnetic_form_array(arr_tuple, magnetic_arr_calculator_func=magnetic_array_calculator)
-    
+        
     @method_array_cache
     def magnetic_modulated_array(self, qx_array, qy_array, position: Vector, orientation: Vector, magnetization: Vector) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         modulated_array = np.exp(1j * (qx_array * position.x + qy_array * position.y))
         return [fm * modulated_array for fm in self.magnetic_form_array(qx_array, qy_array, orientation, magnetization)]
-        # def magnetic_modulated_calc() -> List[np.ndarray]:
-        #     modulated_array = np.exp(1j * (qx_array * self.position.x + qy_array * self.position.y))
-        #     return [f_m * modulated_array for f_m in self.magnetic_form_array(qx_array, qy_array)]
-        # arr_tuple = (id(qx_array), id(qy_array)) + round_vector(self.orientation) + round_vector(self.magnetization) + round_vector(self.position)
-        # return self.form_cache.modulated_magnetic_array(arr_tuple, modulated_magnetic_arr_calculator_func=magnetic_modulated_calc)# modulated_arr_calculator_func=magnetic_modulated_calc)
-
+        
     def form_result(self, qx_array, qy_array) -> FormResult:
-        #form_nuclear = self.modulated_form_array(qx_array=qx_array, qy_array=qy_array)
-        #form_magnetic_x, form_magnetic_y, form_magnetic_z = self.magnetic_modulated_array(qx_array=qx_array, qy_array=qy_array)
         form_nuclear = self.modulated_form_array(qx_array=qx_array, qy_array=qy_array, position=self.position, orientation=self.orientation)
         form_magnetic_x, form_magnetic_y, form_magnetic_z = self.magnetic_modulated_array(qx_array=qx_array, qy_array=qy_array, position=self.position, orientation=self.orientation, magnetization=self.magnetization)
         return FormResult(
@@ -214,7 +195,6 @@ class CoreShellParticle(Particle):
             sld = self.delta_sld(self.shell_sld), 
             q_array = q)
         return core_form + shell_form
-        #return form_amplitude
 
     def _magnetic_form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector, magnetization: Vector) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         q = modulus_array(qx_array, qy_array)
@@ -231,7 +211,7 @@ class CoreShellParticle(Particle):
         return False
 
     @classmethod
-    def gen_from_parameters(cls, position: Vector, magnetization: Vector = None, core_radius = 0, thickness = 0, core_sld = 0, shell_sld = 0, solvent_sld = 0):
+    def gen_from_parameters(cls, position: Vector, magnetization: Vector = None, core_radius: float = 0, thickness: float = 0, core_sld: float = 0, shell_sld: float = 0, solvent_sld: float = 0):
         sphere_inner = Sphere(central_position=position, radius=core_radius)
         sphere_outer = Sphere(central_position=position, radius= core_radius + thickness)
         return cls(
@@ -360,18 +340,12 @@ class Dumbbell(Particle):
         magnetic_2 = self.particle_2.magnetic_modulated_array(qx_array, qy_array, position=self.particle_2.position, orientation=self.particle_2.orientation, magnetization=self.particle_2.magnetization)
         return [m1 + m2 for m1, m2 in zip(magnetic_1, magnetic_2)]
 
-    # def magnetic_modulated_array(self, qx_array, qy_array) -> np.ndarray:
-    #     def modulated_magnetic_array_calcluator():
-    #         magnetic_1 = self.particle_1.magnetic_modulated_array(qx_array, qy_array)
-    #         magnetic_2 = self.particle_2.magnetic_modulated_array(qx_array, qy_array)
-    #         return [m_1 + m_2 for m_1, m_2 in zip(magnetic_1, magnetic_2)]
-    #     arr_tuple = (id(qx_array), id(qy_array)) + round_vector(self.particle_1.magnetization) + round_vector(self.particle_2.magnetization) + round_vector(self.particle_1.position) + round_vector(self.particle_2.position)
-    #     return self.form_cache.modulated_magnetic_array(arr_tuple, modulated_magnetic_arr_calculator_func=modulated_magnetic_array_calcluator)
-        
     @classmethod
-    def gen_from_parameters(cls, core_radius, seed_radius, shell_thickness, core_sld, seed_sld, shell_sld, solvent_sld, position = Vector.null_vector(), orientation = Vector(0,0,1)):
+    def gen_from_parameters(cls, core_radius, seed_radius, shell_thickness, core_sld, seed_sld, shell_sld, solvent_sld, position: Vector = None, orientation: Vector = None):
+        particle_position = position if position else Vector.null_vector()
+        particle_orientation = orientation if orientation else Vector(0, 1, 0)
         core_shell = CoreShellParticle.gen_from_parameters(
-            position=position,
+            position=particle_position,
             core_radius=core_radius,
             thickness=shell_thickness,
             core_sld=core_sld,
@@ -379,7 +353,7 @@ class Dumbbell(Particle):
             solvent_sld=solvent_sld
         )
         seed_shell = CoreShellParticle.gen_from_parameters(
-            position=position,
+            position=particle_position,
             core_radius=seed_radius,
             thickness=shell_thickness,
             core_sld=seed_sld,
@@ -391,7 +365,7 @@ class Dumbbell(Particle):
             particle_1 = core_shell,
             particle_2 = seed_shell
             )
-        dumbell.orientation = orientation
+        dumbell.set_orientation(particle_orientation)
         return dumbell
 
 
@@ -534,6 +508,9 @@ class CylinderNumerical(NumericalParticle):
 
 @dataclass
 class NumericalParticleCustom(NumericalParticle):
+    '''
+    This is highly experimental, please don't use this unless you can handle the consequences
+    '''
     get_sld_function: Callable[[Vector], float] = None
 
     def is_spherical(self) -> bool:

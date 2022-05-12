@@ -245,8 +245,7 @@ class ScaleCommand(Command):
         return {
             "Particle Index": -1,
             "Action": type(self).__name__,
-            "Nuclear rescale": self.simulation_params.rescale_factor,
-            "Magnetic rescale": self.simulation_params.magnetic_rescale,
+            **self.simulation_params.to_dict()
 
         }
 
@@ -259,7 +258,8 @@ class NuclearScale(ScaleCommand):
     change_to_factor: float
 
     def execute(self) -> None:
-        self.simulation_params.rescale_factor = self.change_to_factor
+        rescale_param = self.simulation_params[0]
+        rescale_param.set_value(self.change_to_factor)
 
 
 @dataclass
@@ -267,7 +267,8 @@ class MagneticScale(ScaleCommand):
     change_to_factor: float
 
     def execute(self) -> None:
-        self.simulation_params.magnetic_rescale = self.change_to_factor
+        magnetic_rescale_param = self.simulation_params[1]
+        magnetic_rescale_param.set_value(self.change_to_factor)
 
 
 @dataclass
@@ -275,7 +276,8 @@ class NuclearRescale(ScaleCommand):
     change_by_factor: float = 1
 
     def execute(self) -> None:
-        new_scale = self.simulation_params.rescale_factor * self.change_by_factor
+        rescale_param = self.simulation_params[0]
+        new_scale = rescale_param.value * self.change_by_factor
         NuclearScale(self.simulation_params, change_to_factor=new_scale).execute()
         
 
@@ -284,8 +286,10 @@ class MagneticRescale(ScaleCommand):
     change_by_factor: float = 1
 
     def execute(self) -> None:
-        new_scale = self.simulation_params.magnetic_rescale * self.change_by_factor
+        magnetic_rescale_param = self.simulation_params[1]
+        new_scale = magnetic_rescale_param.value * self.change_by_factor
         MagneticScale(self.simulation_params, change_to_factor=new_scale).execute()
+
 
 @dataclass
 class NuclearMagneticScale(ScaleCommand):
@@ -301,8 +305,22 @@ class NuclearMagneticRescale(ScaleCommand):
     change_by_factor: float = 1
 
     def execute(self) -> None:
-        new_scale_factor = self.simulation_params.rescale_factor * self.change_by_factor
+        rescale_param = self.simulation_params[0]
+        new_scale_factor = rescale_param.value * self.change_by_factor
         NuclearMagneticScale(self.simulation_params, change_to_factor=new_scale_factor).execute()
+
+
+@dataclass
+class SetSimulationParams(ScaleCommand):
+    change_to_factors: List[float]
+
+    def execute(self) -> None:
+        for change_to_factor, simulation_param in zip(self.change_to_factors, self.simulation_params.params):
+            simulation_param.set_value(change_to_factor)
+
+    @classmethod
+    def gen_from_simulation_params(cls, simulation_params: SimulationParams):
+        return cls(simulation_params=simulation_params, change_to_factors=simulation_params.values)
 
 
 @dataclass
@@ -322,9 +340,8 @@ class SetSimulationState(Command):
 
     @classmethod
     def gen_from_simulation(cls, simulation_params: SimulationParams, box_list: List[Box]):
-        command_ledger = []
-        command_ledger.append(NuclearScale(simulation_params, change_to_factor=simulation_params.rescale_factor))
-        command_ledger.append(MagneticScale(simulation_params, change_to_factor=simulation_params.magnetic_rescale))
+        command_ledger = [SetSimulationParams.gen_from_simulation_params(simulation_params)]
+        #command_ledger.append(SetSimulationParams(simulation_params, change_to_factors=simulation_params.values))
         for box in box_list:
             for particle_index, _ in enumerate(box.particles):
                 command_ledger.append(

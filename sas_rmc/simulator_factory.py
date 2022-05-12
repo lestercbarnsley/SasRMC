@@ -2,7 +2,7 @@
 from datetime import datetime
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, List, Optional, Tuple, Type, Union
+from typing import Callable, List, Tuple, Type, Union
 
 import numpy as np
 import pandas as pd
@@ -11,7 +11,7 @@ from .array_cache import array_cache
 from . import commands
 from .acceptance_scheme import MetropolisAcceptance
 from .viewer import CLIViewer
-from .scattering_simulation import Fitter2D, ScatteringSimulation, SimulationParams
+from .scattering_simulation import Fitter2D, ScatteringSimulation, SimulationParam, SimulationParams
 from .simulator import MemorizedSimulator, MonteCarloEvaluator, Simulator
 from .vector import Vector
 from .particle import CoreShellParticle, Particle
@@ -24,7 +24,6 @@ rng = np.random.default_rng()
 PI = np.pi
 RANGE_FACTOR = 1.2
 
-Reader = Callable[[str, Optional[Type], Optional[Any]], Any]
 ParticleFactory = Callable[[], Particle]
 BoxFactory = Callable[[int,ParticleFactory], Box]
 
@@ -34,43 +33,103 @@ DEFAULT_VAL_TYPES =  {
     float: 0.0,
     bool: False,
     Polarization: Polarization.UNPOLARIZED
-}
+} # Mark for deletion
+  
+truth_dict = {
+    'ON' : True,
+    'OFF' : False,
+    'on' : True,
+    'off' : False,
+    'On': True,
+    'Off': False,
+    'True' :  True,
+    'TRUE' : True,
+    'true' : True,
+    'False' :  False,
+    'FALSE' : False,
+    'false' : False
+} # I'm sure I haven't come close to fully covering all the wild and creative ways users could say "True" or "False"
+
+def is_bool(s: str) -> bool:
+    """Checks if a string can be converted to a bool
+
+    Looks up a string against a set of interpretable options and decides if the string can be converted to a bool
+
+    Parameters
+    ----------
+    s : str
+        A string to test
+
+    Returns
+    -------
+    bool
+        Returns True if the string can be interpreted as a bool
+    """
+    return s in truth_dict     
+
+def _is_numeric_type(s: str, t: Type) -> bool:
+    try:
+        t(s)
+        return True
+    except ValueError:
+        return False
 
 def is_float(s: str) -> bool:
-    try:
-        float(s)
-        return True
-    except ValueError: # This is the only time I would ever except an error, why on earth does Python not have a built-in isfloat method?
-        return False
+    """Checks if a string is compatible with the float format
+
+    Parameters
+    ----------
+    s : str
+        A string that might be converted to a float
+
+    Returns
+    -------
+    bool
+        True if the string can be converted to a float
+    """
+    return _is_numeric_type(s, t = float)
+
+def is_int(s: str) -> bool:
+    """Checks if a string is compatible with the int format
+
+    Parameters
+    ----------
+    s : str
+        A string that might be converted to a int
+
+    Returns
+    -------
+    bool
+        True if the string can be converted to a int
+    """
+    return _is_numeric_type(s, t = int)
 
 def add_row_to_dict(d: dict, param_name: str, param_value: str) -> None:
     if not param_name.strip():
         return
     if r'#' in param_name.strip():
         return
-    if not param_value.strip():
+    v = param_value.strip()
+    if not v:
         return
-    d[param_name] = param_value.strip()
+    if is_int(v):
+        d[param_name] = int(v)
+    elif is_float(v):
+        d[param_name] = float(v)
+    elif is_bool(v):
+        d[param_name] = truth_dict[v]
+    else:
+        d[param_name] = v
 
-def dict_reader(config_dict: dict, key: str, t: Type = float, default_value: Any = None) -> Any:
-    type_in_default_dict = lambda : DEFAULT_VAL_TYPES[t] if t in DEFAULT_VAL_TYPES else 0 # lambda to delay calculation
-    default_value_to_use = default_value if default_value else type_in_default_dict()
-    print('key', key, 'value', 'not in dict' if key not in config_dict else config_dict[key])
-    if (key not in config_dict) or not config_dict[key]:
-        if key == "Data Source":
-            print("Data source",t(default_value_to_use))
-        return t(default_value_to_use)
-    if key == "Data Source":
-        print("Data source",t(config_dict[key]))
-    return t(config_dict[key])
 
-def dataframe_to_config_dict_with_reader(dataframe: pd.DataFrame) -> Tuple[dict, Reader]:
+
+def dataframe_to_config_dict(dataframe: pd.DataFrame) -> dict:
     config_dict = dict()
     for _, row in dataframe.iterrows():
         param_name = row.iloc[0]
         param_value = row.iloc[1]
         add_row_to_dict(config_dict, param_name, param_value)
-    return config_dict, lambda key, t = float, default_value = 0 : dict_reader(config_dict, key, t, default_value)
+    return config_dict
 
 def different_random_int(n: int, number_to_avoid: int) -> int:
     for _ in range(200000):
@@ -78,6 +137,13 @@ def different_random_int(n: int, number_to_avoid: int) -> int:
         if x != number_to_avoid:
             return x
     return -1
+
+def box_simulation_params_factory() -> SimulationParams:
+    params = [
+        SimulationParam(value = 1, name = "Nuclear rescale", bounds=(0, np.inf)), 
+        SimulationParam(value = 1, name = "Magnetic rescale", bounds=(0, np.inf))
+        ]
+    return SimulationParams(params = params)
 
 @array_cache
 def qxqy_array_from_ranges(qx_min: float, qx_max: float, qx_delta: float, qy_min: float, qy_max: float, qy_delta: float, range_factor: float = RANGE_FACTOR, resolution_increase_factor: float = 1):
@@ -95,8 +161,6 @@ def qxqy_array_from_detectorimage(detector_image: DetectorImage, range_factor: f
     qy_min = np.min(detector_image.qY)
     delta_qy = detector_image.qy_delta
     qX, qY = qxqy_array_from_ranges(qx_min, qx_max, delta_qx, qy_min, qy_max, delta_qy, range_factor=range_factor, resolution_increase_factor=resolution_increase_factor)
-    print('id qx', id(qX))
-    print('id qy', id(qY))
     return qX, qY
 
 
@@ -178,44 +242,30 @@ def command_factory(nominal_step_size: float, box: Box, particle_index: int, tem
             temperature=temperature
         )
     )
-    
 
-@dataclass
-class ParticleConfig:
-    particle_type: str
-    core_radius: float
-    core_polydispersity: float
-    core_sld: float
-    shell_thickness: float
-    shell_polydispersity: float
-    shell_sld: float
-    solvent_sld: float
-    core_magnetization: float
+def core_shell_particle_factory(core_radius: float, core_polydispersity: float, core_sld: float, shell_thickness: float, shell_polydispersity: float, shell_sld: float, solvent_sld: float, core_magnetization: float) -> ParticleFactory:
+    return lambda : CoreShellParticle.gen_from_parameters(
+        position=Vector.null_vector(),
+        magnetization=Vector.random_vector_xy(core_magnetization),
+        core_radius=rng.normal(loc = core_radius, scale = core_polydispersity * core_radius),
+        thickness=rng.normal(loc = shell_thickness, scale = shell_polydispersity * shell_thickness),
+        core_sld=core_sld,
+        shell_sld=shell_sld,
+        solvent_sld=solvent_sld
+    )
 
-    def generate_particle_factory(self) -> ParticleFactory:
-        factory = lambda : CoreShellParticle.gen_from_parameters(
-            position = Vector.null_vector(),
-            magnetization=Vector.random_vector_xy(self.core_magnetization),
-            core_radius=rng.normal(loc = self.core_radius, scale = self.core_polydispersity * self.core_radius),
-            thickness=rng.normal(loc = self.shell_thickness, scale = self.shell_polydispersity * self.shell_thickness),
-            core_sld=self.core_sld,
-            shell_sld=self.shell_sld,
-            solvent_sld=self.solvent_sld
-        )
-        return factory
-
-    @classmethod
-    def gen_from_d_reader(cls, d_reader: Reader):
-        return cls(
-            particle_type= d_reader("particle_type", str),
-            core_radius=d_reader("core_radius"),
-            core_polydispersity=d_reader("core_polydispersity"),
-            core_sld=d_reader("core_sld"),
-            shell_thickness=d_reader("shell_thickness"),
-            shell_polydispersity=d_reader("shell_polydispersity"),
-            shell_sld=d_reader("shell_sld"),
-            solvent_sld=d_reader("solvent_sld"),
-            core_magnetization=d_reader("core_magnetization")
+def generate_particle_factory_from_config_dict(config_dict: dict) -> ParticleFactory:
+    particle_type= config_dict.setdefault("particle_type", "CoreShellParticle")
+    if particle_type == "CoreShellParticle":
+        return core_shell_particle_factory(
+            core_radius=config_dict.setdefault("core_radius", 0.0),
+            core_polydispersity=config_dict.setdefault("core_polydispersity", 0.0),
+            core_sld=config_dict.setdefault("core_sld", 0.0),
+            shell_thickness=config_dict.setdefault("shell_thickness", 0.0),
+            shell_polydispersity=config_dict.setdefault("shell_polydispersity", 0.0),
+            shell_sld=config_dict.setdefault("shell_sld", 0.0),
+            solvent_sld=config_dict.setdefault("solvent_sld", 0.0),
+            core_magnetization=config_dict.setdefault("core_magnetization", 0.0)
         )
 
 
@@ -267,7 +317,7 @@ def detector_from_dataframe(data_source: str, data_frames: dict, detector_config
 def subtract_buffer_intensity(detector: DetectorImage, buffer: Union[float, DetectorImage]) -> DetectorImage:
     if isinstance(buffer, DetectorImage):
         detector.intensity = detector.intensity - buffer.intensity
-        detector.intensity_err = np.sqrt(detector.intensity_err**2 + buffer.intensity_err**2)
+        detector.intensity_err = np.sqrt(detector.intensity_err**2 + buffer.intensity_err**2) # This is the proper way to do this, since the errors add in quadrature. If the buffer intensity error isn't present, the total error won't change
     elif isinstance(buffer, float):
         detector.intensity = detector.intensity - buffer
     return detector
@@ -279,6 +329,12 @@ polarization_dict = {
     "unpolarised" : Polarization.UNPOLARIZED,
     "out" : Polarization.UNPOLARIZED
 }
+
+def series_to_config_dict(series: pd.Series) -> dict:
+    d = {}
+    for k, v in series.iteritems():
+        add_row_to_dict(d, k, v)
+    return d
 
 
 @dataclass
@@ -299,8 +355,6 @@ class DetectorDataConfig:
             data_frames=data_frames
         )
 
-   
-
     def generate_detector(self, data_frames: dict) -> SimulatedDetectorImage:
         detector = detector_from_dataframe(
             data_source=self.data_source,
@@ -311,68 +365,53 @@ class DetectorDataConfig:
         return subtract_buffer_intensity(detector, buffer)
 
     @classmethod
-    def generate_detectorconfig_from_dict(cls, d_reader: Reader):
+    def generate_detectorconfig_from_dict(cls, config_dict: dict):
         detector_config = DetectorConfig(
-            detector_distance_in_m=d_reader("Detector distance"),
-            collimation_distance_in_m=d_reader("Collimation distance"),
-            collimation_aperture_area_in_m2=d_reader("Collimation aperture"),
-            sample_aperture_area_in_m2=d_reader("Sample aperture"),
-            detector_pixel_size_in_m=d_reader("Detector pixel"),
-            wavelength_in_angstrom=d_reader("Wavelength"),
-            wavelength_spread=d_reader("Wavelength Spread"),
-            polarization=polarization_dict[d_reader("Polarization", str, default_value = "out")]
+            detector_distance_in_m=config_dict.setdefault("Detector distance", 0),
+            collimation_distance_in_m=config_dict.setdefault("Collimation distance", 0),
+            collimation_aperture_area_in_m2=config_dict.setdefault("Collimation aperture", 0),
+            sample_aperture_area_in_m2=config_dict.setdefault("Sample aperture", 0),
+            detector_pixel_size_in_m=config_dict.setdefault("Detector pixel", 0),
+            wavelength_in_angstrom=config_dict.setdefault("Wavelength", 5.0),
+            wavelength_spread=config_dict.setdefault("Wavelength Spread", 0.1),
+            polarization=polarization_dict[config_dict.setdefault("Polarization", "out")]
         )
         return cls(
-            data_source=d_reader("Data Source", str),
-            label = d_reader("Label", str),
+            data_source=config_dict.setdefault("Data Source", ""),
+            label = config_dict.setdefault("Label", ""),
             detector_config=detector_config,
-            buffer_source=d_reader("Buffer Source", str)
+            buffer_source=config_dict.setdefault("Buffer Source", "")
         )
 
     @classmethod
     def generate_detectorconfig_list_from_dataframe(cls, dataframe_2: pd.DataFrame) -> List:
-        '''def get_row_reader(df_row, key, t = float, default_value = None):
-            df_dict = df_row.to_dict()
-            return dict_reader(df_dict, key, t, default_value=default_value)'''
-        return [cls.generate_detectorconfig_from_dict(lambda key, t = float, default_value = None : dict_reader(row.to_dict(), key, t, default_value)) for _, row in dataframe_2.iterrows()]
+        return [cls.generate_detectorconfig_from_dict(series_to_config_dict(row)) for _, row in dataframe_2.iterrows()]
 
 
-def generate_box_factory(box_template: Tuple[float, float, float],  detector_list: List[DetectorImage]) -> BoxFactory:
+def box_factory(particle_number: int, particle_factory: ParticleFactory, box_template: Tuple[float, float, float]) -> Box:
+    dimension_0, dimension_1, dimension_2 = box_template
+    return Box(
+        particles=[particle_factory() for _ in range(particle_number)],
+        cube = Cube(
+            dimension_0=dimension_0,
+            dimension_1=dimension_1,
+            dimension_2=dimension_2
+        )
+    )
+
+def generate_box_factory(box_template: Tuple[float, float, float], detector_list: List[DetectorImage]) -> BoxFactory:
     dimension_0, dimension_1, dimension_2 = box_template
     if dimension_0 * dimension_1 * dimension_2 == 0:
         dimension_0 = np.max([2 * PI / detector.qx_delta for detector in detector_list])
         dimension_1 = np.max([2 * PI / detector.qy_delta for detector in detector_list])
         dimension_2 = dimension_0
-    def box_factory(particle_number: int, particle_factory: ParticleFactory) -> Box:
-        return Box(
-            particles=[particle_factory() for _ in range(particle_number)],
-            cube = Cube(
-                dimension_0=dimension_0,
-                dimension_1=dimension_1,
-                dimension_2=dimension_2
-            )
-        )
-    return box_factory
-    
-truth_dict = {
-    'ON' : True,
-    'OFF' : False,
-    'on' : True,
-    'off' : False,
-    'On': True,
-    'Off': False,
-    'True' :  True,
-    'TRUE' : True,
-    'true' : True,
-    'False' :  False,
-    'FALSE' : False,
-    'false' : False
-} # I'm sure I haven't come close to fully covering all the wild and creative ways users could say "True" or "False"
-            
+    return lambda particle_number, particle_factory : box_factory(particle_number, particle_factory, (dimension_0, dimension_1, dimension_2))
+       
+
 @dataclass
 class SimulationConfig:
     simulation_title: str
-    particle_config: ParticleConfig
+    particle_factory: ParticleFactory
 
     nominal_concentration: float
     particle_number: int
@@ -394,7 +433,7 @@ class SimulationConfig:
         return [detector_data_config.generate_detector(data_frames) for detector_data_config in self.detector_data_configs]
 
     def generate_box_list(self, detector_list: List[DetectorImage]) -> List[Box]:
-        particle_factory = self.particle_config.generate_particle_factory()
+        particle_factory = self.particle_factory
         box_factory = generate_box_factory(self.box_template, detector_list )
         if not self.box_number:
             box_volume = box_factory(0, lambda : None).cube.volume
@@ -426,14 +465,13 @@ class SimulationConfig:
             simulated_detectors=detector_list,
             box_list=box_list
         )
-        return ScatteringSimulation(fitter = fitter)
+        return ScatteringSimulation(fitter = fitter, simulation_params=box_simulation_params_factory())
 
     def generate_controller(self, simulation: ScatteringSimulation, box_list: List[Box]) -> Controller:
         temperature_function = self.annealing_config.generate_temperature_function()
         ledger = [
-            commands.NuclearScale(simulation.simulation_params, change_to_factor=simulation.simulation_params.rescale_factor),
-            commands.MagneticScale(simulation.simulation_params, change_to_factor=simulation.simulation_params.magnetic_rescale),
-        ]
+            commands.SetSimulationParams(simulation.simulation_params, change_to_factors = simulation.simulation_params.values),
+            ]
         for box in box_list:
             box.force_inside_box(in_plane=self.in_plane)
             for particle_index, _ in enumerate(box.particles):
@@ -453,7 +491,7 @@ class SimulationConfig:
                         temperature=temperature,
                         simulation_params=simulation.simulation_params,
                         spherical_particle=particle.is_spherical(),
-                        magnetic_simulation=bool(self.particle_config.core_magnetization)
+                        magnetic_simulation=box.is_magnetic()
                     )
                     acceptable_command.update_loggable_data(
                         {"Cycle": cycle, "Box index": box_index}
@@ -480,35 +518,34 @@ class SimulationConfig:
 
     @classmethod
     def gen_from_dataframes(cls, dataframes: dict):
-        dataframe = list(dataframes.values())[0]
-        dataframe_2 = list(dataframes.values())[1]
-        config_dict, dict_reader = dataframe_to_config_dict_with_reader(dataframe) # ironically I don't need the config dict, because the reader func lets me acces everything
-        total_cycles = dict_reader("total_cycles", int)
-        annealing_stop_cycle_as_read = dict_reader("annealing_stop_cycle_number", int, total_cycles / 2)
+        dataframe, dataframe_2 = list(dataframes.values())[:2]
+        config_dict = dataframe_to_config_dict(dataframe) 
+        total_cycles = config_dict.setdefault("total_cycles", 0)
+        annealing_stop_cycle_as_read = config_dict.setdefault("annealing_stop_cycle_number", total_cycles / 2)
         annealing_config = AnnealingConfig(
-            annealing_type=dict_reader("annealing_type", str).strip().lower(),
-            anneal_start_temp=dict_reader("anneal_start_temp"),
-            anneal_fall_rate=dict_reader("anneal_fall_rate"),
+            annealing_type=config_dict.setdefault("annealing_type", "greedy").strip().lower(),
+            anneal_start_temp=config_dict.setdefault("anneal_start_temp", 0.0),
+            anneal_fall_rate=config_dict.setdefault("anneal_fall_rate",0.1),
             annealing_stop_cycle_number=annealing_stop_cycle_as_read
         )
-        detector_data_configs = [DetectorDataConfig.generate_detectorconfig_from_dict(dict_reader)] if dict_reader("Data Source", str, "") else DetectorDataConfig.generate_detectorconfig_list_from_dataframe(dataframe_2)
+        detector_data_configs = [DetectorDataConfig.generate_detectorconfig_from_dict(config_dict)] if (config_dict.setdefault("Data Source", "")) else DetectorDataConfig.generate_detectorconfig_list_from_dataframe(dataframe_2)
         return cls(
-            simulation_title = dict_reader("simulation_title", str),
-            particle_config = ParticleConfig.gen_from_d_reader(dict_reader),
-            nominal_concentration=dict_reader("nominal_concentration"),
-            particle_number=dict_reader("particle_number", int),
-            box_number=dict_reader("box_number", int),
+            simulation_title = config_dict.setdefault("simulation_title", ""),
+            particle_factory = generate_particle_factory_from_config_dict(config_dict),
+            nominal_concentration=config_dict.setdefault("nominal_concentration", 0.0),
+            particle_number=config_dict.setdefault("particle_number", 0),
+            box_number=config_dict.setdefault("box_number", 0),
             total_cycles = total_cycles,
             annealing_config=annealing_config,
-            nominal_step_size = dict_reader("core_radius") / 2, # make this something more general later
+            nominal_step_size = config_dict.setdefault("core_radius", 100) / 2, # make this something more general later
             detector_data_configs=detector_data_configs,
-            detector_smearing=truth_dict[dict_reader("detector_smearing", str)],
-            field_direction=dict_reader("field_direction", str),
-            force_log = truth_dict[dict_reader("force_log_file", str)],
+            detector_smearing=config_dict.setdefault("detector_smearing", True),
+            field_direction=config_dict.setdefault("field_direction", "Y"),
+            force_log = config_dict.setdefault("force_log_file", True),
             box_template = (
-                dict_reader("box_dimension_1"),
-                dict_reader("box_dimension_2"),
-                dict_reader("box_dimension_3")
+                config_dict.setdefault("box_dimension_1", 0),
+                config_dict.setdefault("box_dimension_2", 0),
+                config_dict.setdefault("box_dimension_3", 0)
             )
         )
     

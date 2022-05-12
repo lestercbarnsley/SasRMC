@@ -1,6 +1,6 @@
 #%%
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Callable, List, Protocol, Tuple
 
 import numpy as np
@@ -10,25 +10,91 @@ from .detector import DetectorImage, Polarization, SimulatedDetectorImage
 from .form_calculator import box_intensity_average
 
 
+@dataclass
+class SimulationParam:
+    """Class for storing variables pertaining to specific simulation parameter
+
+    Attributes
+    ----------
+    value : float
+        The value of the parameter
+    name : str
+        A name identifier for the parameter which is typically unique within a set of SimulationParams
+    bounds : Tuple[float, float]
+        Upper and lower bounds for the parameter
+    """
+    value: float
+    name: str
+    bounds: Tuple[float, float] = (-np.inf, np.inf)
+
+    def set_value(self, new_value: float) -> None:
+        """Sets the value of a SimulationParam.
+
+        Parameters
+        ----------
+        new_value : float
+            The new value to be set
+        """
+        self.value = new_value
+
+    def get_physical_acceptance(self) -> bool:
+        """Determines if a SimulationParam is acceptable.
+
+        The value is checked if it's between the bounds, returning True if it is.
+
+        Returns
+        -------
+        bool
+            True if the value is between the bounds
+        """
+        low_bound, high_bound = np.min(self.bounds), np.max(self.bounds)
+        return low_bound <= self.value <= high_bound
+
+
+@dataclass
+class SimulationConstant(SimulationParam):
+    def set_value(self, new_value: float) -> None:
+        pass # Don't allow a constant to change
+
+    def get_physical_acceptance(self) -> bool:
+        return True
+
 
 @dataclass
 class SimulationParams:
-    rescale_factor: float = 1
-    magnetic_rescale: float = 1
+    
+    params: List[SimulationParam]
 
-    def get_physical_acceptance(self):
-        return self.rescale_factor > 0 and self.magnetic_rescale > 0
+    def __post__init__(self):
+        name_list = []
+        for i, param in enumerate(self.params):
+            if param.name in name_list:
+                param.name = param.name + f"_{i}"
+            name_list.append(param.name) # No duplicate names in params
+
+    @property
+    def values(self) -> List[float]:
+        return [param.value for param in self.params]
+
+    def __getitem__(self, index):
+        return self.params[index]
+
+    def get_physical_acceptance(self) -> bool:
+        return all([param.get_physical_acceptance() for param in self.params])
+
+    def to_dict(self) -> dict:
+        return {param.name : param.value for param in self.params}
+
 
 IntensityCalculator = Callable[[SimulationParams], Tuple[np.ndarray, np.ndarray, np.ndarray]]
 
 def intensity_calculator(box_list: List[Box], qx_array: np.ndarray, qy_array: np.ndarray, simulation_params: SimulationParams, polarization: Polarization) -> np.ndarray:
-    rescale_factor = simulation_params.rescale_factor
-    magnetic_rescale = simulation_params.magnetic_rescale
+    rescale_factor = simulation_params[0].value
+    magnetic_rescale = simulation_params[1].value
     intensity = box_intensity_average(box_list, qx_array, qy_array, rescale_factor=rescale_factor, magnetic_rescale=magnetic_rescale, polarization=polarization)
     return intensity
 
-def create_intensity_calculator(box_list: List[Box], qx_array, qy_array, detector_image: DetectorImage) -> IntensityCalculator:
-    polarization = detector_image.polarization
+def create_intensity_calculator(box_list: List[Box], qx_array, qy_array, polarization: Polarization) -> IntensityCalculator:
     return lambda simulation_params : (intensity_calculator(box_list, qx_array, qy_array, simulation_params, polarization), qx_array, qy_array)
 
 
@@ -40,7 +106,7 @@ class Fitter(Protocol):
 @dataclass
 class ScatteringSimulation:
     fitter: Fitter # The fitter is a strategy class
-    simulation_params: SimulationParams = field(default_factory=SimulationParams)
+    simulation_params: SimulationParams# = field(default_factory=box_simulation_params_factory)
     current_goodness_of_fit: float = np.inf
 
     def get_goodness_of_fit(self) -> float:
@@ -83,12 +149,7 @@ def chi_squared_fit(experimental_detector: DetectorImage, smeared_detector: Simu
     simulated_smeared_intensity = smeared_detector.simulated_intensity
     shadow_factor = experimental_detector.shadow_factor
     return reduced_chi_squared(experimental_intensity, simulated_smeared_intensity, weight, shadow_factor)
-    '''chi_squared_getter = lambda : (simulated_smeared_intensity - experimental_intensity)**2 / weight**2
-    reduced_array = np.where(shadow_factor, chi_squared_getter(), 0)
-    return np.average(reduced_array, weights = shadow_factor)'''
-
-
-
+    
 
 chi_squared_fit_with_default_uncertainty = lambda experimental_detector, smeared_detector: chi_squared_fit(experimental_detector, smeared_detector, weighting_function=default_detector_to_weighting_function)
 
@@ -122,7 +183,7 @@ class Fitter2D:
 
     @classmethod
     def generate_standard_fitter(cls, simulated_detectors: List[DetectorImage], box_list: List[Box], qxqy_list: List[Tuple[np.ndarray, np.ndarray]]):
-        intensity_calculators = [create_intensity_calculator(box_list, qx, qy, detector_image) for (qx, qy), detector_image in zip(qxqy_list, simulated_detectors)]
+        intensity_calculators = [create_intensity_calculator(box_list, qx, qy, detector_image.polarization) for (qx, qy), detector_image in zip(qxqy_list, simulated_detectors)]
         return cls(
             simulated_detectors=simulated_detectors,
             intensity_calculators=intensity_calculators,
@@ -132,7 +193,7 @@ class Fitter2D:
 
     @classmethod
     def generate_no_smear_fitter(cls, simulated_detectors: List[DetectorImage], box_list: List[Box]):
-        intensity_calculators = [create_intensity_calculator(box_list, detector_image.qX, detector_image.qY, detector_image) for detector_image in simulated_detectors]
+        intensity_calculators = [create_intensity_calculator(box_list, detector_image.qX, detector_image.qY, detector_image.polarization) for detector_image in simulated_detectors]
         return cls(
             simulated_detectors=simulated_detectors,
             intensity_calculator=intensity_calculators,
@@ -144,3 +205,5 @@ class Fitter2D:
 
 if __name__ == "__main__":
     pass
+
+#%%

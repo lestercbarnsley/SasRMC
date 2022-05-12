@@ -105,7 +105,6 @@ class DetectorPixel:
         }
 
 
-
 @dataclass
 class DetectorConfig:
     detector_distance_in_m: float

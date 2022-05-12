@@ -1,4 +1,3 @@
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Callable, List, Protocol
 
@@ -9,25 +8,10 @@ from .particle import CoreShellParticle, Particle
 class Loggable(Protocol):
     def get_loggable_data(self) -> dict:
         pass
-    
-    
-@dataclass# Mark for deletion
-class Converter(ABC):
-
-    @abstractmethod
-    def convert(self, command: Loggable) -> dict:
-        pass
 
 
-@dataclass# Mark for deletion
-class ParticleConverter(Converter):
-    conversion_function: Callable[[dict], dict] = None
-
-    def convert(self, command: Loggable) -> dict:
-        data = command.get_loggable_data()
-        if self.conversion_function is not None:
-            return self.conversion_function(data)
-        return data
+Converter = Callable[[Loggable], dict]
+ParticleConverter = Callable[[Particle], dict]
 
 
 def standard_command_converter(loggable: Loggable) -> dict:
@@ -35,20 +19,9 @@ def standard_command_converter(loggable: Loggable) -> dict:
 
 
 @dataclass
-class CommandWriter:#(ABC):
+class CommandWriter:
 
-    '''@abstractmethod
-    def to_data(self, command: Loggable) -> dict:
-        pass
-
-    
-
-
-
-@dataclass
-class ParticleWriter(CommandWriter):'''
-
-    command_converter: Callable[[Loggable], dict]#Converter
+    command_converter: Converter
 
     def to_data(self, command: Loggable) -> dict:
         return self.command_converter(command)
@@ -75,13 +48,12 @@ def convert_default_particle(particle: Particle) -> dict:
         'Total scattering length' : particle.scattering_length,
     }
 
-
-def convert_core_shell_particle(core_shell_particle: CoreShellParticle):
+def convert_core_shell_particle(core_shell_particle: CoreShellParticle) -> dict:
     core_radius = core_shell_particle.shapes[0].radius
     overall_radius = core_shell_particle.shapes[1].radius
     thickness = overall_radius - core_radius
     data = {
-        'Particle type': "this is about to be overwritten, so it doesn't matter what I write here",
+        'Particle type': "",
         'Core radius': core_radius,
         'Shell thickness': thickness,
         'Core SLD': core_shell_particle.core_sld,
@@ -102,7 +74,7 @@ def convert_particle(particle: Particle) -> dict:
 
 @dataclass
 class BoxWriter:
-    particle_converter: Callable[[Particle], dict]
+    particle_converter: ParticleConverter
 
     def to_data(self, box: Box) -> List[dict]:
         return [self.particle_converter(particle) for particle in box.particles]

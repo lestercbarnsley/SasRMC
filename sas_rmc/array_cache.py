@@ -38,7 +38,7 @@ def array_cache(func, max_size: int = MAX_SIZE):
         if argument_tuple not in cache:
             if len(cache) >= max_size:
                 keys = list(cache.keys())
-                [cache.pop(key) for key in keys[:-int(max_size / 2)]]
+                uncached = [cache.pop(key) for key in keys[:-int(max_size / 2)]]
             result = func(*args, **kwargs)
             cache[argument_tuple] = result
         return cache[argument_tuple]
@@ -59,7 +59,7 @@ def method_array_cache(func, max_size: int = CLASS_MAX_SIZE):
         if cache_key not in object_cache:
             if len(object_cache) >= max_size:
                 keys = list(object_cache.keys())
-                [object_cache.pop(key) for key in keys[:-2]]
+                uncached = [object_cache.pop(key) for key in keys[:-2]]
             result = func(*args, **kwargs)
             object_cache[cache_key] = result
         return object_cache[cache_key]
