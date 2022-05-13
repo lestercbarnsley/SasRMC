@@ -8,38 +8,96 @@ from .vector import Vector, Interface
 
 PI = np.pi
 
-null_vector = lambda : Vector.null_vector()
 sphere_volume = lambda radius: (4 *PI / 3) * (radius**3)
 
 
 @dataclass
 class Shape(ABC):
-    central_position: Vector = null_vector()
+    """Abstract base class for a Shape type.
+
+    Attributes
+    ----------
+    central_position : Vector, optional
+        A vector to represent the position of this shape (usually the central position).
+    orientation : Vector, optional
+        A vector describing the orientation of the particle. This matters for anisotropic (non-spherical) shapes.
+
+    """
+    central_position: Vector = field(default_factory=Vector.null_vector)
     orientation: Vector = field(default_factory=lambda : Vector(0,1,0))
 
     @abstractmethod
     def is_inside(self, position: Vector) -> bool:
-        '''Indicates whether a vector is inside the shape. Use this for collision detection, but not for form factor calculations'''
-        pass
+        """Indicates whether a vector is inside the shape.
 
-    def is_inside_shape(self, position: Vector) -> bool:
-        '''Indicates whether a vector is inside the shape, assuming the position is set to the origin'''
-        return self.is_inside(position + self.central_position)
+        This is an abstract method, so you will need to write your own implementation if you define a new Shape type. This is used for collision detection, but not for form factor calculations. Please use concrete class attributes for form factor calculations.
+
+        Parameters
+        ----------
+        position : Vector
+            The position vector to test.
+
+        Returns
+        -------
+        bool
+            Returns True if the position vector is inside the shape.
+        """
+        pass
 
     @property
     @abstractmethod
     def volume(self) -> float:
+        """Calculates the volume of a shape.
+
+        Returns
+        -------
+        float
+            The volume of the shape.
+        """
         pass
 
     @abstractmethod
     def closest_surface_position(self, position: Vector) -> Vector:
+        """Returns the position on the surface of the shape which is closest to the input position Vector.
+
+        Parameters
+        ----------
+        position : Vector
+            The vector to test against.
+
+        Returns
+        -------
+        Vector
+            A position on the surface of the shape which is closest to the input position.
+        """
         pass
 
     def collision_detected(self, shape) -> bool:
+        """Tests whether another shape has collided with or impinged with this shape.
+
+        Parameters
+        ----------
+        shape : Shape
+            Another shape.
+
+        Returns
+        -------
+        bool
+            Returns True is a collision or impingement has been detected.
+        """
         return self.is_inside(shape.closest_surface_position(self.central_position)) or shape.is_inside(self.closest_surface_position(shape.central_position))
 
     @abstractmethod
     def random_position_inside(self) -> Vector:
+        """A random position which is inside the shape.
+
+        This is an abstract method, so you will need to write your own implementation if you define a new Shape type.
+
+        Returns
+        -------
+        Vector
+            A randomly generated position vector which is inside the shape.
+        """
         pass
 
 
@@ -86,7 +144,7 @@ class Cylinder(Shape):
         return scalar_projection * (orientation_reffed.unit_vector) + interfaces[0].position_marker
 
     def is_inside(self, position: Vector) -> bool:
-        if all([interface.is_inside(position) for interface in self.end_interfaces]):
+        if all((interface.is_inside(position) for interface in self.end_interfaces)):
             axis_position = self._project_to_cylinder_axis(position)
             return (position - axis_position).mag <= self.radius
         return False
@@ -153,3 +211,26 @@ class Cube(Shape):
         return self.central_position + a * basis_a + b * basis_b + c * basis_c
 
     
+
+def collision_detected(shapes_1: List[Shape], shape_2: List[Shape]) -> bool:
+    """Detect if a collision has occured between two lists of shapes.
+
+    I made this as a helper function for collision detection because it has less coupling than my first implementation.
+
+    Parameters
+    ----------
+    shapes_1 : List[Shape]
+        A list of shapes.
+    shape_2 : List[Shape]
+        Another list of shapes.
+
+    Returns
+    -------
+    bool
+        Returns True if any collision is detected between a shape in the first list and a shape in the second list
+    """
+    for shape in shapes_1:
+        for other_shape in shape_2:
+            if shape.collision_detected(other_shape):
+                return True
+    return False

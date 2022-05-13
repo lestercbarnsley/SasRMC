@@ -1,6 +1,6 @@
 #%%
 from dataclasses import dataclass
-from enum import Enum, auto
+from enum import Enum
 from typing import Any, Callable, List, Tuple
 
 import numpy as np
@@ -32,13 +32,13 @@ def get_slicing_func_from_gaussian(gaussian: np.ndarray, slicing_range: int = 0)
 
 
 class Polarization(Enum):
-    UNPOLARIZED = auto()
-    SPIN_UP = auto()
-    SPIN_DOWN = auto()
-    MINUS_MINUS = auto()
-    MINUS_PLUS = auto()
-    PLUS_MINUS = auto()
-    PLUS_PLUS = auto()
+    UNPOLARIZED = "unpolarized"
+    SPIN_UP = "spin_up"
+    SPIN_DOWN = "spin_down"
+    MINUS_MINUS = "minus_minus"
+    MINUS_PLUS = "minus_plus"
+    PLUS_MINUS = "plus_minus"
+    PLUS_PLUS = "plus_plus"
 
 
 @dataclass

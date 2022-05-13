@@ -1,5 +1,5 @@
 
-from enum import Enum, auto
+from enum import Enum
 from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
 
@@ -11,9 +11,9 @@ rng = np.random.default_rng()
 
 
 class AcceptanceState(Enum):
-    UNTESTED = auto()
-    ACCEPTABLE = auto()
-    UNACCEPTABLE = auto()
+    UNTESTED = "untested"
+    ACCEPTABLE = "acceptable"
+    UNACCEPTABLE = "unacceptable"
 
 
 @dataclass
@@ -38,7 +38,7 @@ class AcceptanceScheme(ABC):
 
 @dataclass
 class UnconditionalAcceptance(AcceptanceScheme):
-
+    
     def handle_simulation(self, simulation: ScatteringSimulation) -> None:
         return super().handle_simulation(simulation)
 

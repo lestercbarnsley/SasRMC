@@ -50,7 +50,7 @@ truth_dict = {
     'false' : False
 } # I'm sure I haven't come close to fully covering all the wild and creative ways users could say "True" or "False"
 
-def is_bool(s: str) -> bool:
+def is_bool_in_truth_dict(s: str) -> bool:
     """Checks if a string can be converted to a bool
 
     Looks up a string against a set of interpretable options and decides if the string can be converted to a bool
@@ -116,12 +116,10 @@ def add_row_to_dict(d: dict, param_name: str, param_value: str) -> None:
         d[param_name] = int(v)
     elif is_float(v):
         d[param_name] = float(v)
-    elif is_bool(v):
+    elif is_bool_in_truth_dict(v):
         d[param_name] = truth_dict[v]
     else:
         d[param_name] = v
-
-
 
 def dataframe_to_config_dict(dataframe: pd.DataFrame) -> dict:
     config_dict = dict()
@@ -406,7 +404,11 @@ def generate_box_factory(box_template: Tuple[float, float, float], detector_list
         dimension_1 = np.max([2 * PI / detector.qy_delta for detector in detector_list])
         dimension_2 = dimension_0
     return lambda particle_number, particle_factory : box_factory(particle_number, particle_factory, (dimension_0, dimension_1, dimension_2))
-       
+
+def generate_save_file(output_folder: Path, description: str = None, file_format: str = "xlsx") -> Path:
+    datetime_format = '%Y%m%d%H%M%S'
+    return output_folder / Path(f"{datetime.now().strftime(datetime_format)}_{description}.{file_format}")
+
 
 @dataclass
 class SimulationConfig:
@@ -451,9 +453,8 @@ class SimulationConfig:
         particle_number_per_box = int(self.particle_number / self.box_number)
         return [box_factory(particle_number_per_box, particle_factory) for _ in range(self.box_number)]
 
-    def generate_save_file(self, output_folder: Path):
-        datetime_format = '%Y%m%d%H%M%S'
-        return output_folder / Path(f"{datetime.now().strftime(datetime_format)}_{self.simulation_title}.xlsx")
+    def generate_save_file(self, output_folder: Path) -> Path:
+        return generate_save_file(output_folder=output_folder, description=self.simulation_title, file_format="xlsx")
 
     def generate_scattering_simulation(self, detector_list: List[DetectorImage], box_list: List[Box]) -> ScatteringSimulation:
         qxqy_list = qxqy_array_list_from_detector_list(detector_list, range_factor=RANGE_FACTOR)

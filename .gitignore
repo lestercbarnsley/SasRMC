@@ -1,4 +1,5 @@
 data/results/
 sas_rmc/__pycache__/
-data/~$CoreShell Simulation Input - Copy.xlsx
-data/~$CoreShell F20 pol.xlsx
+*.xlsx
+!data/config.yaml
+!data/CoreShell_Simulation_Input.xlsx

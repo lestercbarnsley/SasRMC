@@ -1,6 +1,7 @@
+# SasRMC config file.
 
-input_config_source : CoreShell F20 pol.xlsx
+input_config_source : generate core shell template
 
-# if you write "generate core shell template" as the value for input_config_source, the algorithm will create a new "CoreShell Simulation Input" template Excel file in this folder with a current timestamp
+# if you write "generate core shell template" as the value for input_config_source, the algorithm will create a new "CoreShell_Simulation_Input" template Excel file in this folder with a current timestamp
 
 output_folder : ./results

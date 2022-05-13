@@ -9,7 +9,7 @@ from scipy import constants
 
 from .array_cache import method_array_cache, round_vector
 from .vector import Vector, VectorElement, VectorSpace
-from .shapes import Shape, Sphere, Cylinder
+from .shapes import Shape, Sphere, Cylinder, collision_detected
 
 get_physical_constant = lambda constant_str: constants.physical_constants[constant_str][0]
 
@@ -41,36 +41,111 @@ class FormResult:
 
 @dataclass
 class Particle(ABC):
+    """Abstract base class for Particle type.
+
+    When you make your own particle type, you should inherit from this class. This is an abstract class, so it cannot be instantiated itself, but it shows a template of how a Particle class should be written, and provides abstract methods that should have implementations written by the user.
+
+    Attributes
+    ----------
+    shapes : List[Shape]
+        List of shapes used to calculate collision detection.
+    solvent_sld : float, optional
+        The SLD of the solvent phase in 1E-6 * Angstrom^-2.
+    _magnetization : Vector, optional
+        A vector describing the magnetization of the magnetic phase. Units are Amps/metre.
+
+    """
     _magnetization: Vector = field(default_factory = Vector.null_vector)
     shapes: List[Shape] = field(default_factory = list)
     solvent_sld: float = 0
 
     @property
     def volume(self) -> float:
+        """The volume of the particle.
+
+        Returns
+        -------
+        float
+            The volume of the particle in units Angstrom^3
+        """
         return np.sum([shape.volume for shape in self.shapes])
 
     def is_magnetic(self) -> bool:
+        """Is the particle magnetic?
+
+        Returns
+        -------
+        bool
+            Returns True if the particle is magnetic.
+        """
         return self._magnetization.mag != 0
 
-    def delta_sld(self, sld: float):
+    def delta_sld(self, sld: float) -> float:
+        """The contrast between an SLD value and the SLD of the solvent phase
+
+        Note the unit change between the input and return values.
+
+        Parameters
+        ----------
+        sld : float
+            An SLD value to test against, in 1E-6 * Angstrom^-2.
+
+        Returns
+        -------
+        float
+            The contrast between the SLD value and solvent SLD in Angstrom^-2
+        """
         return (sld - self.solvent_sld) * 1e-6
 
     @property
     @abstractmethod
-    def scattering_length(self):
+    def scattering_length(self) -> float:
+        """The total scattering length of the particle in Angstroms.
+
+        This is an abstract method. A user will need to write their own implementation of this method when inheriting from the Particle class.
+
+        Returns
+        -------
+        float
+            The total scattering length of the particle in Angstroms
+        """
         pass
 
     @property
     def position(self) -> Vector:
+        """A vector to represent the position of the particle.
+
+        Usually this is the centre of the particle. This may also be the centre of one of the Shape objects in self.shapes.
+
+        Returns
+        -------
+        Vector
+            The position of the particle in Angstroms.
+        """
         return self.shapes[0].central_position
 
     def set_position(self, position: Vector) -> None:
+        """Set the position vector of a Particle object.
+
+        Parameters
+        ----------
+        position : Vector
+            The new position vector of the particle, in Angstrom.
+        """
         position_delta = position - self.position
         for shape in self.shapes:
             shape.central_position = shape.central_position + position_delta
 
     def is_spherical(self) -> bool: # Don't allow orientation changes to a spherical particle
-        # Default implementation, override if necessary
+        """Check if the particle is spherical.
+
+        In this context, a particle is spherical if an orientation change has no effect on the particle. Therefore, a particle that consists of a group of spheres may not be spherical itself, but it would be if all these particles share the same centre position. This is essentially how the default implementation works, but you are STRONGLY encouraged to write your own implementation when you make a new Particle type (even though this isn't an abstract method). After all, you yourself know if your particle is spherical or not. You do know if your particle is spherical... right?
+
+        Returns
+        -------
+        bool
+            Returns True if the particle is spherical
+        """
         same_location = lambda location_vector : round_vector(location_vector) == round_vector(self.position)
         return all([isinstance(shape, Sphere) for shape in self.shapes]) and all([same_location(shape.central_position) for shape in self.shapes])
 
@@ -91,16 +166,24 @@ class Particle(ABC):
         self._magnetization = magnetization
 
     def is_inside(self, position: Vector) -> bool:
+        """Method for determining if a position in space is inside a particle.
+
+        Parameters
+        ----------
+        position : Vector
+            Position vector to test.
+
+        Returns
+        -------
+        bool
+            Returns True if the position is inside the particle.
+        """
         return any(
-            [shape.is_inside(position) for shape in self.shapes]
+            (shape.is_inside(position) for shape in self.shapes) # Use a generator here to take advantage of lazy iteration
         )
         
     def collision_detected(self, other_particle) -> bool:
-        for shape in self.shapes:
-            for other_shape in other_particle.shapes:
-                if shape.collision_detected(other_shape):
-                    return True
-        return False
+        return collision_detected(self.shapes, other_particle.shapes)
 
     def random_position_inside(self) -> Vector:
         shape = np.random.choice(self.shapes)
@@ -205,10 +288,7 @@ class CoreShellParticle(Particle):
 
     def collision_detected(self, other_particle: Particle) -> bool:
         biggest_shape = self.shapes[np.argmax([shape.volume for shape in self.shapes])]
-        for other_shape in other_particle.shapes:
-            if biggest_shape.collision_detected(other_shape):
-                return True
-        return False
+        return collision_detected([biggest_shape], other_particle.shapes)
 
     @classmethod
     def gen_from_parameters(cls, position: Vector, magnetization: Vector = None, core_radius: float = 0, thickness: float = 0, core_sld: float = 0, shell_sld: float = 0, solvent_sld: float = 0):
@@ -305,11 +385,9 @@ class Dumbbell(Particle):
             [particle.is_inside(position) for particle in [self.particle_1, self.particle_2]]
         )
 
-    def collision_detected(self, other_particle) -> bool:
-        for particle in [self.particle_1, self.particle_2]:
-            if particle.collision_detected(other_particle):
-                return True
-        return False
+    def collision_detected(self, other_particle: Particle) -> bool:
+        sphere_particles = [self.particle_1, self.particle_2]
+        return any((sphere_particle.collision_detected(other_particle) for sphere_particle in sphere_particles))
 
     def random_position_inside(self) -> Vector:
         return np.random.choice(

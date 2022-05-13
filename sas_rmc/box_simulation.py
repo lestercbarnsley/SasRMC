@@ -18,7 +18,7 @@ rng = np.random.default_rng()
 @dataclass
 class Box:
     '''The Box class is responsible for particle mechanics, determining how and when particles can move. It has no knowledge about anything related to scattering, which is the responsibility of the Simulator class. Special cases of the Box class can be made as their own class that inherit from the Box'''
-    particles: List[Particle] = field(default_factory=List)
+    particles: List[Particle] = field(default_factory=list)
     cube: Cube = field(default_factory=Cube)
 
     #IF the box has no responsibility for the scattering, it should have no knowledge of the nuclear and magnetic rescale factors
@@ -27,7 +27,7 @@ class Box:
     def __len__(self) -> int:
         return len(self.particles)
 
-    def __getitem__(self, i) -> Particle:
+    def __getitem__(self, i: int) -> Particle:
         return self.particles[i]
 
     @property
@@ -59,7 +59,7 @@ class Box:
                 return True
         return False
 
-    def move_inside_box(self, i: int, in_plane = False) -> None:
+    def move_inside_box(self, i: int, in_plane: bool = False) -> None:
         particle = self.particles[i]
         position = self.cube.random_position_inside()
         if in_plane:
@@ -76,12 +76,12 @@ class Box:
             self.move_inside_box(i, in_plane=in_plane)
         raise Exception("Failed to find unexcluded particle configuration. Try lowering number of particles in box")
         
-    def force_inside_box(self, in_plane = False) -> None:
+    def force_inside_box(self, in_plane: bool = False) -> None:
         for i, _ in enumerate(self.particles):
             self._force_particle_inside_box(i, half_test=True, in_plane=in_plane)
             
     def collision_test(self) -> bool:
-        for i, particle in enumerate(self.particles):# range(len(self.particles) - 1):
+        for i, _ in enumerate(self.particles):
             if self.wall_or_particle_collision(i, half_test=True):
                 return True
         return False
@@ -93,7 +93,7 @@ class Box:
         distances = [distance(particle2) for particle2 in self.particles]
         return self.particles[np.argmin(distances)]
 
-    def plot_particle_positions(self, symbol = 'b.') -> None:
+    def plot_particle_positions(self, symbol: str = 'b.') -> None:
         plt.plot([p.position.x for p in self.particles], [p.position.y for p in self.particles], symbol)
         plt.show()
 
