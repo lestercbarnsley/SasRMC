@@ -11,9 +11,10 @@ import sas_rmc
 
 from sas_rmc import DetectorImage, Vector, VectorSpace, SimulatedDetectorImage, DetectorConfig, Polarization
 from sas_rmc.box_simulation import Box
+from sas_rmc.command_writer import BoxWriter
 from sas_rmc.form_calculator import box_intensity_average
 from sas_rmc.particle import CoreShellParticle, NumericalParticle, NumericalParticleCustom, Particle
-from sas_rmc.scattering_simulation import SimulationParams
+from sas_rmc.scattering_simulation import SimulationParam, SimulationParams
 from sas_rmc.shapes import Cube
 from sas_rmc.simulator_factory import is_float, subtract_buffer_intensity
 from sas_rmc.scattering_simulation import detector_smearer
@@ -853,10 +854,10 @@ def read_simulation_output(file_path: Path) -> Tuple[List[DetectorImage], List[B
             if is_float(simulation_row['Magnetic rescale']) and float(simulation_row['Magnetic rescale']):
                 magnetic_rescale = float(simulation_row['Magnetic rescale'])
     simulation_params = SimulationParams(
-        rescale_factor=nuclear_rescale,
-        magnetic_rescale=magnetic_rescale
+        params=[
+            SimulationParam(value = nuclear_rescale, name = "Nuclear rescale"),
+            SimulationParam(value = magnetic_rescale, name = "Magnetic rescale")]
     )
-    print(simulation_params)
     return detector_list, box_list, simulation_params
 
 def figure_polarization_v2():
@@ -958,9 +959,10 @@ def figure_polarization_v2():
     subtract_buffer_intensity(detector_8_up, toluene_8)
     subtract_buffer_intensity(detector_2_down, toluene_2)
     subtract_buffer_intensity(detector_2_up, toluene_2)
-
+    rescale_factor, magnetic_rescale = [simulation_param.value for simulation_param in simulation_params.params]
     for detector in [detector_20_down, detector_20_up, detector_8_down, detector_8_up, detector_2_down, detector_2_up]:
-        simulated_intensity = box_intensity_average(box_list, detector.qX, detector.qY, simulation_params.rescale_factor, simulation_params.magnetic_rescale, detector.polarization)
+        print(detector.qY.shape)
+        simulated_intensity = box_intensity_average(box_list, detector.qX, detector.qY, rescale_factor, magnetic_rescale, detector.polarization)
         simulated_detector = detector_smearer(simulated_intensity, detector.qX, detector.qY, detector)
         
     angle_subfigure(ax1, detector_8_up, detector_8_down)
@@ -1068,13 +1070,24 @@ def figure_polarization_v2():
 
     fig.tight_layout()
 
+def quick_test(): # Add to version control then delete
+    box_writer = BoxWriter.standard_box_writer()
+    box = Box(
+        particles=[CoreShellParticle.gen_from_parameters(position = Vector.null_vector(), core_radius=100) for _ in range(20)],
+        cube=Cube(dimension_0=10000, dimension_1=10000, dimension_2=10000)
+    )
+    box.force_inside_box(in_plane=True)
+    fig = box_writer.to_plot(box)
+    plt.show()
+
 
 def main():
-    figure_form_factors()
-    figure_particle_maps()
-    figure_algorithm_performance()
-    figure_polarization()
-    figure_polarization_v2()
+    # figure_form_factors()
+    # figure_particle_maps()
+    # figure_algorithm_performance()
+    # figure_polarization()
+    #figure_polarization_v2()
+    quick_test()
 
 if __name__ == "__main__":
     main()

@@ -3,3 +3,5 @@ sas_rmc/__pycache__/
 *.xlsx
 !data/config.yaml
 !data/CoreShell_Simulation_Input.xlsx
+sas_rmc.egg-info/
+requirements.txt

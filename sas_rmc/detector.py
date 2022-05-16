@@ -5,8 +5,8 @@ from typing import Any, Callable, List, Tuple
 
 import numpy as np
 from matplotlib import pyplot as plt
+from matplotlib.figure import Figure
 import pandas as pd
-
 
 from .array_cache import method_array_cache
 from .vector import Vector, broadcast_array_function
@@ -214,11 +214,11 @@ class DetectorImage:
         return self.qx_delta, self.qy_delta
 
     @staticmethod
-    def plot_intensity_matrix(intensity_matrix, qx, qy , log_intensity = True, show_crosshair = True, levels = 30, cmap = 'jet') -> None:
+    def plot_intensity_matrix(intensity_matrix, qx, qy , log_intensity = True, show_crosshair = True, levels = 30, cmap = 'jet', show_fig: bool = True) -> Figure:
         fig, ax = plt.subplots()
         range_arr = lambda arr: np.max(arr) - np.min(arr)
         aspect_ratio = range_arr(qx) / range_arr(qy)
-        fig.set_size_inches(4,4 / aspect_ratio)
+        fig.set_size_inches(5,5 / aspect_ratio)
         ax.contourf(qx, qy, np.log(intensity_matrix) if log_intensity else intensity_matrix, levels = levels, cmap = cmap)
         ax.set_xlabel(r'Q$_{x}$ ($\AA^{-1}$)',fontsize =  16)#'x-large')
         ax.set_ylabel(r'Q$_{y}$ ($\AA^{-1}$)',fontsize =  16)#'x-large')
@@ -227,10 +227,14 @@ class DetectorImage:
         if show_crosshair:
             ax.axhline(0, linestyle='-', color='k') # horizontal lines
             ax.axvline(0, linestyle='-', color='k') # vertical lines
-        plt.show()
+        ax.set_box_aspect(1/aspect_ratio)
+        fig.tight_layout()
+        if show_fig:
+            plt.show()
+        return fig
 
-    def plot_intensity(self, log_intensity = True, show_crosshair = True, levels = 30, cmap = 'jet'):
-        type(self).plot_intensity_matrix(self.intensity, self.qX, self.qY, log_intensity=log_intensity, show_crosshair=show_crosshair, levels=levels, cmap = cmap)
+    def plot_intensity(self, log_intensity = True, show_crosshair = True, levels = 30, cmap = 'jet', show_fig: bool = True) -> Figure:
+        return type(self).plot_intensity_matrix(self.intensity, self.qX, self.qY, log_intensity=log_intensity, show_crosshair=show_crosshair, levels=levels, cmap = cmap, show_fig=show_fig)
     
     def get_pandas(self):
         d = []
@@ -399,13 +403,13 @@ class SimulatedDetectorImage(DetectorImage):
             return pixel.simulated_intensity
         return self.array_from_pixels(smear_pixel)
 
-    def plot_intensity(self, mode: int = 2, log_intensity: bool = True, show_crosshair: bool = True, levels: int = 30, cmap: str = 'jet'):
-        intensity_matrix = {
-            0 : self.experimental_intensity,
-            1 : self.simulated_intensity,
-            2 : np.where(self.qX < 0, self.experimental_intensity, self.simulated_intensity)
-        }[mode]
-        type(self).plot_intensity_matrix(intensity_matrix, self.qX, self.qY, log_intensity=log_intensity, show_crosshair=show_crosshair, levels = levels, cmap = cmap)
+    def plot_intensity(self, mode: int = 2, log_intensity: bool = True, show_crosshair: bool = True, levels: int = 30, cmap: str = 'jet', show_fig: bool = True) -> Figure:
+        intensity_matrix_maker = [
+            lambda : self.experimental_intensity,
+            lambda : self.simulated_intensity,
+            lambda : np.where(self.qX < 0, self.experimental_intensity, self.simulated_intensity)
+        ][mode] # Always be lazy!
+        return type(self).plot_intensity_matrix(intensity_matrix_maker(), self.qX, self.qY, log_intensity=log_intensity, show_crosshair=show_crosshair, levels = levels, cmap = cmap, show_fig=show_fig)
 
 
 

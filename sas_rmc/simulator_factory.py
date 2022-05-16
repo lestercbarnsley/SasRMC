@@ -11,7 +11,7 @@ from .array_cache import array_cache
 from . import commands
 from .acceptance_scheme import MetropolisAcceptance
 from .viewer import CLIViewer
-from .scattering_simulation import Fitter2D, ScatteringSimulation, SimulationParam, SimulationParams
+from .scattering_simulation import MAGNETIC_RESCALE, NUCLEAR_RESCALE, Fitter2D, ScatteringSimulation, SimulationParam, SimulationParams
 from .simulator import MemorizedSimulator, MonteCarloEvaluator, Simulator
 from .vector import Vector
 from .particle import CoreShellParticle, Particle
@@ -138,8 +138,8 @@ def different_random_int(n: int, number_to_avoid: int) -> int:
 
 def box_simulation_params_factory() -> SimulationParams:
     params = [
-        SimulationParam(value = 1, name = "Nuclear rescale", bounds=(0, np.inf)), 
-        SimulationParam(value = 1, name = "Magnetic rescale", bounds=(0, np.inf))
+        SimulationParam(value = 1, name = NUCLEAR_RESCALE, bounds=(0, np.inf)), 
+        SimulationParam(value = 1, name = MAGNETIC_RESCALE, bounds=(0, np.inf))
         ]
     return SimulationParams(params = params)
 
@@ -405,9 +405,13 @@ def generate_box_factory(box_template: Tuple[float, float, float], detector_list
         dimension_2 = dimension_0
     return lambda particle_number, particle_factory : box_factory(particle_number, particle_factory, (dimension_0, dimension_1, dimension_2))
 
-def generate_save_file(output_folder: Path, description: str = None, file_format: str = "xlsx") -> Path:
+def generate_save_file(datetime_string: str, output_folder: Path, description: str = "", comment: str = "", file_format: str = "xlsx") -> Path:
+    return output_folder / Path(f"{datetime_string}_{description}{comment}.{file_format}")
+
+def generate_file_path_maker(output_folder: Path, description: str = "") -> Callable[[str, str], Path]:
     datetime_format = '%Y%m%d%H%M%S'
-    return output_folder / Path(f"{datetime.now().strftime(datetime_format)}_{description}.{file_format}")
+    datetime_string = datetime.now().strftime(datetime_format)
+    return lambda comment, file_format: generate_save_file(datetime_string, output_folder, description, comment, file_format)
 
 
 @dataclass
@@ -430,6 +434,7 @@ class SimulationConfig:
     box_template: Tuple[float, float, float]
     in_plane: bool = True
     force_log: bool = True
+    output_plot_format: str = "none"
 
     def generate_detector_list(self, data_frames) -> List[DetectorImage]:
         return [detector_data_config.generate_detector(data_frames) for detector_data_config in self.detector_data_configs]
@@ -453,8 +458,9 @@ class SimulationConfig:
         particle_number_per_box = int(self.particle_number / self.box_number)
         return [box_factory(particle_number_per_box, particle_factory) for _ in range(self.box_number)]
 
-    def generate_save_file(self, output_folder: Path) -> Path:
-        return generate_save_file(output_folder=output_folder, description=self.simulation_title, file_format="xlsx")
+    def generate_save_file_maker(self, output_folder: Path) -> Callable[[str, str], Path]:
+        return generate_file_path_maker(output_folder=output_folder, description=self.simulation_title)
+        #return generate_save_file(output_folder=output_folder, description=self.simulation_title, file_format="xlsx")
 
     def generate_scattering_simulation(self, detector_list: List[DetectorImage], box_list: List[Box]) -> ScatteringSimulation:
         qxqy_list = qxqy_array_list_from_detector_list(detector_list, range_factor=RANGE_FACTOR)
@@ -543,6 +549,7 @@ class SimulationConfig:
             detector_smearing=config_dict.setdefault("detector_smearing", True),
             field_direction=config_dict.setdefault("field_direction", "Y"),
             force_log = config_dict.setdefault("force_log_file", True),
+            output_plot_format = config_dict.setdefault("output_plot_format", "NONE").lower(),
             box_template = (
                 config_dict.setdefault("box_dimension_1", 0),
                 config_dict.setdefault("box_dimension_2", 0),

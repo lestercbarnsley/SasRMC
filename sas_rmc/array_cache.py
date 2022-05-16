@@ -10,11 +10,12 @@ from .vector import Vector
 
 CLASS_MAX_SIZE = 18
 MAX_SIZE = 50
+DEFAULT_PRECISION = 14
 
 immutable_types = (str, float, int, Enum, np.float64)
 
-def round_vector(vector: Vector) -> Tuple[int, int, int]:
-    round_vector_comp = lambda comp: int(comp * (2**20))
+def round_vector(vector: Vector, precision: int = DEFAULT_PRECISION) -> Tuple[int, int, int]:
+    round_vector_comp = lambda comp: round(comp, precision)
     return round_vector_comp(vector.x), round_vector_comp(vector.y), round_vector_comp(vector.z)
 
 def pass_arg(arg):

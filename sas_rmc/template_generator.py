@@ -36,6 +36,7 @@ def generate_core_shell_template() -> Tuple[List[pd.DataFrame], List[str]]:
             ["detector_smearing",r"ON",r"# Acceptable options: ON, OFF",None],
             ["field_direction",r"Y",r"# Acceptable options: X, Y, Z, OFF",None],
             ["force_log_file",r"ON",r"# Acceptable options: ON, OFF, Forces log file to be saved, even if simulation ended prematurely",None],
+            ["output_plot_format",r"PDF",r"# Acceptable options: NONE, PDF, PNG, JPG, Saves collection of images to review after simulation. These are NOT publication quality figures.",None],
             [None,None,None,None],
             [r"# Information about source for experimental, reduced data, either directly below or in the next tab",None,None,None],
             [r"# If you are fitting one detector image, you may input information here",None,None,None],

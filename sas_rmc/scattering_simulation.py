@@ -1,13 +1,16 @@
 #%%
 
 from dataclasses import dataclass
-from typing import Callable, List, Protocol, Tuple
+from typing import Callable, List, Optional, Protocol, Tuple
 
 import numpy as np
 
 from .box_simulation import Box
 from .detector import DetectorImage, Polarization, SimulatedDetectorImage
 from .form_calculator import box_intensity_average
+
+NUCLEAR_RESCALE = "Nuclear rescale"
+MAGNETIC_RESCALE = "Magnetic rescale"
 
 
 @dataclass
@@ -54,6 +57,15 @@ class SimulationParam:
 @dataclass
 class SimulationConstant(SimulationParam):
     def set_value(self, new_value: float) -> None:
+        """Sets the value of a SimulationParam.
+
+        This does nothing for a SimulationConstant, because the value for a constant shouldn't be changed.
+
+        Parameters
+        ----------
+        new_value : float
+            A test value that actually doesn't do anything
+        """
         pass # Don't allow a constant to change
 
     def get_physical_acceptance(self) -> bool:
@@ -80,17 +92,26 @@ class SimulationParams:
         return self.params[index]
 
     def get_physical_acceptance(self) -> bool:
-        return all([param.get_physical_acceptance() for param in self.params])
+        return all(param.get_physical_acceptance() for param in self.params)
 
-    def to_dict(self) -> dict:
+    def to_param_dict(self) -> dict:
+        return {param.name : param for param in self.params}
+
+    def to_value_dict(self) -> dict:
         return {param.name : param.value for param in self.params}
+
+    def get_param(self, key: str) -> SimulationParam:
+        return self.to_param_dict()[key] # Raises KeyError if key not there
+
+    def get_value(self, key: str, default: Optional[float] = None) -> float:
+        return self.to_value_dict().get(key, default)
 
 
 IntensityCalculator = Callable[[SimulationParams], Tuple[np.ndarray, np.ndarray, np.ndarray]]
 
 def intensity_calculator(box_list: List[Box], qx_array: np.ndarray, qy_array: np.ndarray, simulation_params: SimulationParams, polarization: Polarization) -> np.ndarray:
-    rescale_factor = simulation_params[0].value
-    magnetic_rescale = simulation_params[1].value
+    rescale_factor = simulation_params.get_value(NUCLEAR_RESCALE, default=1.0)
+    magnetic_rescale = simulation_params.get_value(MAGNETIC_RESCALE, default=1.0)
     intensity = box_intensity_average(box_list, qx_array, qy_array, rescale_factor=rescale_factor, magnetic_rescale=magnetic_rescale, polarization=polarization)
     return intensity
 
