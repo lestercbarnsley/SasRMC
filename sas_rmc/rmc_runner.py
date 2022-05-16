@@ -123,5 +123,4 @@ def load_config(config_file: str) -> Runner:
 
 
 if __name__ == "__main__":
-    rmc_runner = load_config("../SasRMC/data/config.yaml")
-    rmc_runner.run()
+    pass

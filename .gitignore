@@ -7,4 +7,3 @@ sas_rmc.egg-info/
 requirements.txt
 tests/__pycache__/
 .vscode/
-.vscode/settings.json

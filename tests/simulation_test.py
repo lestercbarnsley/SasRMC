@@ -1,5 +1,6 @@
 #%%
 import pytest
+from pathlib import Path
 
 from typing import List
 
@@ -56,7 +57,7 @@ def default_dumbbell_box(particle_number = 20):
 
 
 def default_detector_image() -> SimulatedDetectorImage:
-    FILE = r'J:\Uni\Sorted results\User Experiments\p13209 - Feygenson\data\ASCII-I\I-pandas-unpolarized-SM-16586-S9DH-B--2200mT-KWS1.DAT'
+    file = Path.cwd() / Path('data') / Path('I-pandas-unpolarized-SM-16586-S9DH-B--2200mT-KWS1.DAT')
     DETECTOR_CONFIG_C14D14 = DetectorConfig(
         detector_distance_in_m=14,
         collimation_distance_in_m=14,
@@ -67,7 +68,7 @@ def default_detector_image() -> SimulatedDetectorImage:
         wavelength_spread=0.1,
         polarization=Polarization.UNPOLARIZED
         )
-    detector_image = SimulatedDetectorImage.gen_from_txt(FILE, DETECTOR_CONFIG_C14D14)
+    detector_image = SimulatedDetectorImage.gen_from_txt(file, DETECTOR_CONFIG_C14D14)
     return detector_image
 
 def default_simulation(box_list: List[Box]) -> ScatteringSimulation:
@@ -232,6 +233,8 @@ def test_modulated_form_cache_polish():
 
 def test_dumbbell_modulated_and_form_array():
     box = default_dumbbell_box()
+    detector_image = default_detector_image()
+    qx_array, qy_array = detector_image.qX, detector_image.qY 
     for _ in range(50):
         box.force_inside_box()
         position = Vector(2144.6643,1231.12315,1532.123)
@@ -239,8 +242,6 @@ def test_dumbbell_modulated_and_form_array():
         position_d2 = box[14].particle_2.position
         command = commands.MoveParticleTo(box, 14, position)
         command2 = commands.MoveParticleTo(box, 14, position_2)
-        detector_image = default_detector_image()
-        qx_array, qy_array = detector_image.qX, detector_image.qY
         d1 = box[14].modulated_form_array(qx_array, qy_array, position=box[14].position, orientation=box[14].orientation)
         f1 = box[14].form_array(qx_array, qy_array, orientation=box[14].orientation)
         dcore_01 = box[14].particle_1.modulated_form_array(qx_array, qy_array, position=box[14].particle_1.position, orientation=box[14].particle_1.orientation)

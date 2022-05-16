@@ -253,17 +253,17 @@ def core_shell_particle_factory(core_radius: float, core_polydispersity: float, 
     )
 
 def generate_particle_factory_from_config_dict(config_dict: dict) -> ParticleFactory:
-    particle_type= config_dict.setdefault("particle_type", "CoreShellParticle")
+    particle_type= config_dict.get("particle_type", "CoreShellParticle")
     if particle_type == "CoreShellParticle":
         return core_shell_particle_factory(
-            core_radius=config_dict.setdefault("core_radius", 0.0),
-            core_polydispersity=config_dict.setdefault("core_polydispersity", 0.0),
-            core_sld=config_dict.setdefault("core_sld", 0.0),
-            shell_thickness=config_dict.setdefault("shell_thickness", 0.0),
-            shell_polydispersity=config_dict.setdefault("shell_polydispersity", 0.0),
-            shell_sld=config_dict.setdefault("shell_sld", 0.0),
-            solvent_sld=config_dict.setdefault("solvent_sld", 0.0),
-            core_magnetization=config_dict.setdefault("core_magnetization", 0.0)
+            core_radius=config_dict.get("core_radius", 0.0),
+            core_polydispersity=config_dict.get("core_polydispersity", 0.0),
+            core_sld=config_dict.get("core_sld", 0.0),
+            shell_thickness=config_dict.get("shell_thickness", 0.0),
+            shell_polydispersity=config_dict.get("shell_polydispersity", 0.0),
+            shell_sld=config_dict.get("shell_sld", 0.0),
+            solvent_sld=config_dict.get("solvent_sld", 0.0),
+            core_magnetization=config_dict.get("core_magnetization", 0.0)
         )
 
 
@@ -365,20 +365,20 @@ class DetectorDataConfig:
     @classmethod
     def generate_detectorconfig_from_dict(cls, config_dict: dict):
         detector_config = DetectorConfig(
-            detector_distance_in_m=config_dict.setdefault("Detector distance", 0),
-            collimation_distance_in_m=config_dict.setdefault("Collimation distance", 0),
-            collimation_aperture_area_in_m2=config_dict.setdefault("Collimation aperture", 0),
-            sample_aperture_area_in_m2=config_dict.setdefault("Sample aperture", 0),
-            detector_pixel_size_in_m=config_dict.setdefault("Detector pixel", 0),
-            wavelength_in_angstrom=config_dict.setdefault("Wavelength", 5.0),
-            wavelength_spread=config_dict.setdefault("Wavelength Spread", 0.1),
-            polarization=polarization_dict[config_dict.setdefault("Polarization", "out")]
+            detector_distance_in_m=config_dict.get("Detector distance", 0),
+            collimation_distance_in_m=config_dict.get("Collimation distance", 0),
+            collimation_aperture_area_in_m2=config_dict.get("Collimation aperture", 0),
+            sample_aperture_area_in_m2=config_dict.get("Sample aperture", 0),
+            detector_pixel_size_in_m=config_dict.get("Detector pixel", 0),
+            wavelength_in_angstrom=config_dict.get("Wavelength", 5.0),
+            wavelength_spread=config_dict.get("Wavelength Spread", 0.1),
+            polarization=polarization_dict[config_dict.get("Polarization", "out")]
         )
         return cls(
-            data_source=config_dict.setdefault("Data Source", ""),
-            label = config_dict.setdefault("Label", ""),
+            data_source=config_dict.get("Data Source", ""),
+            label = config_dict.get("Label", ""),
             detector_config=detector_config,
-            buffer_source=config_dict.setdefault("Buffer Source", "")
+            buffer_source=config_dict.get("Buffer Source", "")
         )
 
     @classmethod
@@ -527,33 +527,33 @@ class SimulationConfig:
     def gen_from_dataframes(cls, dataframes: dict):
         dataframe, dataframe_2 = list(dataframes.values())[:2]
         config_dict = dataframe_to_config_dict(dataframe) 
-        total_cycles = config_dict.setdefault("total_cycles", 0)
-        annealing_stop_cycle_as_read = config_dict.setdefault("annealing_stop_cycle_number", total_cycles / 2)
+        total_cycles = config_dict.get("total_cycles", 0)
+        annealing_stop_cycle_as_read = config_dict.get("annealing_stop_cycle_number", total_cycles / 2)
         annealing_config = AnnealingConfig(
-            annealing_type=config_dict.setdefault("annealing_type", "greedy").strip().lower(),
-            anneal_start_temp=config_dict.setdefault("anneal_start_temp", 0.0),
-            anneal_fall_rate=config_dict.setdefault("anneal_fall_rate",0.1),
+            annealing_type=config_dict.get("annealing_type", "greedy").strip().lower(),
+            anneal_start_temp=config_dict.get("anneal_start_temp", 0.0),
+            anneal_fall_rate=config_dict.get("anneal_fall_rate",0.1),
             annealing_stop_cycle_number=annealing_stop_cycle_as_read
         )
-        detector_data_configs = [DetectorDataConfig.generate_detectorconfig_from_dict(config_dict)] if (config_dict.setdefault("Data Source", "")) else DetectorDataConfig.generate_detectorconfig_list_from_dataframe(dataframe_2)
+        detector_data_configs = [DetectorDataConfig.generate_detectorconfig_from_dict(config_dict)] if (config_dict.get("Data Source", "")) else DetectorDataConfig.generate_detectorconfig_list_from_dataframe(dataframe_2)
         return cls(
-            simulation_title = config_dict.setdefault("simulation_title", ""),
+            simulation_title = config_dict.get("simulation_title", ""),
             particle_factory = generate_particle_factory_from_config_dict(config_dict),
-            nominal_concentration=config_dict.setdefault("nominal_concentration", 0.0),
-            particle_number=config_dict.setdefault("particle_number", 0),
-            box_number=config_dict.setdefault("box_number", 0),
+            nominal_concentration=config_dict.get("nominal_concentration", 0.0),
+            particle_number=config_dict.get("particle_number", 0),
+            box_number=config_dict.get("box_number", 0),
             total_cycles = total_cycles,
             annealing_config=annealing_config,
-            nominal_step_size = config_dict.setdefault("core_radius", 100) / 2, # make this something more general later
+            nominal_step_size = config_dict.get("core_radius", 100) / 2, # make this something more general later
             detector_data_configs=detector_data_configs,
-            detector_smearing=config_dict.setdefault("detector_smearing", True),
-            field_direction=config_dict.setdefault("field_direction", "Y"),
-            force_log = config_dict.setdefault("force_log_file", True),
-            output_plot_format = config_dict.setdefault("output_plot_format", "NONE").lower(),
+            detector_smearing=config_dict.get("detector_smearing", True),
+            field_direction=config_dict.get("field_direction", "Y"),
+            force_log = config_dict.get("force_log_file", True),
+            output_plot_format = config_dict.get("output_plot_format", "NONE").lower(),
             box_template = (
-                config_dict.setdefault("box_dimension_1", 0),
-                config_dict.setdefault("box_dimension_2", 0),
-                config_dict.setdefault("box_dimension_3", 0)
+                config_dict.get("box_dimension_1", 0),
+                config_dict.get("box_dimension_2", 0),
+                config_dict.get("box_dimension_3", 0)
             )
         )
     

@@ -25,7 +25,8 @@ setup(
         'numpy',
         'scipy',
         'matplotlib',
-        'openpyxl'
+        'openpyxl',
+        'ipython'
         ],
 )
 
