@@ -4,11 +4,12 @@ import pytest
 from typing import List
 
 import numpy as np
+import sas_rmc
 
 from sas_rmc.box_simulation import Box
 from sas_rmc.controller import Controller
 from sas_rmc.particle import CoreShellParticle, Dumbbell
-from sas_rmc.scattering_simulation import Fitter2D, ScatteringSimulation
+from sas_rmc.scattering_simulation import MAGNETIC_RESCALE, NUCLEAR_RESCALE, Fitter2D, ScatteringSimulation
 from sas_rmc import Vector, SimulatedDetectorImage, Polarization, DetectorConfig, commands, shapes
 
 
@@ -77,10 +78,9 @@ def default_simulation(box_list: List[Box]) -> ScatteringSimulation:
     fitter = Fitter2D.generate_standard_fitter(
         simulated_detectors=[detector],
         box_list=box_list,
-        qx_array=qx,
-        qy_array=qy
+        qxqy_list=[(qx, qy)]
     )
-    return ScatteringSimulation(fitter=fitter)
+    return ScatteringSimulation(fitter=fitter, simulation_params=sas_rmc.simulator_factory.box_simulation_params_factory())
 
 def test_particle_move():
     box = default_box()
@@ -109,8 +109,24 @@ def test_box_disperse():
                     [p.position.z == 0 for p in box]
                 )
                 assert np.sum(
-                    [p.orientation.z  for p in box]
+                    [p.orientation.z for p in box]
                 ) == 0
+
+def test_collision_detection():
+    shape_list_1 = [shapes.Sphere(radius=100)]
+    shape_list_2 = [shapes.Sphere(radius=100)]
+    assert shapes.collision_detected(shape_list_1, shape_list_2) == True
+    shape_list_2 = [shapes.Sphere(central_position=Vector(200, 200, 0))]
+    assert shapes.collision_detected(shape_list_1, shape_list_2) == False
+    shape_list_2 = [shapes.Sphere(central_position=Vector(100, 0,0))]
+    assert shapes.collision_detected(shape_list_1, shape_list_2) == True
+
+def test_particle_collision_detection():
+    core_shell_particles = default_particles()
+    assert core_shell_particles[0].collision_detected(core_shell_particles[1]) == True
+    core_shell_particles[1].set_position(Vector(2000, 2000))
+    assert core_shell_particles[0].collision_detected(core_shell_particles[1]) == False
+
 
 def test_particle_jump():
     box = default_box()
@@ -182,9 +198,9 @@ def test_modulated_form_cache():
     command = commands.MoveParticleTo(box, 14, position)
     detector_image = default_detector_image()
     qx_array, qy_array = detector_image.qX, detector_image.qY
-    d1 = box[13].modulated_form_array(qx_array, qy_array)
+    d1 = box[13].modulated_form_array(qx_array, qy_array, position=box[13].position, orientation=box[13].orientation)
     command.execute()
-    d2 = box[13].modulated_form_array(qx_array, qy_array)
+    d2 = box[13].modulated_form_array(qx_array, qy_array, position=box[13].position, orientation=box[13].orientation)
     assert np.average(d2 - d1) == 0
     assert id(d2) == id(d1)
 
@@ -197,14 +213,14 @@ def test_modulated_form_cache_polish():
     command2 = commands.MoveParticleTo(box, 14, position_2)
     detector_image = default_detector_image()
     qx_array, qy_array = detector_image.qX, detector_image.qY
-    d1 = box[14].modulated_form_array(qx_array, qy_array)
-    f1 = box[14].form_array(qx_array, qy_array)
+    d1 = box[14].modulated_form_array(qx_array, qy_array, position=box[14].position, orientation=box[14].orientation)
+    f1 = box[14].form_array(qx_array, qy_array, orientation=box[14].orientation)
     command.execute()
-    d2 = box[14].modulated_form_array(qx_array, qy_array)
-    f2 = box[14].form_array(qx_array, qy_array)
+    d2 = box[14].modulated_form_array(qx_array, qy_array, position=box[14].position, orientation=box[14].orientation)
+    f2 = box[14].form_array(qx_array, qy_array, orientation=box[14].orientation)
     command2.execute()
-    d3 = box[14].modulated_form_array(qx_array, qy_array)
-    f3 = box[14].form_array(qx_array, qy_array)
+    d3 = box[14].modulated_form_array(qx_array, qy_array, position=box[14].position, orientation=box[14].orientation)
+    f3 = box[14].form_array(qx_array, qy_array, orientation=box[14].orientation)
     assert np.average(d3 - d1) == 0
     assert id(d3) == id(d1)
     assert np.average(d3 - d2) != 0
@@ -225,21 +241,21 @@ def test_dumbbell_modulated_and_form_array():
         command2 = commands.MoveParticleTo(box, 14, position_2)
         detector_image = default_detector_image()
         qx_array, qy_array = detector_image.qX, detector_image.qY
-        d1 = box[14].modulated_form_array(qx_array, qy_array)
-        f1 = box[14].form_array(qx_array, qy_array)
-        dcore_01 = box[14].particle_1.modulated_form_array(qx_array, qy_array)
-        dcore_02 = box[14].particle_2.modulated_form_array(qx_array, qy_array)
+        d1 = box[14].modulated_form_array(qx_array, qy_array, position=box[14].position, orientation=box[14].orientation)
+        f1 = box[14].form_array(qx_array, qy_array, orientation=box[14].orientation)
+        dcore_01 = box[14].particle_1.modulated_form_array(qx_array, qy_array, position=box[14].particle_1.position, orientation=box[14].particle_1.orientation)
+        dcore_02 = box[14].particle_2.modulated_form_array(qx_array, qy_array,position=box[14].particle_2.position, orientation=box[14].particle_2.orientation)
         command.execute()
-        d2 = box[14].modulated_form_array(qx_array, qy_array)
-        f2 = box[14].form_array(qx_array, qy_array)
-        dcore_11 = box[14].particle_1.modulated_form_array(qx_array, qy_array)
-        dcore_12 = box[14].particle_2.modulated_form_array(qx_array, qy_array)
+        d2 = box[14].modulated_form_array(qx_array, qy_array, position=box[14].position, orientation=box[14].orientation)
+        f2 = box[14].form_array(qx_array, qy_array, orientation=box[14].orientation)
+        dcore_11 = box[14].particle_1.modulated_form_array(qx_array, qy_array, position=box[14].particle_1.position, orientation=box[14].particle_1.orientation)
+        dcore_12 = box[14].particle_2.modulated_form_array(qx_array, qy_array,position=box[14].particle_2.position, orientation=box[14].particle_2.orientation)
         command2.execute()
-        d3 = box[14].modulated_form_array(qx_array, qy_array)
-        f3 = box[14].form_array(qx_array, qy_array)
+        d3 = box[14].modulated_form_array(qx_array, qy_array, position=box[14].position, orientation=box[14].orientation)
+        f3 = box[14].form_array(qx_array, qy_array, orientation=box[14].orientation)
         position_d22 = box[14].particle_2.position
-        dcore_21 = box[14].particle_1.modulated_form_array(qx_array, qy_array)
-        dcore_22 = box[14].particle_2.modulated_form_array(qx_array, qy_array)
+        dcore_21 = box[14].particle_1.modulated_form_array(qx_array, qy_array, position=box[14].particle_1.position, orientation=box[14].particle_1.orientation)
+        dcore_22 = box[14].particle_2.modulated_form_array(qx_array, qy_array,position=box[14].particle_2.position, orientation=box[14].particle_2.orientation)
         assert box[14].position == position_2
         assert (position_d2 - position_d22).mag == pytest.approx(0)
         assert np.average(d3 - d1) == pytest.approx(0)
@@ -258,8 +274,8 @@ def test_modulated_and_form_array():
     box.force_inside_box()
     detector_image = default_detector_image()
     qx_array, qy_array = detector_image.qX, detector_image.qY
-    ff = box[13].form_array(qx_array, qy_array)
-    fm = box[13].modulated_form_array(qx_array, qy_array)
+    ff = box[13].form_array(qx_array, qy_array, orientation=box[13].orientation)
+    fm = box[13].modulated_form_array(qx_array, qy_array, position=box[13].position, orientation=box[13].orientation)
     fm2 = ff * np.exp(1j * (qx_array * box[13].position.x + qy_array * box[13].position.y))
     assert np.average(fm2 - fm) == 0
 
@@ -270,7 +286,7 @@ def test_box_intensity():
     detector_image = default_detector_image()
     qx_array, qy_array = detector_image.qX, detector_image.qY
     b_tensity = box_intensity(box, qx_array, qy_array)
-    get_mfas = lambda : [p.modulated_form_array(qx_array, qy_array) for p in box.particles]
+    get_mfas = lambda : [p.form_result(qx_array, qy_array).form_nuclear for p in box.particles]
     mfas_prior = get_mfas()
     command = commands.MoveParticleBy(box, 15, Vector(20,20,20))
     command.execute()
@@ -286,19 +302,6 @@ def test_box_intensity():
     b_tensity_after = box_intensity(box, qx_array, qy_array)
     assert b_tensity.shape == b_tensity_after.shape
     assert np.average(b_tensity_after - b_tensity) != 0
-
-def test_reset_form_cache():
-    particles = default_particles()
-    particle = particles[19]
-    detector = default_detector_image()
-    qx, qy = detector.qX, detector.qY
-    particle.modulated_form_array(qx, qy)
-    assert len(particle.form_cache._form_array) != 0
-    assert len(particle.form_cache._modulated_form_array) != 0
-    particle.form_cache.reset_form()
-    assert len(particle.form_cache._form_array) == 0
-    assert len(particle.form_cache._modulated_form_array) == 0
-    
 
 def test_controller():
     box = default_box()
@@ -331,36 +334,35 @@ def test_controller():
     assert len(controller.completed_commands) == controller._current
     
 def test_metropolis_acceptance():
-    metropolis = commands.MetropolisAcceptance(
+    metropolis = sas_rmc.acceptance_scheme.MetropolisAcceptance(
         temperature=10,
-        rng = 0.1,
-        delta_chi=10,
-        _after_chi = 5,
+        rng_val = 0.1,
     )
-    metropolis._acceptance_state = commands.AcceptanceState.UNTESTED
+    metropolis.set_delta_chi(delta_chi=10, after_chi=5)
+    metropolis._acceptance_state = sas_rmc.acceptance_scheme.AcceptanceState.UNTESTED
     metropolis._calculate_success()
     assert metropolis.is_acceptable() == True
-    metropolis.rng = 0.4
-    metropolis._acceptance_state = commands.AcceptanceState.UNTESTED
+    metropolis.rng_val = 0.4
+    metropolis._acceptance_state = sas_rmc.acceptance_scheme.AcceptanceState.UNTESTED
     metropolis._calculate_success()
     assert metropolis.is_acceptable() == False
     metropolis.temperature = 5
-    metropolis._acceptance_state = commands.AcceptanceState.UNTESTED
+    metropolis._acceptance_state = sas_rmc.acceptance_scheme.AcceptanceState.UNTESTED
     metropolis._calculate_success()
     assert metropolis.is_acceptable() == False
-    metropolis.delta_chi = -0.000001
-    metropolis._acceptance_state = commands.AcceptanceState.UNTESTED
+    metropolis.set_delta_chi(delta_chi=-0.000001, after_chi=5)
+    metropolis._acceptance_state = sas_rmc.acceptance_scheme.AcceptanceState.UNTESTED
     metropolis._calculate_success()
     assert metropolis.is_acceptable() == True
 
 def test_metropolis_handle_simulation():
     box_list = [default_box()]
     simulation = default_simulation(box_list=box_list)
-    metropolis = commands.MetropolisAcceptance(
+    metropolis = sas_rmc.acceptance_scheme.MetropolisAcceptance(
         temperature=10,
-        rng = 0.1,
-        _after_chi = 5,
+        rng_val = 0.1,
     )
+    metropolis.set_delta_chi(delta_chi=0, after_chi=5)
     metropolis.handle_simulation(simulation)
     metropolis.set_physical_acceptance(simulation.get_physical_acceptance())
     assert metropolis.is_acceptable()
@@ -371,16 +373,16 @@ def test_metropolis_handle_simulation():
 def test_simulation_get_acceptance():
     box_list = [default_box()]
     simulation = default_simulation(box_list=box_list)
-    simulation.rescale_factor = 1.0
-    simulation.magnetic_rescale = 1.0
+    simulation.simulation_params.set_value(NUCLEAR_RESCALE, 1.0)
+    simulation.simulation_params.set_value(MAGNETIC_RESCALE, 1.0)
     assert simulation.get_physical_acceptance()
-    simulation.rescale_factor = -0.0000001
+    simulation.simulation_params.set_value(NUCLEAR_RESCALE, -0.0000001)
     assert simulation.get_physical_acceptance() == False
-    simulation.rescale_factor = 1.0
-    simulation.magnetic_rescale = -0.0000001
+    simulation.simulation_params.set_value(NUCLEAR_RESCALE, 1.0)
+    simulation.simulation_params.set_value(MAGNETIC_RESCALE, -0.0000001)
     assert simulation.get_physical_acceptance() == False
-    simulation.rescale_factor = 1.0
-    simulation.magnetic_rescale = 1.0
+    simulation.simulation_params.set_value(NUCLEAR_RESCALE, 1.0)
+    simulation.simulation_params.set_value(MAGNETIC_RESCALE, 1.0)
     command = commands.MoveParticleTo(box_list[0], 13, Vector(1e10, 1e10, 1e10))
     command.execute()
     assert box_list[0].collision_test() != False
@@ -401,10 +403,10 @@ def test_acceptable_command():
     ]
     decorated_commands = [commands.AcceptableCommand(
         base_command = command,
-        acceptance_scheme=commands.MetropolisAcceptance(
-            delta_chi=-1
-        )
+        acceptance_scheme=sas_rmc.acceptance_scheme.MetropolisAcceptance()
     ) for command in commands_for_controller]
+    for c in decorated_commands:
+        c.acceptance_scheme.set_delta_chi(-1, after_chi = 0)
     controller = Controller(ledger = decorated_commands)
     for command in controller.ledger:
         controller.action()
@@ -435,10 +437,10 @@ def test_controller_acceptance_independence():
         ]
     decorated_commands = [commands.AcceptableCommand(
         base_command = command,
-        acceptance_scheme=commands.MetropolisAcceptance(
-            delta_chi=-1
-        )
+        acceptance_scheme=sas_rmc.acceptance_scheme.MetropolisAcceptance()
     ) for command in commands_for_controller]
+    for c in decorated_commands:
+        c.acceptance_scheme.set_delta_chi(-1, after_chi = 0)
     controller = Controller(decorated_commands)
     for i, command in enumerate(controller.ledger):
         controller.action()
@@ -460,11 +462,11 @@ def test_dumbbell_rotation():
         orientation_calc = lambda : dumbbell.orientation
         old_distance = distance_calc()
         old_orientation = orientation_calc()
-        dumbbell.position = dumbbell.position + Vector(50,50,50)
+        dumbbell.set_position( dumbbell.position + Vector(50,50,50) )
         assert old_distance == pytest.approx(distance_calc())
         assert old_orientation == orientation_calc()
         new_orientation = Vector(np.random.rand(), np.random.rand(), np.random.rand())
-        dumbbell.orientation = new_orientation
+        dumbbell.set_orientation(new_orientation )
         assert old_distance == pytest.approx(distance_calc())
         assert (new_orientation.unit_vector - orientation_calc()).mag == pytest.approx(0)
 
@@ -480,7 +482,7 @@ def test_set_particle_state():
         command_2 = commands.SetParticleState(box, 4, random_vec(), random_vec(), random_vec())
         command_2.execute()
         assert box[4].position != position
-        assert box[4].orientation != orientation
+        assert box[4].orientation == orientation # These are default particles, so orientation changes are not allowed
         assert box[4].magnetization != magnetization
         command_1.execute()
         assert box[4].position == position
@@ -497,7 +499,7 @@ def test_physical_acceptance_half_test():
             particle_index=particle_index,
             position_delta=Vector.random_vector_xy(100)
         )
-        undo_command = commands.SetParticleState.gen_from_particle_command(command)
+        undo_command = commands.SetParticleState.gen_from_particle(box, particle_index)#.gen_from_particle_command(command)
         command.execute()
         weak_physical_acceptance = command.physical_acceptance_weak()
         assert weak_physical_acceptance != box.collision_test()
@@ -510,7 +512,7 @@ def test_physical_acceptance_simulator_scale():
     simulation = default_simulation(box_list=[box])
     for _ in range(500):
         command = commands.NuclearRescale(
-            simulation=simulation,
+            simulation_params=simulation.simulation_params,
             change_by_factor=np.random.uniform(
                 low = 0.1,
                 high = 1.9,

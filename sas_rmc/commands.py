@@ -258,8 +258,7 @@ class NuclearScale(ScaleCommand):
     change_to_factor: float
 
     def execute(self) -> None:
-        rescale_param = self.simulation_params.get_param(key = NUCLEAR_RESCALE)
-        rescale_param.set_value(self.change_to_factor)
+        self.simulation_params.set_value(key = NUCLEAR_RESCALE, value = self.change_to_factor)
 
 
 @dataclass
@@ -267,8 +266,7 @@ class MagneticScale(ScaleCommand):
     change_to_factor: float
 
     def execute(self) -> None:
-        magnetic_rescale_param = self.simulation_params.get_param(key = MAGNETIC_RESCALE)
-        magnetic_rescale_param.set_value(self.change_to_factor)
+        self.simulation_params.set_value(key = MAGNETIC_RESCALE, value = self.change_to_factor)
 
 
 @dataclass

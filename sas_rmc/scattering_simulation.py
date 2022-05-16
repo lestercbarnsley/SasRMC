@@ -106,6 +106,10 @@ class SimulationParams:
     def get_value(self, key: str, default: Optional[float] = None) -> float:
         return self.to_value_dict().get(key, default)
 
+    def set_value(self, key: str, value: float) -> None:
+        param = self.get_param(key)
+        param.set_value(value)
+
 
 IntensityCalculator = Callable[[SimulationParams], Tuple[np.ndarray, np.ndarray, np.ndarray]]
 

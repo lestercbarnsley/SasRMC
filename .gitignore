@@ -5,3 +5,6 @@ sas_rmc/__pycache__/
 !data/CoreShell_Simulation_Input.xlsx
 sas_rmc.egg-info/
 requirements.txt
+tests/__pycache__/
+.vscode/
+.vscode/settings.json

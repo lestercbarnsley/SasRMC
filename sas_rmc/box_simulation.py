@@ -50,14 +50,15 @@ class Box:
         return any([particle.is_magnetic() for particle in self.particles])
     
     def wall_or_particle_collision(self, i: int, half_test = False) -> bool:
-        compare_to_i = lambda j: (i < j) if half_test else (i != j)
+        compare_to_i = (lambda j: i < j) if half_test else (lambda j: i != j)#lambda j: (i < j) if half_test else (i != j)
         particle = self.particles[i]
         if not self.is_inside(particle.position):
             return True
-        for j, particle2 in enumerate(self.particles):
+        return any(compare_to_i(j) and particle.collision_detected(particle2) for j, particle2 in enumerate(self.particles))
+        '''for j, particle2 in enumerate(self.particles):
             if compare_to_i(j) and particle.collision_detected(particle2):
                 return True
-        return False
+        return False'''
 
     def move_inside_box(self, i: int, in_plane: bool = False) -> None:
         particle = self.particles[i]
@@ -78,13 +79,14 @@ class Box:
         
     def force_inside_box(self, in_plane: bool = False) -> None:
         for i, _ in enumerate(self.particles):
-            self._force_particle_inside_box(i, half_test=True, in_plane=in_plane)
+            self._force_particle_inside_box(i, half_test=False, in_plane=in_plane)
             
     def collision_test(self) -> bool:
-        for i, _ in enumerate(self.particles):
+        return any(self.wall_or_particle_collision(i, half_test=True) for i, _ in enumerate(self.particles))
+        '''for i, _ in enumerate(self.particles):
             if self.wall_or_particle_collision(i, half_test=True):
                 return True
-        return False
+        return False'''
 
     def get_nearest_particle(self, particle: Particle) -> Particle:
         #particle = self.particles[particle_index]
