@@ -11,15 +11,15 @@ SasRMC is compatible with Python 3.8 and newer. An upgrade to Python 3.10 is pla
 where `myvenv` is the name of your **venv**
 4. Activate the virtual environment with 
     `$ .\.myvenv\Scripts\activate`
-5. I recommend conda for scientists using Windows who are new to Python. Please consult with your local Pythonista for their advice. Installation instructions for conda can be found online: https://docs.conda.io/projects/conda/en/latest/user-guide/install/download.html
+5. I recommend **conda** for scientists using Windows who are new to Python. Please consult with your local Pythonista for their advice. Installation instructions for conda can be found online: https://docs.conda.io/projects/conda/en/latest/user-guide/install/download.html
 6. After installing conda, in a terminal, create an environment with
     `$ conda create -n myenv python=3.x`
 where `myenv` is the name of your conda environment and `3.x` is the Python version you wish to use. (Please use 3.8 or greater).
 7. Activate the conda environment with
     `$ conda activate myenv`
-8. In the terminal, navigate to the directory containing `main.py`
+8. In the terminal, navigate to the directory containing `setup.py`
 9. Install all dependencies with
-    `(myenv)$ pip install -r requirements.txt`
+    `(myenv)$ pip install -e .`
 
 ## Usage
 Most configuration for SasRMC is done using Excel spreadsheets.

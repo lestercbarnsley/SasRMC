@@ -18,13 +18,14 @@ setup(
     url='', # the url of your packge, can be pypi
     licence="MIT",
     packages=find_packages(include=["sas_rmc", "sas_rmc.*"]),#["sas_rmc"],  # packages=setuptools.find_packages(),
-    package_dir={'sas_rmc': "./sas_rmc"},
+    #package_dir={'sas_rmc': "./sas_rmc"},
     install_requires=[
         'PyYAML',
         'pandas',
         'numpy',
         'scipy',
         'matplotlib',
+        'openpyxl'
         ],
 )
 
