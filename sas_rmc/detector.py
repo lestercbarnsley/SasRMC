@@ -241,7 +241,7 @@ class DetectorImage:
         for i, pixel in enumerate(self._detector_pixels.flatten()):
             pixel_data = pixel.to_dict()
             if i == 0:
-                pixel_data.update({"Polarization": str(self.polarization)})
+                pixel_data.update({"Polarization": self.polarization.value})
             d.append(pixel_data)
         return pd.DataFrame(d)
 
@@ -304,9 +304,10 @@ class DetectorImage:
             i = qX_1d.index(qX)
             j = qY_1d.index(qY)
             detector_pixels[j, i] = cls.row_to_pixel(row, detector_config=detector_config)
+            polarization = detector_config.polarization if detector_config else Polarization(data_dict.get("Polarization", Polarization.UNPOLARIZED.value))
         return cls(
             _detector_pixels = detector_pixels,
-            polarization = detector_config.polarization if detector_config is not None else Polarization.UNPOLARIZED
+            polarization = polarization
         
         )
 
@@ -340,9 +341,7 @@ class DetectorImage:
         all_qx = dataframe['qX'].astype(np.float64)
         all_qy = dataframe['qY'].astype(np.float64)
         all_intensity = dataframe['intensity'].astype(np.float64)
-        column_titles = dataframe.columns
-        shape = all_intensity.size
-        filter_optional_column = lambda col_title: dataframe[col_title].astype(np.float64) if col_title in column_titles else np.zeros(shape)
+        filter_optional_column = lambda col_title: dataframe.get(col_title, np.zeros(all_intensity.size)).astype(np.float64)
         def filter_optional_column_possibilities(col_title_possibilities: List[str]):
             for col_title in col_title_possibilities:
                 all_vals = filter_optional_column(col_title)
@@ -366,7 +365,8 @@ class DetectorImage:
             'sigma_para' : all_sigma_para,
             'sigma_perp' : all_sigma_perp,
             'shadow_factor' : all_shadow_factor,
-            'simulated_intensity' : all_simulated_intensity
+            'simulated_intensity' : all_simulated_intensity,
+            'Polarization' : dataframe.get("Polarization", pd.Series([Polarization.UNPOLARIZED.value])).iloc[0]
         }
         if np.sum(all_sigma_para**2) and np.sum(all_sigma_perp**2):
             return cls.gen_from_data(data_dict = data_dict) # Don't pass the detector config if sigma_para and sigma_perp are present

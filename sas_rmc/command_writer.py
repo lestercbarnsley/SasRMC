@@ -7,10 +7,13 @@ from matplotlib.figure import Figure
 from matplotlib.axes import Axes
 from matplotlib import pyplot as plt
 
+from sas_rmc.converters import particle_to_axes
+
 from .box_simulation import Box
-from .particle import CoreShellParticle, Dumbbell, Particle
+from .particle import Particle
 
 PI = np.pi
+
 
 class Loggable(Protocol):
     def get_loggable_data(self) -> dict:
@@ -19,10 +22,7 @@ class Loggable(Protocol):
 
 Converter = Callable[[Loggable], dict]
 ParticleConverter = Callable[[Particle], dict]
-
-
-def standard_command_converter(loggable: Loggable) -> dict:
-    return loggable.get_loggable_data()
+ParticleToAxesWriter = Callable[[Particle, Axes], None]
 
 
 @dataclass
@@ -36,57 +36,8 @@ class CommandWriter:
 
     @classmethod
     def standard_particle_writer(cls):
-        return cls(command_converter = standard_command_converter)
+        return cls(command_converter = lambda loggable: loggable.get_loggable_data())
 
-
-def convert_default_particle(particle: Particle) -> dict:
-    return {
-        'Particle type': type(particle).__name__,
-        'Position.X' : particle.position.x,
-        'Position.Y' : particle.position.y,
-        'Position.Z' : particle.position.z,
-        'Orientation.X' : particle.orientation.x,
-        'Orientation.Y' : particle.orientation.y,
-        'Orientation.Z' : particle.orientation.z,
-        'Magnetization.X' : particle.magnetization.x,
-        'Magnetization.Y' : particle.magnetization.y,
-        'Magnetization.Z' : particle.magnetization.z,
-        'Volume' : particle.volume,
-        'Total scattering length' : particle.scattering_length,
-    }
-
-def convert_core_shell_particle(core_shell_particle: CoreShellParticle) -> dict:
-    core_radius = core_shell_particle.shapes[0].radius
-    overall_radius = core_shell_particle.shapes[1].radius
-    thickness = overall_radius - core_radius
-    data = {
-        'Particle type': "",
-        'Core radius': core_radius,
-        'Shell thickness': thickness,
-        'Core SLD': core_shell_particle.core_sld,
-        'Shell SLD' : core_shell_particle.shell_sld,
-        'Solvent SLD': core_shell_particle.solvent_sld,
-    }
-    data.update(
-        convert_default_particle(core_shell_particle)
-    )
-    return data
-
-def convert_particle(particle: Particle) -> dict:
-    #When making these converters, ask the question, what parameters do I need to reconstruct a particle from a finished simulation
-    if isinstance(particle, CoreShellParticle):
-        return convert_core_shell_particle(particle)
-    return convert_default_particle(particle)
-
-def put_particle_on_ax(particle: Particle, ax: Axes, c: str = 'blue', alpha: float = 0.5) -> None:
-    if isinstance(particle, CoreShellParticle):
-        circle = plt.Circle((particle.position.x, particle.position.y), radius= particle.shapes[1].radius, color = c, alpha = alpha)
-        ax.add_patch(circle)
-    elif isinstance(particle, Dumbbell):
-        put_particle_on_ax(particle=particle.particle_1, ax = ax, c = 'blue')
-        put_particle_on_ax(particle=particle.particle_2, ax = ax, c = 'red')
-    else:
-        ax.scatter(x = particle.position.x, y = particle.position.y, c = 'blue')
 
 @dataclass
 class BoxWriter:
@@ -95,8 +46,8 @@ class BoxWriter:
     def to_data(self, box: Box) -> List[dict]:
         return [self.particle_converter(particle) for particle in box.particles]
 
-    def to_plot(self, box: Box, fontsize: int = 14, particle_on_axes_writer: Optional[Callable[[Particle, Axes], None]] = None) -> Figure:
-        p_on_ax_writer = particle_on_axes_writer if particle_on_axes_writer is not None else put_particle_on_ax
+    def to_plot(self, box: Box, fontsize: int = 14, particle_to_axes_writer: Optional[ParticleToAxesWriter] = None) -> Figure:
+        p_on_ax_writer = particle_to_axes_writer if particle_to_axes_writer is not None else particle_to_axes
         fig, ax = plt.subplots()
         fig.set_size_inches(4,4)
         for p in box.particles:
@@ -114,7 +65,7 @@ class BoxWriter:
     @classmethod
     def standard_box_writer(cls):
         return cls(
-            particle_converter = convert_particle,
+            particle_converter = lambda particle : particle.get_loggable_data(),
         )
 
 

@@ -1,5 +1,5 @@
 #%%
-from typing import Callable, Tuple, Type
+from typing import Callable, List, Tuple, Type
 from dataclasses import dataclass
 
 import numpy as np
@@ -28,7 +28,7 @@ def broadcast_to_numpy_array(object_array: np.ndarray, getter_function: Callable
 class Vector:
     x: float
     y: float
-    z: float = 0
+    z: float = 0.0
 
     @property
     def mag(self) -> float:
@@ -56,12 +56,11 @@ class Vector:
     def __mul__(self, vector_or_scalar):
         if isinstance(vector_or_scalar, Vector):# type(vector_or_scalar) == type(self): This should be hardcodes as the base class because a sub class should be multipliable by any Vector
             return self.x * vector_or_scalar.x + self.y * vector_or_scalar.y + self.z * vector_or_scalar.z
-        if type(vector_or_scalar) == type(1.0) or type(vector_or_scalar) == type(1):
-            return type(self)(
-                x = self.x * vector_or_scalar,
-                y = self.y * vector_or_scalar,
-                z = self.z * vector_or_scalar
-                )
+        return type(self)(
+            x = self.x * vector_or_scalar,
+            y = self.y * vector_or_scalar,
+            z = self.z * vector_or_scalar
+            )
 
     def __rmul__(self, scalar):
         return self * scalar
@@ -88,18 +87,45 @@ class Vector:
 
     def copy(self):
         return type(self)(
-            x = self.x + 0,
-            y = self.y + 0,
-            z = self.z + 0
+            x = self.x + 0.0,
+            y = self.y + 0.0,
+            z = self.z + 0.0
             )
 
+    def to_dict(self, vector_str: str = None) -> dict:
+        if vector_str is None:
+            return {
+                "X": self.x,
+                "Y": self.y,
+                "Z": self.z
+            }
+        return {
+            f"{vector_str}.X" : self.x,
+            f"{vector_str}.Y" : self.y,
+            f"{vector_str}.Z" : self.z,
+        }
+
     @classmethod
-    def from_list(cls, l):
+    def from_list(cls, l: List[float]):
         return cls(x = l[0], y = l[1], z = l[2])
 
     @classmethod
     def from_numpy(cls, arr):
         return cls(x = arr[0], y = arr[1], z = arr[2])
+
+    @classmethod
+    def from_dict(cls, d: dict, vector_str: str = None):
+        if vector_str is None:
+            return cls(
+                x = d.get('X', 0.0),
+                y = d.get('Y', 0.0),
+                z = d.get('Z', 0.0)
+            )
+        return cls(
+            x = d.get(f'{vector_str}.X', 0.0),
+            y = d.get(f'{vector_str}.X', 0.0),
+            z = d.get(f'{vector_str}.Z', 0.0)
+        )
 
     def rotated_basis(self):
         unit_a = self.unit_vector
@@ -131,9 +157,9 @@ class Vector:
 @dataclass
 class VectorElement:
     position: Vector = Vector.null_vector()
-    dx: float = 0
-    dy: float = 0
-    dz: float = 0
+    dx: float = 0.0
+    dy: float = 0.0
+    dz: float = 0.0
 
     @property
     def volume(self) -> float:
@@ -240,6 +266,9 @@ class Interface:
         return position_ref - (self.normal.unit_vector * position_ref) * self.normal.unit_vector + self.position_marker
 
         
+
+
+
 if __name__ == "__main__":
     v = Vector(2,0)
     print(v.unit_vector)
@@ -252,3 +281,6 @@ if __name__ == "__main__":
     x, y, z = 1, 2.5, 0
     print(Vector(x, y, z) == Vector(x, y, z))
     print(np.array([x,y,z]) is np.array([x, y, z]))
+
+
+

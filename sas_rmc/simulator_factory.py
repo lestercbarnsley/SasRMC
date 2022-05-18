@@ -14,7 +14,7 @@ from .viewer import CLIViewer
 from .scattering_simulation import MAGNETIC_RESCALE, NUCLEAR_RESCALE, Fitter2D, ScatteringSimulation, SimulationParam, SimulationParams
 from .simulator import MemorizedSimulator, MonteCarloEvaluator, Simulator
 from .vector import Vector
-from .particle import CoreShellParticle, Particle
+from .particle import CoreShellParticle, Dumbbell, NumericalDumbell, Particle
 from .box_simulation import Box
 from .detector import DetectorImage, Polarization, DetectorConfig, SimulatedDetectorImage
 from .shapes import Cube
@@ -241,30 +241,94 @@ def command_factory(nominal_step_size: float, box: Box, particle_index: int, tem
         )
     )
 
-def core_shell_particle_factory(core_radius: float, core_polydispersity: float, core_sld: float, shell_thickness: float, shell_polydispersity: float, shell_sld: float, solvent_sld: float, core_magnetization: float) -> ParticleFactory:
+def polydisperse_parameter(loc: float, polyd: float, dispersity_fn: Callable[[float, float], float] = None) -> float:
+    poly_fn = dispersity_fn if dispersity_fn else (lambda l, s: rng.normal(loc = l, scale = s)) # I only want to write out the lambda expression like this so I can be explicit about the kwargs
+    return poly_fn(loc, loc * polyd)
+
+def core_shell_particle_factory(config_dict: dict) -> ParticleFactory:#core_radius: float, core_polydispersity: float, core_sld: float, shell_thickness: float, shell_polydispersity: float, shell_sld: float, solvent_sld: float, core_magnetization: float) -> ParticleFactory:
+    core_magnetization = config_dict.get("core_magnetization", 0.0)
+    core_radius = config_dict.get("core_radius", 0.0)
+    core_polydispersity = config_dict.get("core_polydispersity", 0.0)
+    shell_thickness = config_dict.get("shell_thickness", 0.0)
+    shell_polydispersity = config_dict.get("shell_polydispersity", 0.0)
+    core_sld = config_dict.get("core_sld", 0.0)
+    shell_sld = config_dict.get("shell_sld", 0.0)
+    solvent_sld = config_dict.get("solvent_sld", 0.0)
     return lambda : CoreShellParticle.gen_from_parameters(
         position=Vector.null_vector(),
         magnetization=Vector.random_vector_xy(core_magnetization),
-        core_radius=rng.normal(loc = core_radius, scale = core_polydispersity * core_radius),
-        thickness=rng.normal(loc = shell_thickness, scale = shell_polydispersity * shell_thickness),
+        core_radius=polydisperse_parameter(loc = core_radius, polyd = core_polydispersity),
+        thickness=polydisperse_parameter(loc = shell_thickness, polyd=shell_polydispersity),
         core_sld=core_sld,
         shell_sld=shell_sld,
         solvent_sld=solvent_sld
     )
 
+def dumbbell_particle_factory(config_dict: dict) -> ParticleFactory:
+    core_radius = config_dict.get("core_radius", 0.0)
+    core_polydispersity = config_dict.get("core_polydispersity", 0.0)
+    core_sld= config_dict.get("core_sld", 0.0)
+    seed_radius = config_dict.get("seed_radius", 0.0)
+    seed_polydispersity = config_dict.get("seed_polydispersity", 0.0)
+    seed_sld = config_dict.get("seed_sld", 0.0)
+    shell_thickness = config_dict.get("shell_thickness", 0.0)
+    shell_polydispersity = config_dict.get("shell_polydispersity", 0.0)
+    shell_sld = config_dict.get("shell_sld", 0.0)
+    solvent_sld = config_dict.get("solvent_sld", 0.0)
+    core_magnetization = config_dict.get("core_magnetization", 0.0)
+    seed_magnetization= config_dict.get("seed_magnetization", 0.0)
+    return lambda : Dumbbell.gen_from_parameters(
+        core_radius=polydisperse_parameter(loc = core_radius, polyd=core_polydispersity),
+        seed_radius=polydisperse_parameter(loc = seed_radius, polyd = seed_polydispersity),
+        shell_thickness=polydisperse_parameter(loc = shell_thickness, polyd = shell_polydispersity),
+        core_sld = core_sld,
+        seed_sld = seed_sld,
+        shell_sld=shell_sld,
+        solvent_sld=solvent_sld,
+        position = Vector.null_vector(),
+        orientation=Vector.random_vector_xy(),
+        core_magnetization = Vector.random_vector_xy(core_magnetization),
+        seed_magnetization=Vector.random_vector_xy(seed_magnetization)
+    )
+
+def numerical_dumbbell_particle_factory(config_dict: dict) -> ParticleFactory:
+    core_radius = config_dict.get("core_radius", 0.0)
+    core_polydispersity = config_dict.get("core_polydispersity", 0.0)
+    core_sld= config_dict.get("core_sld", 0.0)
+    seed_radius = config_dict.get("seed_radius", 0.0)
+    seed_polydispersity = config_dict.get("seed_polydispersity", 0.0)
+    seed_sld = config_dict.get("seed_sld", 0.0)
+    shell_thickness = config_dict.get("shell_thickness", 0.0)
+    shell_polydispersity = config_dict.get("shell_polydispersity", 0.0)
+    shell_sld = config_dict.get("shell_sld", 0.0)
+    centre_to_centre_separation = config_dict.get("centre_to_centre_separation", 0.0)
+    centre_to_centre_polydispersity = config_dict.get("centre_to_centre_polydispersity", 0.0)
+    solvent_sld = config_dict.get("solvent_sld", 0.0)
+    core_magnetization = config_dict.get("core_magnetization", 0.0)
+    seed_magnetization= config_dict.get("seed_magnetization", 0.0)
+    
+    return lambda : NumericalDumbell.gen_from_parameters(
+        core_radius=polydisperse_parameter(core_radius, polyd=core_polydispersity),
+        seed_radius=polydisperse_parameter(seed_radius, polyd=seed_polydispersity),
+        shell_thickness=polydisperse_parameter(shell_thickness, polyd=shell_polydispersity),
+        centre_to_centre=polydisperse_parameter(centre_to_centre_separation, centre_to_centre_polydispersity),
+        core_sld=core_sld,
+        seed_sld=seed_sld,
+        shell_sld=shell_sld,
+        solvent_sld=solvent_sld,
+        position=Vector.null_vector(),
+        orientation=Vector.random_vector_xy()
+    )
+
 def generate_particle_factory_from_config_dict(config_dict: dict) -> ParticleFactory:
     particle_type= config_dict.get("particle_type", "CoreShellParticle")
-    if particle_type == "CoreShellParticle":
-        return core_shell_particle_factory(
-            core_radius=config_dict.get("core_radius", 0.0),
-            core_polydispersity=config_dict.get("core_polydispersity", 0.0),
-            core_sld=config_dict.get("core_sld", 0.0),
-            shell_thickness=config_dict.get("shell_thickness", 0.0),
-            shell_polydispersity=config_dict.get("shell_polydispersity", 0.0),
-            shell_sld=config_dict.get("shell_sld", 0.0),
-            solvent_sld=config_dict.get("solvent_sld", 0.0),
-            core_magnetization=config_dict.get("core_magnetization", 0.0)
-        )
+    if particle_type == CoreShellParticle.__name__:
+        return core_shell_particle_factory(config_dict)
+    if particle_type == Dumbbell.__name__:
+        return dumbbell_particle_factory(config_dict)
+    if particle_type == NumericalDumbell.__name__:
+        return numerical_dumbbell_particle_factory(config_dict)
+    
 
 
 @dataclass
@@ -558,7 +622,18 @@ class SimulationConfig:
         )
     
 
+@dataclass
+class SimulationReloader(SimulationConfig):
 
+    def generate_detector_list(self, data_frames) -> List[DetectorImage]:
+        detector_list = []
+        for i in range(100_000):
+            s = f"Final detector image {i}"
+            if s in data_frames:
+                detector_list.append(SimulatedDetectorImage.gen_from_pandas(data_frames[s]))
+            else:
+                break
+        return detector_list
 
 
 

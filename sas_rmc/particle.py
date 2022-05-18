@@ -1,6 +1,8 @@
 #%%
 from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
+from distutils import core
+from turtle import pos
 from typing import Callable, List, Tuple
 
 import numpy as np
@@ -146,8 +148,8 @@ class Particle(ABC):
         bool
             Returns True if the particle is spherical
         """
-        same_location = lambda location_vector : round_vector(location_vector) == round_vector(self.position)
-        return all([isinstance(shape, Sphere) for shape in self.shapes]) and all([same_location(shape.central_position) for shape in self.shapes])
+        same_location = lambda : all(round_vector(shape.central_position) == round_vector(self.shapes[0].central_position) for shape in self.shapes)
+        return all(isinstance(shape, Sphere) for shape in self.shapes) and same_location()
 
     @property
     def orientation(self) -> Vector:
@@ -224,8 +226,15 @@ class Particle(ABC):
             form_magnetic_z=form_magnetic_z,
         )
 
-    def core_repr(self):
-        return f'{type(self).__name__}(position = {self.position}, orientation = {self.orientation}, magnetization = {self._magnetization}, volume = {self.volume}, scattering_length = {self.scattering_length})'
+    def get_loggable_data(self) -> dict:
+        return {
+        'Particle type': type(self).__name__,
+        **self.position.to_dict("Position"),
+        **self.orientation.to_dict("Orientation"),
+        **self.magnetization.to_dict("Magnetization"),
+        'Volume' : self.volume,
+        'Total scattering length' : self.scattering_length,
+    }
 
 
 def form_array_sphere(radius: float, sld: float, q_array: np.ndarray) -> np.ndarray:
@@ -290,6 +299,21 @@ class CoreShellParticle(Particle):
         biggest_shape = self.shapes[np.argmax([shape.volume for shape in self.shapes])]
         return collision_detected([biggest_shape], other_particle.shapes)
 
+    def get_loggable_data(self) -> dict:
+        core_radius = self.shapes[0].radius
+        overall_radius = self.shapes[1].radius
+        thickness = overall_radius - core_radius
+        data = {
+            'Particle type': "",
+            'Core radius': core_radius,
+            'Shell thickness': thickness,
+            'Core SLD': self.core_sld,
+            'Shell SLD' : self.shell_sld,
+            'Solvent SLD': self.solvent_sld,
+        }
+        data.update(super().get_loggable_data())
+        return data
+
     @classmethod
     def gen_from_parameters(cls, position: Vector, magnetization: Vector = None, core_radius: float = 0, thickness: float = 0, core_sld: float = 0, shell_sld: float = 0, solvent_sld: float = 0):
         sphere_inner = Sphere(central_position=position, radius=core_radius)
@@ -338,9 +362,9 @@ class Dumbbell(Particle):
         return self.particle_1.position
 
     def set_position(self, position: Vector) -> None:
-        delta_position = position - self.position
-        self.particle_1.set_position(self.particle_1.position + delta_position)
-        self.particle_2.set_position(self.particle_2.position + delta_position)
+        orientation = self.orientation
+        self.particle_1.set_position(position)
+        self.set_orientation(orientation)
 
     @property
     def orientation(self) -> Vector:
@@ -358,12 +382,6 @@ class Dumbbell(Particle):
         mag_2 = self.particle_2.magnetization
         return mag_1 if mag_1.mag > mag_2.mag else mag_2
 
-    @property
-    def magnetization_minor(self) -> Vector:
-        mag_1 = self.particle_1.magnetization
-        mag_2 = self.particle_2.magnetization
-        return mag_2 if mag_1.mag > mag_2.mag else mag_1
-
     def set_magnetization(self, magnetization: Vector) -> None:
         mag_1 = self.particle_1.magnetization
         mag_2 = self.particle_2.magnetization
@@ -371,14 +389,6 @@ class Dumbbell(Particle):
             self.particle_1.set_magnetization(magnetization)
         else:
             self.particle_2.set_magnetization(magnetization)
-
-    def set_magnetization_minor(self, magnetization_minor: Vector) -> None:
-        mag_1 = self.particle_1.magnetization
-        mag_2 = self.particle_2.magnetization
-        if mag_1.mag > mag_2.mag:
-            self.particle_2.set_magnetization(magnetization_minor)
-        else:
-            self.particle_1.set_magnetization(magnetization_minor)
 
     def is_inside(self, position: Vector) -> bool:
         return any(
@@ -418,8 +428,28 @@ class Dumbbell(Particle):
         magnetic_2 = self.particle_2.magnetic_modulated_array(qx_array, qy_array, position=self.particle_2.position, orientation=self.particle_2.orientation, magnetization=self.particle_2.magnetization)
         return [m1 + m2 for m1, m2 in zip(magnetic_1, magnetic_2)]
 
+    def get_loggable_data(self) -> dict:
+        core_radius = self.particle_1.shapes[0].radius
+        overall_radius = self.particle_1.shapes[1].radius
+        thickness = overall_radius - core_radius
+        data = {
+            'Particle type' : "",
+            'Core radius': core_radius,
+            'Seed radius' : self.particle_2.shapes[0].radius,
+            'Shell thickness': thickness,
+            'Core SLD': self.particle_1.core_sld,
+            'Seed SLD': self.particle_2.core_sld,
+            'Shell SLD' : self.particle_1.shell_sld,
+            'Solvent SLD': self.particle_1.solvent_sld,
+        }
+        data.update(super().get_loggable_data())
+        data.update(self.particle_1.magnetization.to_dict('MagnetizationCore'))
+        data.update(self.particle_2.magnetization.to_dict('MagnetizationSeed'))
+        
+        return data
+
     @classmethod
-    def gen_from_parameters(cls, core_radius, seed_radius, shell_thickness, core_sld, seed_sld, shell_sld, solvent_sld, position: Vector = None, orientation: Vector = None):
+    def gen_from_parameters(cls, core_radius, seed_radius, shell_thickness, core_sld, seed_sld, shell_sld, solvent_sld, position: Vector = None, orientation: Vector = None, core_magnetization: Vector = None, seed_magnetization: Vector = None):
         particle_position = position if position else Vector.null_vector()
         particle_orientation = orientation if orientation else Vector(0, 1, 0)
         core_shell = CoreShellParticle.gen_from_parameters(
@@ -428,7 +458,8 @@ class Dumbbell(Particle):
             thickness=shell_thickness,
             core_sld=core_sld,
             shell_sld=shell_sld,
-            solvent_sld=solvent_sld
+            solvent_sld=solvent_sld,
+            magnetization=core_magnetization if core_magnetization else Vector.null_vector()
         )
         seed_shell = CoreShellParticle.gen_from_parameters(
             position=particle_position,
@@ -436,7 +467,8 @@ class Dumbbell(Particle):
             thickness=shell_thickness,
             core_sld=seed_sld,
             shell_sld=shell_sld,
-            solvent_sld=solvent_sld
+            solvent_sld=solvent_sld,
+            magnetization=seed_magnetization if seed_magnetization else Vector.null_vector()
         )
         dumbell = cls(
             shapes = [core_shell.shapes[1], seed_shell.shapes[1]],
@@ -532,6 +564,15 @@ class SphereNumerical(NumericalParticle):
         relative_position = position - self.position
         return self.delta_sld(self.sphere_sld) if self.is_inside(relative_position) else self.delta_sld(self.solvent_sld)
 
+    def get_loggable_data(self) -> dict:
+        data = {
+            'Particle type' : "",
+            'Sphere radius': self.shapes[0].radius,
+            'Sphere SLD' : self.sphere_sld
+            }
+        data.update(super().get_loggable_data())
+        return data
+
     @classmethod
     def gen_from_parameters(cls, radius, sphere_sld, solvent_sld, pixel_size = None, position = Vector.null_vector(), max_size = None, vector_space = None):
         dx = pixel_size if pixel_size is not None else radius / 10
@@ -582,6 +623,72 @@ class CylinderNumerical(NumericalParticle):
             cylinder_sld=cylinder_sld,
             solvent_sld=solvent_sld
             )
+
+@dataclass
+class NumericalDumbell(NumericalParticle):
+    shapes: List[Shape] = field(
+        default_factory=lambda : [Sphere(), Sphere(), Sphere(), Sphere()]
+    )
+    core_sld: float = 0
+    seed_sld: float = 0
+    shell_sld: float = 0
+    _centre_to_centre: float = 0
+
+    @property
+    def centre_to_centre(self) -> float:
+        return self._centre_to_centre
+
+    def set_centre_to_centre(self, centre_to_centre: float) -> None:
+        self._centre_to_centre = centre_to_centre
+
+    @property
+    def position(self) -> Vector:
+        return self.shapes[0].central_position
+
+    def set_position(self, position: Vector) -> None:
+        orientation = self.orientation
+        self.shapes[0].central_position = position
+        self.shapes[1].central_position = position
+        self.set_orientation(orientation)
+
+    @property
+    def orientation(self) -> Vector:
+        return (self.shapes[2].central_position - self.shapes[0].central_position).unit_vector
+
+    def set_orientation(self, orientation: Vector) -> None:
+        orientation_new = orientation.unit_vector
+        particle_2_position = self.position + (self.centre_to_centre * orientation_new)
+        self.shapes[2].central_position = particle_2_position
+        self.shapes[3].central_position = particle_2_position
+
+    def get_sld(self, position: Vector) -> float:
+        if self.shapes[2].is_inside(position):
+            return self.delta_sld(self.seed_sld)
+        if self.shapes[0].is_inside(position):
+            return self.delta_sld(self.core_sld)
+        if self.shapes[1].is_inside(position) or self.shapes[3].is_inside(position):
+            return self.delta_sld(self.shell_sld)
+        return self.delta_sld(self.solvent_sld)
+
+    @classmethod
+    def gen_from_parameters(cls, core_radius: float, seed_radius: float, shell_thickness: float, centre_to_centre: float, core_sld: float, seed_sld: float, shell_sld: float, solvent_sld: float, position: Vector = None, orientation: Vector = None):
+        position_ = position if position else Vector.null_vector()
+        orientation_ = orientation if orientation else Vector(0,1,0)
+        numerical_dumbell = cls(
+            shapes=[
+                Sphere(central_position=position_,radius=core_radius),
+                Sphere(central_position=position_, radius = core_radius + shell_thickness),
+                Sphere(central_position=position_, radius = seed_radius),
+                Sphere(central_position=position_, radius=seed_radius + shell_thickness)
+                ],
+            core_sld=core_sld,
+            seed_sld=seed_sld,
+            shell_sld=shell_sld,
+            solvent_sld=solvent_sld,
+            _centre_to_centre = centre_to_centre,
+        )
+        numerical_dumbell.set_orientation(orientation_)
+        return numerical_dumbell
 
 
 @dataclass

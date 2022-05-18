@@ -19,7 +19,7 @@ from sas_rmc.shapes import Cube
 from sas_rmc.simulator_factory import is_float, subtract_buffer_intensity
 from sas_rmc.scattering_simulation import detector_smearer
 
-
+file_maker = sas_rmc.simulator_factory.generate_file_path_maker(Path.cwd(), description="figures")
 
 PI = np.pi
 mod = lambda arr: np.real(arr * np.conj(arr))
@@ -336,6 +336,9 @@ def figure_form_factors():
             ax.set_box_aspect(1)
 
     fig.tight_layout()
+    fig.savefig(file_maker("form_factors", ".eps"))
+    fig.savefig(file_maker("form_factors", ".pdf"))
+    
 
 def intensity_matrix_from_detector(detector: SimulatedDetectorImage):
     intensity_matrix = np.where(detector.qX < 0, detector.experimental_intensity, detector.simulated_intensity * detector.shadow_factor)
@@ -538,6 +541,9 @@ def figure_particle_maps():
 
     fig.tight_layout()
 
+    fig.savefig(file_maker("particle_positions", ".eps"))
+    fig.savefig(file_maker("particle_positions", ".pdf"))
+
 def numpy_to_sets(numpy: np.ndarray):
     cycles = np.unique(numpy[:,0])
     get_temperature = np.frompyfunc(lambda cycle : np.average(numpy[:,4][numpy[:,0] == cycle]), 1, 1)
@@ -615,6 +621,9 @@ def figure_algorithm_performance():
 
 
     fig.tight_layout()
+
+    fig.savefig(file_maker("algorithm_performance", ".eps"))
+    fig.savefig(file_maker("algorithm_performance", ".pdf"))
 
 
 def angle_subfigure(ax, detector_up: SimulatedDetectorImage, detector_down:SimulatedDetectorImage):
@@ -713,6 +722,7 @@ def figure_polarization():
 
     fig.tight_layout()
 
+
     fig_2, (ax5,ax6,ax7) = plt.subplots(1,3)
     fig_2.set_size_inches((3.5 * 3,3 * 1))
 
@@ -790,6 +800,10 @@ def figure_polarization():
     ax7.set_box_aspect(1)
 
     fig_2.tight_layout()
+
+    
+    fig.savefig(file_maker("polarization_fig", ".eps"))
+    fig.savefig(file_maker("polarization_fig", ".pdf"))
 
 
 def row_to_particle(row: pd.Series) -> Particle:
@@ -1070,6 +1084,9 @@ def figure_polarization_v2():
 
     fig.tight_layout()
 
+    fig.savefig(file_maker("magnetization_fig", ".eps"))
+    fig.savefig(file_maker("magnetization_fig", ".pdf"))
+
 def quick_test(): # Add to version control then delete
     box_writer = BoxWriter.standard_box_writer()
     box = Box(
@@ -1082,12 +1099,12 @@ def quick_test(): # Add to version control then delete
 
 
 def main():
-    # figure_form_factors()
-    # figure_particle_maps()
-    # figure_algorithm_performance()
-    # figure_polarization()
-    #figure_polarization_v2()
-    quick_test()
+    figure_form_factors()
+    figure_particle_maps()
+    figure_algorithm_performance()
+    figure_polarization()
+    figure_polarization_v2()
+    #quick_test()
 
 if __name__ == "__main__":
     main()

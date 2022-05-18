@@ -25,8 +25,10 @@ def pass_arg(arg):
         arg.flags.writeable = False
     if isinstance(arg, Vector):
         return round_vector(arg)
-    if isinstance(arg, list):
-        return tuple((pass_arg(a) for a in arg)) # I finally found a use case for recursion
+    if isinstance(arg, list) or isinstance(arg, tuple):
+        return tuple(pass_arg(a) for a in arg) # I finally found a use case for recursion
+    if isinstance(arg, dict):
+        return tuple((pass_arg(k), pass_arg(v)) for k, v in arg.items())
     return id(arg)
 
 def array_cache(func, max_size: int = MAX_SIZE):
@@ -34,8 +36,8 @@ def array_cache(func, max_size: int = MAX_SIZE):
 
     @wraps(func)
     def wrapper(*args, **kwargs):
-        kwarg_tuple = tuple((k, pass_arg(v)) for k, v in kwargs.items())
-        argument_tuple = tuple(pass_arg(arg) for arg in args) + kwarg_tuple
+        kwarg_tuple = pass_arg(kwargs)
+        argument_tuple = pass_arg(args) + kwarg_tuple
         if argument_tuple not in cache:
             if len(cache) >= max_size:
                 keys = list(cache.keys())

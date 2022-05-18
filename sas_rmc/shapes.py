@@ -3,6 +3,8 @@ from dataclasses import field, dataclass
 from abc import ABC, abstractmethod
 
 import numpy as np
+from matplotlib import pyplot as plt
+from matplotlib import patches
 
 from .vector import Vector, Interface
 
@@ -100,6 +102,12 @@ class Shape(ABC):
         """
         pass
 
+    @abstractmethod
+    def get_patches(self, **kwargs) -> patches.Patch:
+        pass
+
+
+
 
 @dataclass
 class Sphere(Shape):
@@ -118,6 +126,13 @@ class Sphere(Shape):
 
     def random_position_inside(self) -> Vector:
         return Vector.random_normal_vector(np.random.uniform(low=0, high=self.radius))
+
+    def get_patches(self, **kwargs) -> patches.Circle:
+        return patches.Circle(
+            xy = (self.central_position.x, self.central_position.y),
+            radius = self.radius,
+            **kwargs
+        )
 
 @dataclass
 class Cylinder(Shape):
@@ -169,6 +184,14 @@ class Cylinder(Shape):
         para_vec, radial_vec_1, radial_vec_2 = self.orientation.rotated_basis()
         return self.central_position + z * para_vec + r * (np.cos(phi) * radial_vec_1 + np.sin(phi) * radial_vec_2)
 
+    def get_patches(self, **kwargs) -> patches.Rectangle:
+        return patches.Rectangle(
+            xy = (self.central_position.x - self.radius, self.central_position.y - self.height / 2),
+            width = self.height,
+            height = 2 * self.radius,
+            angle = np.arctan2(self.orientation.y, self.orientation.x),
+            **kwargs
+        )
     
 @dataclass
 class Cube(Shape):
@@ -210,6 +233,14 @@ class Cube(Shape):
         basis_c, basis_a, basis_b = self.orientation.rotated_basis()
         return self.central_position + a * basis_a + b * basis_b + c * basis_c
 
+    def get_patches(self, **kwargs) -> patches.Rectangle:
+        return patches.Rectangle(
+            xy = (self.central_position.x - self.dimension_0 / 2, self.central_position.y - self.dimension_1 / 2),
+            width = self.dimension_0,
+            height = 2 * self.dimension_1,
+            angle = np.arctan2(self.orientation.y, self.orientation.x),
+            **kwargs
+        )
     
 
 def collision_detected(shapes_1: List[Shape], shape_2: List[Shape]) -> bool:

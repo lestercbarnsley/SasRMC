@@ -12,7 +12,7 @@ from .box_simulation import Box
 from .detector import DetectorImage
 from .logger import Logger
 from .simulator_factory import SimulationConfig, generate_file_path_maker
-from .template_generator import df_list_to_excel, generate_core_shell_template
+from .template_generator import generate_core_shell, generate_dumbbell, generate_numerical_dumbbell, generate_reload
 
 
 @dataclass
@@ -95,9 +95,7 @@ def rmc_runner_factory(input_config_source: Path, output_path: Path) -> RmcRunne
         output_format=output_format
     )
 
-def generate_core_shell(output_path: Path) -> None:
-    dfs, sheet_names = generate_core_shell_template()
-    df_list_to_excel(output_path, dfs, sheet_names)
+
 
 def core_shell_factory(data_folder) -> TemplateGenerator:
     template_name = "CoreShell_Simulation_Input"
@@ -107,12 +105,26 @@ def core_shell_factory(data_folder) -> TemplateGenerator:
         template_generating_method=generate_core_shell
     )
 
+def dumbbell_factory(data_folder) -> TemplateGenerator:
+    template_name = "Dumbbell_Simulation_Input"
+    return TemplateGenerator(
+        config_folder=data_folder,
+        template_name=template_name,
+        template_generating_method=generate_dumbbell
+    )
+
 def load_config(config_file: str) -> Runner:
     config_file_path = Path(config_file)
     with open(config_file_path, "r") as f:
         configs = yaml.load(f, Loader = yaml.FullLoader)
     if configs['input_config_source'] == "generate core shell template":
         return core_shell_factory(config_file_path.parent)
+    if configs['input_config_source'] == "generate dumbbell template":
+        return dumbbell_factory(config_file_path.parent)
+    if configs['input_config_source'] == "generate numerical dumbbell template":
+        return generate_numerical_dumbbell(config_file_path.parent)
+    if configs['input_config_source'] == "generate reload template":
+        return generate_reload(config_file_path.parent)
     input_config_source = Path(configs['input_config_source'])
     if not input_config_source.exists():
         input_config_source = config_file_path.parent / input_config_source

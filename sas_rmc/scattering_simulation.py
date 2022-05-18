@@ -74,6 +74,15 @@ class SimulationConstant(SimulationParam):
 
 @dataclass
 class SimulationParams:
+    """Collection of SimulationParams.
+
+    Exposes a set of methods to interact with the underlying list of SimulationParams.
+
+    Attributes
+    ----------
+    params : List[SimulationParam]
+        A list of SimulationParam.
+    """
     
     params: List[SimulationParam]
 
@@ -86,12 +95,26 @@ class SimulationParams:
 
     @property
     def values(self) -> List[float]:
+        """Get a list of values from SimulationParams.
+
+        Returns
+        -------
+        List[float]
+            The values contained inside each SimulationParam as a list.
+        """
         return [param.value for param in self.params]
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int) -> SimulationParam:
         return self.params[index]
 
     def get_physical_acceptance(self) -> bool:
+        """Check that all values in the list of SimulationParam are within bounds
+
+        Returns
+        -------
+        bool
+            Returns True if all SimulationParam values are within bounds
+        """
         return all(param.get_physical_acceptance() for param in self.params)
 
     def to_param_dict(self) -> dict:
