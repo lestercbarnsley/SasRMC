@@ -57,7 +57,7 @@ def default_dumbbell_box(particle_number = 20):
 
 
 def default_detector_image() -> SimulatedDetectorImage:
-    file = Path.cwd() / Path('data') / Path('I-pandas-unpolarized-SM-16586-S9DH-B--2200mT-KWS1.DAT')
+    file = Path.cwd() / Path('data') / Path('I-unpolarized_test_data_from_KWS-1.DAT')
     DETECTOR_CONFIG_C14D14 = DetectorConfig(
         detector_distance_in_m=14,
         collimation_distance_in_m=14,

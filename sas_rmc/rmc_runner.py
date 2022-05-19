@@ -11,7 +11,7 @@ from .simulator import Simulator
 from .box_simulation import Box
 from .detector import DetectorImage
 from .logger import Logger
-from .simulator_factory import SimulationConfig, generate_file_path_maker
+from .simulator_factory import gen_config_from_dataframes, generate_file_path_maker
 from .template_generator import generate_core_shell, generate_dumbbell, generate_numerical_dumbbell, generate_reload
 
 
@@ -71,7 +71,7 @@ def rmc_runner_factory(input_config_source: Path, output_path: Path) -> RmcRunne
            sheet_name = None,
            keep_default_na=False,
         )
-    simulator_config = SimulationConfig.gen_from_dataframes(dataframes)
+    simulator_config = gen_config_from_dataframes(dataframes)
     
     detector_list = simulator_config.generate_detector_list(dataframes)
     box_list = simulator_config.generate_box_list(detector_list)
@@ -95,43 +95,43 @@ def rmc_runner_factory(input_config_source: Path, output_path: Path) -> RmcRunne
         output_format=output_format
     )
 
-
-
-def core_shell_factory(data_folder) -> TemplateGenerator:
-    template_name = "CoreShell_Simulation_Input"
-    return TemplateGenerator(
-        config_folder=data_folder,
-        template_name=template_name,
-        template_generating_method=generate_core_shell
-    )
-
-def dumbbell_factory(data_folder) -> TemplateGenerator:
-    template_name = "Dumbbell_Simulation_Input"
-    return TemplateGenerator(
-        config_folder=data_folder,
-        template_name=template_name,
-        template_generating_method=generate_dumbbell
-    )
+TEMPLATE_PARAMS = {
+    "generate core shell template":{
+        "template_name" : "CoreShell_Simulation_Input",
+        "template_generating_method" : generate_core_shell
+        },
+    "generate dumbbell template":{
+        "template_name" : "Dumbell_Simulation_Input",
+        "template_generating_method" : generate_dumbbell
+        },
+    "generate numerical dumbbell template":{
+        "template_name" : "Numerical_Dumbell_Simulation_Input",
+        "template_generating_method" : generate_numerical_dumbbell
+        },
+    "generate reload template":{
+        "template_name" : "Reload_Simulation_Input",
+        "template_generating_method" : generate_reload
+        }
+    }
 
 def load_config(config_file: str) -> Runner:
     config_file_path = Path(config_file)
     with open(config_file_path, "r") as f:
         configs = yaml.load(f, Loader = yaml.FullLoader)
-    if configs['input_config_source'] == "generate core shell template":
-        return core_shell_factory(config_file_path.parent)
-    if configs['input_config_source'] == "generate dumbbell template":
-        return dumbbell_factory(config_file_path.parent)
-    if configs['input_config_source'] == "generate numerical dumbbell template":
-        return generate_numerical_dumbbell(config_file_path.parent)
-    if configs['input_config_source'] == "generate reload template":
-        return generate_reload(config_file_path.parent)
-    input_config_source = Path(configs['input_config_source'])
-    if not input_config_source.exists():
-        input_config_source = config_file_path.parent / input_config_source
+    input_config_source = configs['input_config_source']
+    if input_config_source in TEMPLATE_PARAMS:
+        template_params = TEMPLATE_PARAMS[input_config_source]
+        return TemplateGenerator(
+            config_folder=config_file_path.parent,
+            template_name=template_params["template_name"],
+            template_generating_method=template_params["template_generating_method"])
+    input_config_path = Path(input_config_source)
+    if not input_config_path.exists():
+        input_config_path = config_file_path.parent / input_config_path
     output_path = configs["output_folder"]
     if r'./' in output_path:
         output_path = config_file_path.parent / Path(output_path.replace(r'./', ''))
-    return rmc_runner_factory(input_config_source, output_path)
+    return rmc_runner_factory(input_config_path, output_path)
 
 
 if __name__ == "__main__":

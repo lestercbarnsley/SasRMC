@@ -38,3 +38,5 @@ More templates will be available in future versions.
 7. In the terminal, run
     `(myenv)$ python main.py`
 8. When the simulation is complete, you can find all outputs in the specified `output_folder`
+
+The `/data` folder contains a file `CoreShell_F20_pol.xlsx` which contains data described in the associated publication, and shows an example for how a simulation for a SANSPol measurement across 3 detector configurations and 2 polarization states can be set out.

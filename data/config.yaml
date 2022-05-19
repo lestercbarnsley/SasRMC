@@ -1,7 +1,14 @@
 # SasRMC config file.
 
-input_config_source : CoreShell Simulation Input - Copy.xlsx
+input_config_source : CoreShell Simulation Input.xlsx
 
-# if you write "generate core shell template" as the value for input_config_source, the algorithm will create a new "CoreShell_Simulation_Input" template Excel file in this folder with a current timestamp
+# The default file type for input_config_source is an Excel spreadsheet that contains the configuration for your simulation.
+# If you need a new, empty config file, you can generate one by specifying one of the following commands next to input_config_source (remove the quotation marks):
+# "generate core shell template" <-- This will make a new template for a core-shell simulation
+# "generate dumbbell template" <--- This will make a new template for a dumbbell simulation using a semi-analytical approximate form-factor
+# "generate numerical dumbbell template" <--- This will make a new template for a dumbbell simulation using a fully numerical form-factor
+# "generate reload template" <--- This will make a template that will allow you to reload a previously completed simulation
 
 output_folder : ./results
+
+# This is the folder where you will find your output and log files after the simulation is over.

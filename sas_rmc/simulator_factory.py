@@ -1,6 +1,6 @@
 
 from datetime import datetime
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, List, Tuple, Type, Union
 
@@ -9,6 +9,7 @@ import pandas as pd
 
 from .array_cache import array_cache
 from . import commands
+from .converters import dict_to_particle
 from .acceptance_scheme import MetropolisAcceptance
 from .viewer import CLIViewer
 from .scattering_simulation import MAGNETIC_RESCALE, NUCLEAR_RESCALE, Fitter2D, ScatteringSimulation, SimulationParam, SimulationParams
@@ -392,6 +393,13 @@ polarization_dict = {
     "out" : Polarization.UNPOLARIZED
 }
 
+def get_polarization(polarization_str: str) -> Polarization:
+    try:
+        polarization = Polarization(polarization_str)
+        return polarization
+    except ValueError:
+        return polarization_dict.get(polarization_str, Polarization.UNPOLARIZED)
+
 def series_to_config_dict(series: pd.Series) -> dict:
     d = {}
     for k, v in series.iteritems():
@@ -436,7 +444,7 @@ class DetectorDataConfig:
             detector_pixel_size_in_m=config_dict.get("Detector pixel", 0),
             wavelength_in_angstrom=config_dict.get("Wavelength", 5.0),
             wavelength_spread=config_dict.get("Wavelength Spread", 0.1),
-            polarization=polarization_dict[config_dict.get("Polarization", "out")]
+            polarization=get_polarization(config_dict.get("Polarization", "out")),
         )
         return cls(
             data_source=config_dict.get("Data Source", ""),
@@ -588,9 +596,7 @@ class SimulationConfig:
         )
 
     @classmethod
-    def gen_from_dataframes(cls, dataframes: dict):
-        dataframe, dataframe_2 = list(dataframes.values())[:2]
-        config_dict = dataframe_to_config_dict(dataframe) 
+    def gen_from_dataframes(cls, config_dict: dict, dataframe_2: pd.DataFrame):
         total_cycles = config_dict.get("total_cycles", 0)
         annealing_stop_cycle_as_read = config_dict.get("annealing_stop_cycle_number", total_cycles / 2)
         annealing_config = AnnealingConfig(
@@ -620,26 +626,121 @@ class SimulationConfig:
                 config_dict.get("box_dimension_3", 0)
             )
         )
-    
+
+def box_from_detector(detector_list: DetectorImage, particle_list: List[Particle]) -> Box:
+    dimension_0 = np.max([2 * PI / detector.qx_delta for detector in detector_list])
+    dimension_1 = np.max([2 * PI / detector.qy_delta for detector in detector_list])
+    dimension_2 = dimension_0
+    return Box(
+        particles=particle_list,
+        cube = Cube(
+            dimension_0=dimension_0,
+            dimension_1=dimension_1,
+            dimension_2=dimension_2
+        )
+    )
+
+def get_final_simulation_params(simulation_data: pd.DataFrame) -> Tuple[float, float]:
+    nuclear_rescale, magnetic_rescale = 1,1
+    valid_non_zero_float = lambda v: is_float(v) and float(v)
+    for _, simulation_row in simulation_data.iterrows():
+        if simulation_row['Acceptable Move'] == 'TRUE' or simulation_row['Acceptable Move'] == True:
+            #print(simulation_row['Acceptable Move'])
+            current_nuclear_rescale = simulation_row[NUCLEAR_RESCALE]
+            if valid_non_zero_float(current_nuclear_rescale):
+                nuclear_rescale = float(current_nuclear_rescale)
+            current_magnetic_rescale = simulation_row[MAGNETIC_RESCALE]
+            if valid_non_zero_float(current_magnetic_rescale):
+                magnetic_rescale = float(current_magnetic_rescale)
+    return nuclear_rescale, magnetic_rescale
 
 @dataclass
 class SimulationReloader(SimulationConfig):
+    data_frames: dict = field(default_factory = dict)
 
-    def generate_detector_list(self, data_frames) -> List[DetectorImage]:
+    def generate_detector_list(self, data_frames = None) -> List[DetectorImage]:
+        sdfs = self.data_frames
         detector_list = []
         for i in range(100_000):
             s = f"Final detector image {i}"
-            if s in data_frames:
-                detector_list.append(SimulatedDetectorImage.gen_from_pandas(data_frames[s]))
+            if s in sdfs:
+                detector_list.append(SimulatedDetectorImage.gen_from_pandas(sdfs[s]))
             else:
                 break
         return detector_list
 
+    def generate_box_list(self, detector_list: List[DetectorImage]) -> List[Box]:
+        box_list = []
+        for i in range(100_000):
+            s = f"Box {i} Final Particle States"
+            if s in self.data_frames:
+                particles = [dict_to_particle(row.to_dict()) for _, row in self.data_frames[s].iterrows()]
+                box = box_from_detector(detector_list, particles)
+                box_list.append(box)
+            else:
+                break
+        return box_list
 
+    def generate_controller(self, simulation: ScatteringSimulation, box_list: List[Box]) -> Controller:
+        super_controller = super().generate_controller(simulation, box_list)
+        simulation_data = self.data_frames['Simulation Data']
+        nuclear_rescale, magnetic_rescale = get_final_simulation_params(simulation_data)
+        simulation.simulation_params.set_value(NUCLEAR_RESCALE, nuclear_rescale)
+        simulation.simulation_params.set_value(MAGNETIC_RESCALE, magnetic_rescale)
+        first_command = commands.SetSimulationParams(simulation.simulation_params, change_to_factors = simulation.simulation_params.values)
+        super_controller.ledger[0] = first_command
+        return super_controller
 
-
+    @classmethod
+    def gen_from_dataframes(cls, config_dict: dict, dataframe_2: pd.DataFrame):
+        total_cycles = config_dict.get("total_cycles", 0)
+        annealing_stop_cycle_as_read = config_dict.get("annealing_stop_cycle_number", total_cycles / 2)
+        annealing_config = AnnealingConfig(
+            annealing_type=config_dict.get("annealing_type", "greedy").strip().lower(),
+            anneal_start_temp=config_dict.get("anneal_start_temp", 0.0),
+            anneal_fall_rate=config_dict.get("anneal_fall_rate",0.1),
+            annealing_stop_cycle_number=annealing_stop_cycle_as_read
+        )
+        detector_data_configs = [DetectorDataConfig.generate_detectorconfig_from_dict(config_dict)] if (config_dict.get("Data Source", "")) else DetectorDataConfig.generate_detectorconfig_list_from_dataframe(dataframe_2)
+        simulation_data_location = config_dict.get("log_file_source")
+        simulation_data_frames = pd.read_excel(
+           simulation_data_location,
+           dtype = None,
+           sheet_name = None,
+           keep_default_na=False,
+        )
+        return cls(
+            simulation_title = config_dict.get("simulation_title", ""),
+            data_frames=simulation_data_frames,
+            particle_factory = None,
+            nominal_concentration=config_dict.get("nominal_concentration", 0.0),
+            particle_number=config_dict.get("particle_number", 0),
+            box_number=config_dict.get("box_number", 0),
+            total_cycles = total_cycles,
+            annealing_config=annealing_config,
+            nominal_step_size = config_dict.get("core_radius", 100) / 2, # make this something more general later
+            detector_data_configs=detector_data_configs,
+            detector_smearing=config_dict.get("detector_smearing", True),
+            field_direction=config_dict.get("field_direction", "Y"),
+            force_log = config_dict.get("force_log_file", True),
+            output_plot_format = config_dict.get("output_plot_format", "NONE").lower(),
+            box_template = (
+                config_dict.get("box_dimension_1", 0),
+                config_dict.get("box_dimension_2", 0),
+                config_dict.get("box_dimension_3", 0)
+            )
+        )
 
     
+
+
+def gen_config_from_dataframes(data_frames: dict) -> SimulationConfig:
+    dataframe, dataframe_2 = list(data_frames.values())[:2]
+    config_dict = dataframe_to_config_dict(dataframe)
+    if config_dict["particle_type"] == "Reload old simulation":
+        return SimulationReloader.gen_from_dataframes(config_dict, dataframe_2)
+    return SimulationConfig.gen_from_dataframes(config_dict, dataframe_2)
+        
 
         
 

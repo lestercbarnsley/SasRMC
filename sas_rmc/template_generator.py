@@ -9,7 +9,7 @@ from sas_rmc.particle import CoreShellParticle, Dumbbell, NumericalDumbell
 
 ALWAYS_PRESENT_DATA = [
     [None,None,None,None],
-    ["simulation_title","this_is_a_test",r"# Name of output file",None],
+    ["simulation_title","write_title_here",r"# Name of output file",None],
     [None,None,r'# Cells containing "#" will be ignored by simulation',None],
 ]
 
@@ -60,14 +60,17 @@ NUMERICAL_DUMBBELL_PARTICLE = [
 ]
 
 RELOAD_PARTICLE_DATA = [
-    ["particle_type","Reload old simulation",r"# Angstroms",None],
+    ["particle_type","Reload old simulation",r"# This line should stay unchanged.",None],
     ["log_file_source",None,r"# File path", r"# Point to a previously saved log file (.xlsx). Particle configurations and detector data will be loaded directly from the log file. Simulation configurations are loaded from below parameters"],
 ]
 
-SIMULATION_DATA = [
+BOX_DATA = [
     ["nominal_concentration",None,r"# vol/vol",r"# Put in information for two out of three of nominal_concentration, particle_number and box_number."],
     ["particle_number",None,r"# integer",r"# If all three are present, nominal_concentration will be ignored"],
     ["box_number",None,r"# integer",None],
+]
+
+SIMULATION_DATA = [
     [None,None,None,None],
     ["total_cycles",None,r"# integer",None],
     ["annealing_type",r"Very fast",r"# Acceptable options: Fast, Very Fast, Greedy",None],
@@ -162,19 +165,19 @@ def df_list_to_excel(out_file: Path, dataframe_list: List[pd.DataFrame], sheet_n
 
 def generate_core_shell(output_path: Path) -> None:
     particle_data = CORE_SHELL_PARTICLE_DATA
-    simulation_data = [*SIMULATION_DATA, *DETECTOR_DATA]
+    simulation_data = [*BOX_DATA,*SIMULATION_DATA, *DETECTOR_DATA]
     dfs, sheet_names = generate_normal_template(particle_data=particle_data, simulation_data=simulation_data)
     df_list_to_excel(output_path, dfs, sheet_names)
 
 def generate_dumbbell(output_path: Path) -> None:
     particle_data = DUMBBELL_PARTICLE_DATA
-    simulation_data = [*SIMULATION_DATA, *DETECTOR_DATA]
+    simulation_data = [*BOX_DATA,*SIMULATION_DATA, *DETECTOR_DATA]
     dfs, sheet_names = generate_normal_template(particle_data=particle_data, simulation_data=simulation_data)
     df_list_to_excel(output_path, dfs, sheet_names)
 
 def generate_numerical_dumbbell(output_path: Path) -> None:
     particle_data = NUMERICAL_DUMBBELL_PARTICLE
-    simulation_data = [*SIMULATION_DATA, *DETECTOR_DATA]
+    simulation_data = [*BOX_DATA,*SIMULATION_DATA, *DETECTOR_DATA]
     dfs, sheet_names = generate_normal_template(particle_data=particle_data, simulation_data=simulation_data)
     df_list_to_excel(output_path, dfs, sheet_names)
 

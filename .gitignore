@@ -3,7 +3,12 @@ sas_rmc/__pycache__/
 *.xlsx
 !data/config.yaml
 !data/CoreShell_Simulation_Input.xlsx
+!data/CoreShell_F20_pol.xlsx
 sas_rmc.egg-info/
 requirements.txt
 tests/__pycache__/
 .vscode/
+.vscode/settings.json
+.pytest_cache/
+
+
