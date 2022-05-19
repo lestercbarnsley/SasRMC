@@ -23,7 +23,7 @@ where `myenv` is the name of your conda environment and `3.x` is the Python vers
     `(myenv)$ pip install -e .`
 
 ## Usage
-Most configuration for SasRMC is done using Excel spreadsheets.
+Most configuration for SasRMC is done using Excel spreadsheets. You can use SasRMC without needing to edit any Python code.
 
 1. In your text editor of choice, open `data/config.yaml`
 2. Next to `input_config_source` specify an Excel spreadsheet that will contain configuration data for your simulation. Your excel file should be in the same folder as the `config.yaml` file.
@@ -41,3 +41,10 @@ More templates will be available in future versions.
 8. When the simulation is complete, you can find all outputs in the specified `output_folder`
 
 The `/data` folder contains a file `CoreShell_F20_pol.xlsx` which contains data described in the associated publication, and shows an example for how a simulation for a SANSPol measurement across 3 detector configurations and 2 polarization states can be set out.
+
+## Advanced Usage
+
+1. Open a new .py file
+2. Type: `import sas_rmc`
+3. At this point, you are only limited by your own imagination (and my ability to write documentation).
+4. More documentation coming soon...
