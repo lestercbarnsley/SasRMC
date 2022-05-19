@@ -4,21 +4,22 @@ SasRMC is a Python library for numerical modelling of small-angle scattering dat
 ## Setup
 SasRMC is compatible with Python 3.8 and newer. An upgrade to Python 3.10 is planned.
 
-1. If you have an existing virtual environment or conda environment you wish to use, activate it in the usual way and jump to step 8.
-2. If you wish to create a new Python virtual environment, follow steps 3 and 4. If you wish to create a new conda environment follow steps 5-7.
-3. Navigate to where you wish to create a **venv** virtual environment and create it with
+1. Download source files from https://github.com/lestercbarnsley/SasRMC -> `Code` -> `Download ZIP`
+2. If you have an existing virtual environment or conda environment you wish to use, activate it in the usual way and jump to step 9.
+3. If you wish to create a new Python virtual environment, follow steps 4 and 5. If you wish to create a new conda environment follow steps 6-8.
+4. Navigate to where you wish to create a **venv** virtual environment and create it with
     `$ python -m venv .myvenv`
 where `myvenv` is the name of your **venv**
-4. Activate the virtual environment with 
+5. Activate the virtual environment with 
     `$ .\.myvenv\Scripts\activate`
-5. I recommend **conda** for scientists using Windows who are new to Python. Please consult with your local Pythonista for their advice. Installation instructions for conda can be found online: https://docs.conda.io/projects/conda/en/latest/user-guide/install/download.html
-6. After installing conda, in a terminal, create an environment with
+6. I recommend **conda** for scientists using Windows who are new to Python. Please consult with your local Pythonista for their advice. Installation instructions for conda can be found online: https://docs.conda.io/projects/conda/en/latest/user-guide/install/download.html
+7. After installing conda, in a terminal, create an environment with
     `$ conda create -n myenv python=3.x`
 where `myenv` is the name of your conda environment and `3.x` is the Python version you wish to use. (Please use 3.8 or greater).
-7. Activate the conda environment with
+8. Activate the conda environment with
     `$ conda activate myenv`
-8. In the terminal, navigate to the directory containing `setup.py`
-9. Install all dependencies with
+9. In the terminal, navigate to the directory containing `setup.py`
+10. Install all dependencies with
     `(myenv)$ pip install -e .`
 
 ## Usage
