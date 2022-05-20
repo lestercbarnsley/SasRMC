@@ -1,7 +1,7 @@
 #%%
 from dataclasses import dataclass, field
 from functools import wraps
-from typing import List, Protocol, Union
+from typing import List, Optional, Protocol, Union
 import time
 
 import numpy as np
@@ -40,7 +40,7 @@ def decorate_command(command: CommandOrAcceptableCommand) -> commands.Acceptable
 
 
 class Evaluator(Protocol):
-    def evaluate(self, command: CommandOrAcceptableCommand) -> AcceptanceScheme:
+    def evaluate(self, command: CommandOrAcceptableCommand) -> bool:
         pass
 
 
@@ -66,18 +66,18 @@ class Viewer(Protocol):
 @dataclass
 class MonteCarloEvaluator:
     simulation: ScatteringSimulation
-    viewer: Viewer = None
+    viewer: Optional[Viewer] = None
 
     def _show_view(self, command: CommandOrAcceptableCommand, acc_scheme: AcceptanceScheme) -> None:
         if self.viewer:
             self.viewer.show_view(self.simulation, command, acc_scheme)
 
-    def evaluate(self, command: CommandOrAcceptableCommand) -> AcceptanceScheme:
+    def evaluate(self, command: CommandOrAcceptableCommand) -> bool:
         acceptable_command = decorate_command(command)
         acceptable_command.handle_simulation(self.simulation)
         acc_scheme = acceptable_command.acceptance_scheme
         self._show_view(command, acc_scheme)
-        return acc_scheme
+        return acc_scheme.is_acceptable()
 
 
 @dataclass
@@ -86,19 +86,19 @@ class MemorizedSimulator(Simulator):
     box_list: List[Box]
     state_controller: Controller = field(init = False, default_factory=Controller)
 
-    def compute_states(self):
+    def compute_states(self) -> None:
         if self.state_controller.ledger:
             latest_state_command = self.state_controller.ledger[-1]
             latest_state_command.execute()
         else:
             self.controller.compute_states()
 
-    def simulate_command(self, controller: Controller, command: CommandOrAcceptableCommand):
+    def simulate_command(self, controller: Controller, command: CommandOrAcceptableCommand) -> None:
         controller.action()
         self.compute_states()
         command.execute()
-        acceptance_scheme = self.evaluator.evaluate(command)
-        if acceptance_scheme.is_acceptable():
+        acceptable = self.evaluator.evaluate(command)
+        if acceptable:
             state_command = commands.SetSimulationState.gen_from_simulation(self.simulation.simulation_params, self.box_list)
             self.state_controller.add_command(state_command)
 

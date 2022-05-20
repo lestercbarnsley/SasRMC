@@ -46,5 +46,4 @@ The `/data` folder contains a file `CoreShell_F20_pol.xlsx` which contains data 
 
 1. Open a new .py file
 2. Type: `import sas_rmc`
-3. At this point, you are only limited by your own imagination (and my ability to write documentation).
-4. More documentation coming soon...
+3. More documentation coming soon...

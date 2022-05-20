@@ -14,7 +14,7 @@ DEFAULT_PRECISION = 14
 
 immutable_types = (str, float, int, Enum, np.float64)
 
-def round_vector(vector: Vector, precision: int = DEFAULT_PRECISION) -> Tuple[int, int, int]:
+def round_vector(vector: Vector, precision: int = DEFAULT_PRECISION) -> Tuple[float, float, float]:
     round_vector_comp = lambda comp: round(comp, precision)
     return round_vector_comp(vector.x), round_vector_comp(vector.y), round_vector_comp(vector.z)
 

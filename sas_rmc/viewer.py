@@ -9,13 +9,13 @@ from .simulator import CommandOrAcceptableCommand
 @dataclass
 class CLIViewer:
 
-    def show_command(self, command: CommandOrAcceptableCommand):
+    def show_command(self, command: CommandOrAcceptableCommand) -> None:
         base_command = command.base_command if isinstance(command, commands.AcceptableCommand) else command
         print(type(base_command).__name__)
         if isinstance(base_command, commands.ParticleCommand):
             print(base_command.data, 'Particle index: ',base_command.particle_index)
 
-    def show_simulation(self, simulation: ScatteringSimulation):
+    def show_simulation(self, simulation: ScatteringSimulation) -> None:
         rescale_factor = simulation.simulation_params.params[0].value
         magnetic_rescale = simulation.simulation_params.params[1].value # This is the perfect example of poor coupling!!!
         print('rescale', rescale_factor)
@@ -23,7 +23,7 @@ class CLIViewer:
             print('magnetic rescale', magnetic_rescale)
         print('chi_squared', simulation.current_goodness_of_fit)
 
-    def show_acceptance(self, acceptance_scheme: AcceptanceScheme):
+    def show_acceptance(self, acceptance_scheme: AcceptanceScheme) -> None:
         print('step accepted' if acceptance_scheme.is_acceptable() else 'step rejected')
         if isinstance(acceptance_scheme, MetropolisAcceptance):
             print('temperature',acceptance_scheme.temperature)

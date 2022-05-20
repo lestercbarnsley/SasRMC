@@ -141,7 +141,7 @@ class Cylinder(Shape):
 
     @property
     def end_interfaces(self) -> List[Interface]:
-        def define_interface(plus_or_minus) -> Interface:
+        def define_interface(plus_or_minus: bool) -> Interface:
             factor = +1 if plus_or_minus else -1
             position_marker = self.central_position + factor * (self.height / 2) * (self.orientation.unit_vector)
             return Interface(position_marker, normal = factor * self.orientation.unit_vector)
@@ -159,7 +159,7 @@ class Cylinder(Shape):
         return scalar_projection * (orientation_reffed.unit_vector) + interfaces[0].position_marker
 
     def is_inside(self, position: Vector) -> bool:
-        if all((interface.is_inside(position) for interface in self.end_interfaces)):
+        if all(interface.is_inside(position) for interface in self.end_interfaces):
             axis_position = self._project_to_cylinder_axis(position)
             return (position - axis_position).mag <= self.radius
         return False
