@@ -10,13 +10,19 @@ from .vector import Vector
 
 CLASS_MAX_SIZE = 18
 MAX_SIZE = 50
-DEFAULT_PRECISION = 14
+DEFAULT_PRECISION = 8
 
 immutable_types = (str, float, int, Enum, np.float64)
 
+def _round_vector_comp(comp: float, precision: float):
+    if np.abs(comp) < 1e-16:
+        return 0.0
+    for i in range(34):
+        if np.abs(comp * 10**i) > 1:
+            return int(comp * 10**(precision + i)) / 10**(precision + i)
+
 def round_vector(vector: Vector, precision: int = DEFAULT_PRECISION) -> Tuple[float, float, float]:
-    round_vector_comp = lambda comp: round(comp, precision)
-    return round_vector_comp(vector.x), round_vector_comp(vector.y), round_vector_comp(vector.z)
+    return _round_vector_comp(vector.x, precision), _round_vector_comp(vector.y, precision), _round_vector_comp(vector.z, precision)
 
 def pass_arg(arg):
     if type(arg) in immutable_types:
@@ -26,7 +32,7 @@ def pass_arg(arg):
     if isinstance(arg, Vector):
         return round_vector(arg)
     if isinstance(arg, list) or isinstance(arg, tuple):
-        return tuple(pass_arg(a) for a in arg) # I finally found a use case for recursion
+        return tuple(pass_arg(a) for a in arg)
     if isinstance(arg, dict):
         return tuple((pass_arg(k), pass_arg(v)) for k, v in arg.items())
     return id(arg)

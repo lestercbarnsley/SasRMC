@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from scipy import constants
 
 from .array_cache import method_array_cache, round_vector
-from .vector import Vector, VectorElement, VectorSpace
+from .vector import Vector, VectorElement, VectorSpace, dot
 from .shapes import Shape, Sphere, Cylinder, collision_detected
 
 get_physical_constant = lambda constant_str: constants.physical_constants[constant_str][0]
@@ -201,7 +201,7 @@ class Particle(ABC):
         
     @method_array_cache
     def modulated_form_array(self, qx_array, qy_array, position: Vector, orientation: Vector) -> np.ndarray:
-        return self.form_array(qx_array, qy_array, orientation) * np.exp(1j * (qx_array * position.x + qy_array * position.y))
+        return self.form_array(qx_array, qy_array, orientation) * np.exp(1j * dot(position, (qx_array, qy_array)))#(qx_array * position.x + qy_array * position.y))
         
     @abstractmethod
     def _magnetic_form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector, magnetization: Vector) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -213,7 +213,7 @@ class Particle(ABC):
         
     @method_array_cache
     def magnetic_modulated_array(self, qx_array, qy_array, position: Vector, orientation: Vector, magnetization: Vector) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        modulated_array = np.exp(1j * (qx_array * position.x + qy_array * position.y))
+        modulated_array = np.exp(1j * dot(position, (qx_array, qy_array)))#(qx_array * position.x + qy_array * position.y))
         return [fm * modulated_array for fm in self.magnetic_form_array(qx_array, qy_array, orientation, magnetization)]
         
     def form_result(self, qx_array, qy_array) -> FormResult:
@@ -272,7 +272,7 @@ class CoreShellParticle(Particle):
             shape.central_position = position
 
     def set_orientation(self, orientation: Vector) -> None:
-        return super().set_orientation(self.orientation) # This will block changes to orientation
+        super().set_orientation(self.orientation) # This will block changes to orientation
 
     def _form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector) -> np.ndarray:
         core_sphere = self.shapes[0]
@@ -334,8 +334,8 @@ def _form_array_numerical(vector_space, qx_array, qy_array, sld_from_vs_fn, xy_a
     x, y, z = [xy_project(space_arr) for space_arr in [x_arr, y_arr, z_arr]]
     dx, dy, dz= [xy_project(space_arr_partial) for space_arr_partial in [dx_arr, dy_arr, dz_arr]]
     sld = np.sum(sld_from_vs_fn(x_arr, y_arr, z_arr) * dz_arr, axis = xy_axis)
-    def form_f(qx, qy):
-        return np.sum(sld * np.exp(1j * (qx * x + qy *y)) * dx * dy)
+    def form_f(qx: float, qy: float) -> float:
+        return np.sum(sld * np.exp(1j * dot((x, y), (qx, qy))) * dx * dy)
     
     form_function = np.frompyfunc(form_f, 2, 1)
     return np.complex128(form_function(qx_array, qy_array))
@@ -391,13 +391,11 @@ class Dumbbell(Particle):
             self.particle_2.set_magnetization(magnetization)
 
     def is_inside(self, position: Vector) -> bool:
-        return any(
-            [particle.is_inside(position) for particle in [self.particle_1, self.particle_2]]
-        )
+        return any(particle.is_inside(position) for particle in [self.particle_1, self.particle_2])
 
     def collision_detected(self, other_particle: Particle) -> bool:
         sphere_particles = [self.particle_1, self.particle_2]
-        return any((sphere_particle.collision_detected(other_particle) for sphere_particle in sphere_particles))
+        return any(sphere_particle.collision_detected(other_particle) for sphere_particle in sphere_particles)
 
     def random_position_inside(self) -> Vector:
         return np.random.choice(
@@ -481,7 +479,7 @@ class Dumbbell(Particle):
 
 def numerical_form_array(flat_sld: np.ndarray, x_arr: np.ndarray, y_arr: np.ndarray, qx: float, qy: float) -> float:
     return np.sum(
-        flat_sld * np.exp(1j * (qx * x_arr + qy * y_arr))
+        flat_sld * np.exp(1j * dot(x_arr, y_arr),(qx, qy))
         )
 
 

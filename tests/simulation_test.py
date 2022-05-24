@@ -71,6 +71,8 @@ def default_detector_image() -> SimulatedDetectorImage:
     detector_image = SimulatedDetectorImage.gen_from_txt(file, DETECTOR_CONFIG_C14D14)
     return detector_image
 
+DEFAULT_DETECTOR_IMAGE = default_detector_image()
+
 def default_simulation(box_list: List[Box]) -> ScatteringSimulation:
     for box in box_list:
         box.force_inside_box()
@@ -197,7 +199,7 @@ def test_modulated_form_cache():
     box.force_inside_box()
     position = Vector(2144.6643,1231.12315,1532.123)
     command = commands.MoveParticleTo(box, 14, position)
-    detector_image = default_detector_image()
+    detector_image = DEFAULT_DETECTOR_IMAGE
     qx_array, qy_array = detector_image.qX, detector_image.qY
     d1 = box[13].modulated_form_array(qx_array, qy_array, position=box[13].position, orientation=box[13].orientation)
     command.execute()
@@ -212,7 +214,7 @@ def test_modulated_form_cache_polish():
     position_2 = box[14].position
     command = commands.MoveParticleTo(box, 14, position)
     command2 = commands.MoveParticleTo(box, 14, position_2)
-    detector_image = default_detector_image()
+    detector_image = DEFAULT_DETECTOR_IMAGE
     qx_array, qy_array = detector_image.qX, detector_image.qY
     d1 = box[14].modulated_form_array(qx_array, qy_array, position=box[14].position, orientation=box[14].orientation)
     f1 = box[14].form_array(qx_array, qy_array, orientation=box[14].orientation)
@@ -232,31 +234,33 @@ def test_modulated_form_cache_polish():
     assert id(f1) == id(f3)
 
 def test_dumbbell_modulated_and_form_array():
-    box = default_dumbbell_box()
-    detector_image = default_detector_image()
-    qx_array, qy_array = detector_image.qX, detector_image.qY 
+    detector_image = DEFAULT_DETECTOR_IMAGE
+    qx_array, qy_array = detector_image.qX, detector_image.qY
+    get_current_form_array = lambda p: p.form_array(qx_array, qy_array, orientation = p.orientation)
+    get_current_modulated_form_array = lambda p: p.modulated_form_array(qx_array, qy_array, position = p.position, orientation = p.orientation)
     for _ in range(50):
+        box = default_dumbbell_box()
         box.force_inside_box()
         position = Vector(2144.6643,1231.12315,1532.123)
         position_2 = box[14].position
         position_d2 = box[14].particle_2.position
         command = commands.MoveParticleTo(box, 14, position)
         command2 = commands.MoveParticleTo(box, 14, position_2)
-        d1 = box[14].modulated_form_array(qx_array, qy_array, position=box[14].position, orientation=box[14].orientation)
-        f1 = box[14].form_array(qx_array, qy_array, orientation=box[14].orientation)
-        dcore_01 = box[14].particle_1.modulated_form_array(qx_array, qy_array, position=box[14].particle_1.position, orientation=box[14].particle_1.orientation)
-        dcore_02 = box[14].particle_2.modulated_form_array(qx_array, qy_array,position=box[14].particle_2.position, orientation=box[14].particle_2.orientation)
+        d1 = get_current_modulated_form_array(box[14])#.modulated_form_array(qx_array, qy_array, position=box[14].position, orientation=box[14].orientation)
+        f1 = get_current_form_array(box[14])#.form_array(qx_array, qy_array, orientation=box[14].orientation)
+        dcore_01 = get_current_modulated_form_array(box[14].particle_1)#.modulated_form_array(qx_array, qy_array, position=box[14].particle_1.position, orientation=box[14].particle_1.orientation)
+        dcore_02 = get_current_modulated_form_array(box[14].particle_2)#.modulated_form_array(qx_array, qy_array,position=box[14].particle_2.position, orientation=box[14].particle_2.orientation)
         command.execute()
-        d2 = box[14].modulated_form_array(qx_array, qy_array, position=box[14].position, orientation=box[14].orientation)
-        f2 = box[14].form_array(qx_array, qy_array, orientation=box[14].orientation)
-        dcore_11 = box[14].particle_1.modulated_form_array(qx_array, qy_array, position=box[14].particle_1.position, orientation=box[14].particle_1.orientation)
-        dcore_12 = box[14].particle_2.modulated_form_array(qx_array, qy_array,position=box[14].particle_2.position, orientation=box[14].particle_2.orientation)
+        d2 = get_current_modulated_form_array(box[14])#box[14].modulated_form_array(qx_array, qy_array, position=box[14].position, orientation=box[14].orientation)
+        f2 = get_current_form_array(box[14])#box[14].form_array(qx_array, qy_array, orientation=box[14].orientation)
+        dcore_11 = get_current_modulated_form_array(box[14].particle_1)#box[14].particle_1.modulated_form_array(qx_array, qy_array, position=box[14].particle_1.position, orientation=box[14].particle_1.orientation)
+        dcore_12 = get_current_modulated_form_array(box[14].particle_2)#box[14].particle_2.modulated_form_array(qx_array, qy_array,position=box[14].particle_2.position, orientation=box[14].particle_2.orientation)
         command2.execute()
-        d3 = box[14].modulated_form_array(qx_array, qy_array, position=box[14].position, orientation=box[14].orientation)
-        f3 = box[14].form_array(qx_array, qy_array, orientation=box[14].orientation)
+        d3 = get_current_modulated_form_array(box[14])#box[14].modulated_form_array(qx_array, qy_array, position=box[14].position, orientation=box[14].orientation)
+        f3 = get_current_form_array(box[14])#box[14].form_array(qx_array, qy_array, orientation=box[14].orientation)
         position_d22 = box[14].particle_2.position
-        dcore_21 = box[14].particle_1.modulated_form_array(qx_array, qy_array, position=box[14].particle_1.position, orientation=box[14].particle_1.orientation)
-        dcore_22 = box[14].particle_2.modulated_form_array(qx_array, qy_array,position=box[14].particle_2.position, orientation=box[14].particle_2.orientation)
+        dcore_21 = get_current_modulated_form_array(box[14].particle_1)#box[14].particle_1.modulated_form_array(qx_array, qy_array, position=box[14].particle_1.position, orientation=box[14].particle_1.orientation)
+        dcore_22 = get_current_modulated_form_array(box[14].particle_2)#box[14].particle_2.modulated_form_array(qx_array, qy_array,position=box[14].particle_2.position, orientation=box[14].particle_2.orientation)
         assert box[14].position == position_2
         assert (position_d2 - position_d22).mag == pytest.approx(0)
         assert np.average(d3 - d1) == pytest.approx(0)
@@ -273,7 +277,7 @@ def test_dumbbell_modulated_and_form_array():
 def test_modulated_and_form_array():
     box = default_box()
     box.force_inside_box()
-    detector_image = default_detector_image()
+    detector_image = DEFAULT_DETECTOR_IMAGE
     qx_array, qy_array = detector_image.qX, detector_image.qY
     ff = box[13].form_array(qx_array, qy_array, orientation=box[13].orientation)
     fm = box[13].modulated_form_array(qx_array, qy_array, position=box[13].position, orientation=box[13].orientation)
@@ -284,7 +288,7 @@ def test_box_intensity():
     from sas_rmc.form_calculator import box_intensity
     box = default_box()
     box.force_inside_box()
-    detector_image = default_detector_image()
+    detector_image = DEFAULT_DETECTOR_IMAGE
     qx_array, qy_array = detector_image.qX, detector_image.qY
     b_tensity = box_intensity(box, qx_array, qy_array)
     get_mfas = lambda : [p.form_result(qx_array, qy_array).form_nuclear for p in box.particles]

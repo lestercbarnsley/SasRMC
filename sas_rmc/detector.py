@@ -9,25 +9,40 @@ from matplotlib.figure import Figure
 import pandas as pd
 
 from .array_cache import method_array_cache
-from .vector import Vector, broadcast_array_function
+from .vector import Vector, broadcast_array_function, dot
 from .particle import modulus_array 
 
 
 PI = np.pi
 DEFAULT_SLICING_FRACTION_DENOM = 4 # This considers 6.25% of the detector (i.e, 1/4^2) per pixel, which is more than sufficient
 
+# name string constants, this is the source of truth for the names of these quantities
+QX = 'qX'#: self.qX,
+QY = 'qY'#: self.qY,
+INTENSITY = 'intensity'#: self.intensity,
+INTENSITY_ERROR = 'intensity_err'#: self.intensity_err,
+QZ = 'qZ'#: self.qZ,
+SIGMA_PARA = 'sigma_para'#: self.sigma_para,
+SIGMA_PERP = 'sigma_perp'#: self.sigma_perp,
+SHADOW_FACTOR = 'shadow_factor'#: int(self.shadow_factor),
+SIMULATED_INTENSITY = 'simulated_intensity'#: self.simulated_intensity,
+SIMUATED_INTENSITY_ERR = 'simulated_intensity_err'#: self.simulated_intensity_err,
+POLARIZATION = "Polarization"
+
 
 def get_slicing_func_from_gaussian(gaussian: np.ndarray, slicing_range: int = 0) -> Callable[[np.ndarray], np.ndarray]:
     arg_of_max = np.where(gaussian == np.amax(gaussian)) # I really don't understand this line of code but apparently it works
-    slicing_range_use = slicing_range if slicing_range else int(np.max(gaussian.shape) / DEFAULT_SLICING_FRACTION_DENOM) 
-    i_min = np.max([arg_of_max[0][0] - int(slicing_range_use / 2), 0])
-    i_max = np.min([i_min + slicing_range_use, gaussian.shape[0] - 1])
+    if slicing_range == 0:
+        slicing_range = int(np.max(gaussian.shape) / DEFAULT_SLICING_FRACTION_DENOM)
+    #slicing_range_use = slicing_range if slicing_range else int(np.max(gaussian.shape) / DEFAULT_SLICING_FRACTION_DENOM) 
+    i_min = np.max([arg_of_max[0][0] - int(slicing_range / 2), 0])
+    i_max = np.min([i_min + slicing_range, gaussian.shape[0] - 1])
     if i_max == gaussian.shape[0] - 1:
-        i_min = i_max - slicing_range_use
-    j_min = np.max([arg_of_max[1][0] - int(slicing_range_use / 2), 0])
-    j_max = np.min([j_min + slicing_range_use, gaussian.shape[1] - 1])
+        i_min = i_max - slicing_range
+    j_min = np.max([arg_of_max[1][0] - int(slicing_range / 2), 0])
+    j_max = np.min([j_min + slicing_range, gaussian.shape[1] - 1])
     if j_max == gaussian.shape[1] - 1:
-        j_min = j_max - slicing_range_use
+        j_min = j_max - slicing_range
     return lambda arr: arr[i_min:i_max, j_min:j_max]
 
 
@@ -39,70 +54,6 @@ class Polarization(Enum):
     MINUS_PLUS = "minus_plus"
     PLUS_MINUS = "plus_minus"
     PLUS_PLUS = "plus_plus"
-
-
-@dataclass
-class DetectorPixel:
-    qX: float
-    qY: float
-    intensity: float
-    intensity_err: float
-    qZ: float = 0
-    sigma_para: float = 0
-    sigma_perp: float = 0
-    shadow_factor: bool = True
-    simulated_intensity: float = 0
-    simulated_intensity_err: float = 0
-
-    @property
-    def q_vector(self) -> Vector:
-        return Vector(self.qX, self.qY, self.qZ)
-
-    # I'd rather calculate this differently, using a pyfunc, but this has been the fastest method I've come up with to do this calculation
-    def _resolution_function_calculator(self, qx_array: np.ndarray, qy_array: np.ndarray) -> np.ndarray:
-        qx_offset = qx_array - self.qX
-        qy_offset = qy_array - self.qY
-        def q_arr_fn(q_vec_comp: Vector): #I'd rather use a lambda than a closure, but there's no point in this instance
-            q_unit = q_vec_comp.unit_vector
-            return qx_offset * q_unit.x + qy_offset * q_unit.y
-        q_vec = Vector(self.qX, self.qY)
-        q_para = q_vec.unit_vector
-        perp_angle = np.arctan2(q_para.y, q_para.x) + (PI/2)
-        q_perp = Vector.xy_from_angle(angle=perp_angle)
-        q_para_arr = q_arr_fn(q_para)
-        q_perp_arr = q_arr_fn(q_perp)
-        gaussian = np.exp(-(1/2) * ((q_para_arr / self.sigma_para)**2 + (q_perp_arr / self.sigma_perp)**2) )
-
-        return gaussian / np.sum(gaussian)
-
-    @method_array_cache
-    def precompute_pixel_smearer(self, qx_array: np.ndarray, qy_array: np.ndarray, slicing_range: int = 0) -> Callable[[np.ndarray], float]:
-        resolution_function = self._resolution_function_calculator(qx_array, qy_array)
-        slicing_func = get_slicing_func_from_gaussian(resolution_function, slicing_range=slicing_range)
-        resolution_subset = slicing_func(resolution_function)# Leave this in the scope
-        normalized_resolution_subset = resolution_subset / np.sum(resolution_subset)
-        return lambda simulated_intensity : np.sum(normalized_resolution_subset * slicing_func(simulated_intensity))
-
-    def smear_pixel(self, simulated_intensity_array: np.ndarray, qx_array: np.ndarray, qy_array: np.ndarray, shadow_is_zero: bool = True, slicing_range: int = 0) -> None:
-        if shadow_is_zero and not self.shadow_factor:
-            self.simulated_intensity = 0
-        else:
-            pixel_smearer = self.precompute_pixel_smearer(qx_array, qy_array, slicing_range=slicing_range)
-            self.simulated_intensity = pixel_smearer(simulated_intensity_array)
-
-    def to_dict(self):
-        return {
-            'qX': self.qX,
-            'qY': self.qY,
-            'intensity': self.intensity,
-            'intensity_err': self.intensity_err,
-            'qZ': self.qZ,
-            'sigma_para': self.sigma_para,
-            'sigma_perp': self.sigma_perp,
-            'shadow_factor': int(self.shadow_factor),
-            'simulated_intensity': self.simulated_intensity,
-            'simulated_intensity_err': self.simulated_intensity_err,
-        }
 
 
 @dataclass
@@ -132,6 +83,95 @@ class DetectorConfig:
         q = modulus_array(qx, qy)
         sigma_para = modulus_array(q * (self.wavelength_spread / 2), sigma_geom)
         return sigma_para
+
+
+@dataclass
+class DetectorPixel:
+    qX: float
+    qY: float
+    intensity: float
+    intensity_err: float
+    qZ: float = 0
+    sigma_para: float = 0
+    sigma_perp: float = 0
+    shadow_factor: bool = True
+    simulated_intensity: float = 0
+    simulated_intensity_err: float = 0
+
+    @property
+    def q_vector(self) -> Vector:
+        return Vector(self.qX, self.qY, self.qZ)
+
+    # I'd rather calculate this differently, using a pyfunc, but this has been the fastest method I've come up with to do this calculation
+    def _resolution_function_calculator(self, qx_array: np.ndarray, qy_array: np.ndarray) -> np.ndarray:
+        qx_offset = qx_array - self.qX
+        qy_offset = qy_array - self.qY
+        q_offset = (qx_offset, qy_offset, 0)
+        ''' def q_arr_fn(q_vec_comp: Vector): #I'd rather use a lambda than a closure, but there's no point in this instance
+            q_unit = q_vec_comp.unit_vector
+            return qx_offset * q_unit.x + qy_offset * q_unit.y'''
+        q_vec = Vector(self.qX, self.qY)
+        q_para = q_vec.unit_vector
+        perp_angle = np.arctan2(q_para.y, q_para.x) + (PI/2)
+        q_perp = Vector.xy_from_angle(angle=perp_angle)
+        q_para_arr = dot(q_para.unit_vector, q_offset) #q_arr_fn(q_para)
+        q_perp_arr = dot(q_perp.unit_vector, q_offset)
+        gaussian = np.exp(-(1/2) * ((q_para_arr / self.sigma_para)**2 + (q_perp_arr / self.sigma_perp)**2) )
+
+        return gaussian / np.sum(gaussian)
+
+    @method_array_cache
+    def precompute_pixel_smearer(self, qx_array: np.ndarray, qy_array: np.ndarray, slicing_range: int = 0) -> Callable[[np.ndarray], float]:
+        resolution_function = self._resolution_function_calculator(qx_array, qy_array)
+        slicing_func = get_slicing_func_from_gaussian(resolution_function, slicing_range=slicing_range)
+        resolution_subset = slicing_func(resolution_function)# Leave this in the scope
+        normalized_resolution_subset = resolution_subset / np.sum(resolution_subset)
+        return lambda simulated_intensity : np.sum(normalized_resolution_subset * slicing_func(simulated_intensity))
+
+    def smear_pixel(self, simulated_intensity_array: np.ndarray, qx_array: np.ndarray, qy_array: np.ndarray, shadow_is_zero: bool = True, slicing_range: int = 0) -> None:
+        if shadow_is_zero and not self.shadow_factor:
+            self.simulated_intensity = 0
+        else:
+            pixel_smearer = self.precompute_pixel_smearer(qx_array, qy_array, slicing_range=slicing_range)
+            self.simulated_intensity = pixel_smearer(simulated_intensity_array)
+
+    def to_dict(self):
+        return {
+            QX : self.qX,
+            QY : self.qY,
+            INTENSITY: self.intensity,
+            INTENSITY_ERROR: self.intensity_err,
+            QZ : self.qZ,
+            SIGMA_PARA : self.sigma_para,
+            SIGMA_PERP: self.sigma_perp,
+            SHADOW_FACTOR : int(self.shadow_factor),
+            SIMULATED_INTENSITY: self.simulated_intensity,
+            SIMUATED_INTENSITY_ERR : self.simulated_intensity_err,
+        }
+
+    @classmethod
+    def row_to_pixel(cls, data_row: dict, detector_config: DetectorConfig = None):
+        #get_element = lambda k, default_v = 0 : data_row[k] if k in data_row else default_v
+        qx_i = data_row[QX]
+        qy_i = data_row[QY]
+        intensity = data_row[INTENSITY]
+        intensity_error = data_row.get(INTENSITY_ERROR, 0)#get_element('intensity_error')
+        qZ = data_row.get(QZ, 0)
+        sigma_para = data_row.get(SIGMA_PARA, 0) if detector_config is None else detector_config.get_sigma_parallel(qx_i, qy_i)
+        sigma_perp = data_row.get(SIGMA_PERP, 0) if detector_config is None else detector_config.get_sigma_geometric()
+        shadow_factor = bool(data_row.get(SHADOW_FACTOR,bool(intensity)))
+        simulated_intensity = data_row.get(SIMULATED_INTENSITY, 0)
+        return cls(
+            qX=qx_i,
+            qY=qy_i,
+            intensity=intensity,
+            intensity_err=intensity_error,
+            qZ=qZ,
+            sigma_para=sigma_para,
+            sigma_perp=sigma_perp,
+            shadow_factor=shadow_factor,
+            simulated_intensity=simulated_intensity,
+            )
 
 
 @dataclass
@@ -237,81 +277,47 @@ class DetectorImage:
         return type(self).plot_intensity_matrix(self.intensity, self.qX, self.qY, log_intensity=log_intensity, show_crosshair=show_crosshair, levels=levels, cmap = cmap, show_fig=show_fig)
     
     def get_pandas(self):
-        d = []
-        for i, pixel in enumerate(self._detector_pixels.flatten()):
+        d = [pixel.to_dict() for _, pixel in np.ndenumerate(self._detector_pixels)]
+        d[0].update({POLARIZATION : self.polarization.value})
+        '''for i, pixel in enumerate(self._detector_pixels.flatten()):
             pixel_data = pixel.to_dict()
             if i == 0:
                 pixel_data.update({"Polarization": self.polarization.value})
-            d.append(pixel_data)
+            d.append(pixel_data)'''
         return pd.DataFrame(d)
 
     @classmethod
-    def row_to_pixel(cls, data_row: dict, detector_config: DetectorConfig = None) -> DetectorPixel:
-        get_element = lambda k, default_v = 0 : data_row[k] if k in data_row else default_v
-        qx_i = data_row['qX']
-        qy_i = data_row['qY']
-        intensity = data_row['intensity']
-        intensity_error = get_element('intensity_error')
-        qZ = get_element('qZ')
-        sigma_para = get_element('sigma_para') if detector_config is None else detector_config.get_sigma_parallel(qx_i, qy_i)
-        sigma_perp = get_element('sigma_perp') if detector_config is None else detector_config.get_sigma_geometric()
-        shadow_factor = bool(get_element('shadow_factor', default_v=bool(intensity)))
-        simulated_intensity = get_element('simulated_intensity')
-        return DetectorPixel(
-            qX=qx_i,
-            qY=qy_i,
-            intensity=intensity,
-            intensity_err=intensity_error,
-            qZ=qZ,
-            sigma_para=sigma_para,
-            sigma_perp=sigma_perp,
-            shadow_factor=shadow_factor,
-            simulated_intensity=simulated_intensity,
-            )
-
-    @classmethod
     def gen_from_data(cls, data_dict: dict, detector_config: DetectorConfig = None):
-        qX_data = data_dict['qX']
-        qY_data = data_dict['qY']
+        qX_data = data_dict[QX]
+        qY_data = data_dict[QY]
         qX_1d = np.unique(qX_data).tolist()
         qY_1d = np.unique(qY_data).tolist()
         qx, qy = np.meshgrid(qX_1d, qY_1d)
-        blank_canvas_pixel = lambda qx_i, qy_i : DetectorPixel(
-            qX=qx_i,
-            qY=qy_i,
-            intensity=0,
-            intensity_err=0,
-            sigma_para= 0 if detector_config is None else detector_config.get_sigma_parallel(qx_i, qy_i),
-            sigma_perp= 0 if detector_config is None else detector_config.get_sigma_geometric(),
-            shadow_factor=False
-            )
+        blank_canvas_pixel = lambda qx_i, qy_i : DetectorPixel.row_to_pixel({QX : qx_i, QY : qy_i, INTENSITY : 0}, detector_config= detector_config)
         make_blank_canvas = np.frompyfunc(blank_canvas_pixel, 2, 1)
         detector_pixels = make_blank_canvas(qx, qy).astype(object)
         for index, _ in enumerate(qX_data):
-            get_item = lambda k: data_dict[k][index]
-            qX, qY = get_item('qX'), get_item('qY')
+            get_item = lambda k, v = None: data_dict.get(k, v)[index]
+            qX, qY = get_item(QX), get_item(QY)
             row = {
-                'qX': qX,
-                'qY': qY,
-                'intensity': get_item('intensity'),
-                'intensity_error' : get_item('intensity_error'),
-                'qZ': get_item('qZ'),
-                'sigma_para': get_item('sigma_para'),
-                'sigma_perp': get_item('sigma_perp'),
-                'shadow_factor': get_item('shadow_factor'),
-                'simulated_intensity': get_item('simulated_intensity')
+                QX : qX,
+                QY : qY,
+                INTENSITY : get_item(INTENSITY),
+                INTENSITY_ERROR : get_item(INTENSITY_ERROR),
+                QZ : get_item(QZ),
+                SIGMA_PARA: get_item(SIGMA_PARA),
+                SIGMA_PERP: get_item(SIGMA_PERP),
+                SHADOW_FACTOR : get_item(SHADOW_FACTOR),
+                SIMULATED_INTENSITY : get_item(SIMULATED_INTENSITY)
             }
             i = qX_1d.index(qX)
             j = qY_1d.index(qY)
-            detector_pixels[j, i] = cls.row_to_pixel(row, detector_config=detector_config)
-            polarization = detector_config.polarization if detector_config else Polarization(data_dict.get("Polarization", Polarization.UNPOLARIZED.value))
+            detector_pixels[j, i] = DetectorPixel.row_to_pixel(row, detector_config=detector_config)
+        polarization = detector_config.polarization if detector_config else Polarization(data_dict.get(POLARIZATION, Polarization.UNPOLARIZED.value))
         return cls(
             _detector_pixels = detector_pixels,
             polarization = polarization
-        
         )
-
-
 
     @classmethod
     def gen_from_txt(cls, file_location, detector_config: DetectorConfig = None, skip_header: int = 2, transpose = False):
@@ -323,54 +329,47 @@ class DetectorImage:
         if not np.sum(shadow_factor**2):
             shadow_factor = intensity_col != 0
         data_dict = {
-            'qX' : all_data[:, 1] if transpose else all_data[:, 0],
-            'qY' : all_data[:, 0] if transpose else all_data[:, 1],
-            'intensity' : intensity_col,
-            'intensity_error' : fil_all_data(3),
-            'qZ' : fil_all_data(4),
-            'sigma_para' : fil_all_data(5),
-            'sigma_perp' : fil_all_data(6),
-            'shadow_factor' : shadow_factor,
-            'simulated_intensity' : fil_all_data(8),
-            'simulated_intensity_err' : fil_all_data(9),
+            QX : all_data[:, 1] if transpose else all_data[:, 0],
+            QY : all_data[:, 0] if transpose else all_data[:, 1],
+            INTENSITY : intensity_col,
+            INTENSITY_ERROR : fil_all_data(3),
+            QZ : fil_all_data(4),
+            SIGMA_PARA : fil_all_data(5),
+            SIGMA_PERP : fil_all_data(6),
+            SHADOW_FACTOR : shadow_factor,
+            SIMULATED_INTENSITY : fil_all_data(8),
+            SIMUATED_INTENSITY_ERR : fil_all_data(9),
         }
         return cls.gen_from_data(data_dict=data_dict, detector_config=detector_config)
 
     @classmethod
     def gen_from_pandas(cls, dataframe: pd.DataFrame, detector_config: DetectorConfig = None):
-        all_qx = dataframe['qX'].astype(np.float64)
-        all_qy = dataframe['qY'].astype(np.float64)
-        all_intensity = dataframe['intensity'].astype(np.float64)
+        all_qx = dataframe[QX].astype(np.float64)
+        all_qy = dataframe[QY].astype(np.float64)
+        all_intensity = dataframe[INTENSITY].astype(np.float64)
         filter_optional_column = lambda col_title: dataframe.get(col_title, np.zeros(all_intensity.size)).astype(np.float64)
-        def filter_optional_column_possibilities(col_title_possibilities: List[str]):
-            for col_title in col_title_possibilities:
-                all_vals = filter_optional_column(col_title)
-                if np.sum(all_vals**2):
-                    return all_vals
-            return all_vals
-        all_intensity_error = filter_optional_column_possibilities(['intensity_error','intensity_err'])
-        all_qz = filter_optional_column('qZ')
-        all_sigma_para = filter_optional_column('sigma_para')
-        all_sigma_perp = filter_optional_column('sigma_perp')
-        all_shadow_factor = filter_optional_column('shadow_factor')
-        all_simulated_intensity = filter_optional_column('simulated_intensity')
+        all_intensity_error = filter_optional_column(INTENSITY_ERROR)
+        all_qz = filter_optional_column(QZ)
+        all_sigma_para = filter_optional_column(SIGMA_PARA)
+        all_sigma_perp = filter_optional_column(SIGMA_PERP)
+        all_shadow_factor = filter_optional_column(SHADOW_FACTOR)
+        all_simulated_intensity = filter_optional_column(SIMULATED_INTENSITY)
         if not np.sum(all_shadow_factor**2):
             all_shadow_factor = all_intensity != 0
         data_dict = {
-            'qX' : all_qx,
-            'qY' : all_qy,
-            'intensity' : all_intensity,
-            'intensity_error' : all_intensity_error,
-            'qZ' : all_qz,
-            'sigma_para' : all_sigma_para,
-            'sigma_perp' : all_sigma_perp,
-            'shadow_factor' : all_shadow_factor,
-            'simulated_intensity' : all_simulated_intensity,
-            'Polarization' : dataframe.get("Polarization", pd.Series([Polarization.UNPOLARIZED.value])).iloc[0]
+            QX : all_qx,
+            QY : all_qy,
+            INTENSITY : all_intensity,
+            INTENSITY_ERROR : all_intensity_error,
+            QZ : all_qz,
+            SIGMA_PARA : all_sigma_para,
+            SIGMA_PERP : all_sigma_perp,
+            SHADOW_FACTOR : all_shadow_factor,
+            SIMULATED_INTENSITY : all_simulated_intensity,
+            POLARIZATION : dataframe.iloc[0].get(POLARIZATION, Polarization.UNPOLARIZED.value)
         }
-        if np.sum(all_sigma_para**2) and np.sum(all_sigma_perp**2):
-            return cls.gen_from_data(data_dict = data_dict) # Don't pass the detector config if sigma_para and sigma_perp are present
-        return cls.gen_from_data(data_dict=data_dict, detector_config=detector_config)
+        pass_config_on = np.sum(all_sigma_para**2) == 0 and np.sum(all_sigma_perp**2) == 0
+        return cls.gen_from_data(data_dict=data_dict, detector_config=detector_config if pass_config_on else None)
 
 
 @dataclass

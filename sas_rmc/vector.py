@@ -1,6 +1,7 @@
 #%%
-from typing import Callable, List, Tuple, Type
+from typing import Any, Callable, List, Tuple, Type, Union
 from dataclasses import dataclass
+import math
 
 import numpy as np
 
@@ -14,6 +15,13 @@ def cross(a: Tuple, b: Tuple) -> Tuple:
     cy = az*bx-ax*bz
     cz = ax*by-ay*bx
     return cx, cy, cz
+
+def _dot(a: Tuple, b: Tuple) -> Any:
+    ax, ay = a[:2]
+    az = a[2] if len(a) > 2 else 0
+    bx, by = b[:2]
+    bz = b[2] if len(b) > 2 else 0
+    return (ax * bx) + (ay * by) + (az * bz)
 
 def broadcast_array_function(getter_function: Callable[[object], object], output_dtype: Type = np.float64) -> Callable[[np.ndarray],np.ndarray]:
     numpy_ufunc = np.frompyfunc(getter_function, 1, 1)
@@ -32,7 +40,7 @@ class Vector:
 
     @property
     def mag(self) -> float:
-        return np.sqrt(self.x**2 + self.y**2 + self.z**2)
+        return math.sqrt(self.x**2 + self.y**2 + self.z**2)
 
     def to_list(self) -> list:
         return [self.x, self.y, self.z]
@@ -40,8 +48,14 @@ class Vector:
     def to_numpy(self) -> np.ndarray:
         return np.array(self.to_list())
 
-    def __getitem__(self, i: int) -> float:
-        return self.to_list()[i]
+    def to_tuple(self) -> Tuple[float, float, float]:
+        return self.x, self.y, self.z
+
+    """ def __getitem__(self, i: int) -> float:
+        return self.to_list()[i] """
+
+    def __len__(self) -> int:
+        return 3
 
     @classmethod
     def null_vector(cls):
@@ -55,30 +69,32 @@ class Vector:
 
     def __mul__(self, vector_or_scalar):
         if isinstance(vector_or_scalar, Vector):# type(vector_or_scalar) == type(self): This should be hardcodes as the base class because a sub class should be multipliable by any Vector
-            return self.x * vector_or_scalar.x + self.y * vector_or_scalar.y + self.z * vector_or_scalar.z
+            return _dot(self.to_tuple(), vector_or_scalar.to_tuple())
         return type(self)(
             x = self.x * vector_or_scalar,
             y = self.y * vector_or_scalar,
             z = self.z * vector_or_scalar
             )
 
-    def __rmul__(self, scalar):
+    def __rmul__(self, scalar: float):
         return self * scalar
 
     def __sub__(self, vector2):
         return self + (-1 * vector2)
 
-    def __truediv__(self, divisor):
-        return (1/divisor) * self
+    def __truediv__(self, divisor: float):
+        return self * (1/divisor)
 
     def cross(self, vector2):
-        x, y, z = cross(self, vector2)
+        x, y, z = cross(self.to_tuple(), vector2.to_tuple())
         return type(self)(x, y, z)
 
     @property
     def unit_vector(self):
         if self.mag == 0:
             return type(self).null_vector()
+        if self.mag == 1:
+            return self
         else:
             return self / self.mag
 
@@ -123,11 +139,11 @@ class Vector:
             )
         return cls(
             x = d.get(f'{vector_str}.X', 0.0),
-            y = d.get(f'{vector_str}.X', 0.0),
+            y = d.get(f'{vector_str}.Y', 0.0),
             z = d.get(f'{vector_str}.Z', 0.0)
         )
 
-    def rotated_basis(self):
+    def rotated_basis(self) -> Tuple:
         unit_a = self.unit_vector
         mostly_orthogonal_basis = [-1 * Vector(0,0,1), -1 * Vector(1,0,0), -1 * Vector(0,1,0)]
         mostly_orthog = mostly_orthogonal_basis[np.argmax(unit_a.to_numpy() ** 2)]
@@ -153,6 +169,7 @@ class Vector:
     def random_normal_vector(cls, step_size=1):
         random_numbers = rng.normal(loc = 0, scale = step_size, size = 3)
         return cls.from_numpy(random_numbers)
+
 
 @dataclass
 class VectorElement:
@@ -266,21 +283,14 @@ class Interface:
         return position_ref - (self.normal.unit_vector * position_ref) * self.normal.unit_vector + self.position_marker
 
         
-
+def dot(a: Union[Tuple, Vector], b: Union[Tuple, Vector]) -> Tuple[float, float, float]:
+    return _dot(a.to_tuple() if isinstance(a, Vector) else a, b.to_tuple() if isinstance(b, Vector) else b)
 
 
 if __name__ == "__main__":
     v = Vector(2,0)
-    print(v.unit_vector)
-    print(v - v)
-
-    x = np.linspace(-50, 50, num = 101)
-    dx = np.gradient(x)
-    vs = VectorSpace.gen_from_bounds(-50, 50, 101, -50, 50, 101, -50, 50, 101)
-    ve = vs[31,5,16]
-    x, y, z = 1, 2.5, 0
-    print(Vector(x, y, z) == Vector(x, y, z))
-    print(np.array([x,y,z]) is np.array([x, y, z]))
+    a = np.float64(4.89)
+    #a.__mul__(v)
 
 
 

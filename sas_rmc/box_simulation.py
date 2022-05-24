@@ -83,10 +83,7 @@ class Box:
             
     def collision_test(self) -> bool:
         return any(self.wall_or_particle_collision(i, half_test=True) for i, _ in enumerate(self.particles))
-        '''for i, _ in enumerate(self.particles):
-            if self.wall_or_particle_collision(i, half_test=True):
-                return True
-        return False'''
+     
 
     def get_nearest_particle(self, particle: Particle) -> Particle:
         #particle = self.particles[particle_index]
@@ -95,11 +92,11 @@ class Box:
         distances = [distance(particle2) for particle2 in self.particles]
         return self.particles[np.argmin(distances)]
 
-    def plot_particle_positions(self, symbol: str = 'b.') -> None:
+    def plot_particle_positions(self, symbol: str = 'b.') -> None: # Mark for deletion
         plt.plot([p.position.x for p in self.particles], [p.position.y for p in self.particles], symbol)
         plt.show()
 
-    def plot_particle_magnetizations(self) -> None:
+    def plot_particle_magnetizations(self) -> None: # Mark for deletion
         radius_from_particle = lambda p: (p.volume / (4 * PI/3))**(1/3)
         def arrow(particle: Particle) -> List[float]:
             magnetization_normalized = radius_from_particle(particle) * (particle.magnetization.unit_vector)

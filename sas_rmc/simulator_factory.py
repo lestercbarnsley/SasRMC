@@ -737,9 +737,8 @@ class SimulationReloader(SimulationConfig):
 def gen_config_from_dataframes(data_frames: dict) -> SimulationConfig:
     dataframe, dataframe_2 = list(data_frames.values())[:2]
     config_dict = dataframe_to_config_dict(dataframe)
-    if config_dict["particle_type"] == "Reload old simulation":
-        return SimulationReloader.gen_from_dataframes(config_dict, dataframe_2)
-    return SimulationConfig.gen_from_dataframes(config_dict, dataframe_2)
+    t = SimulationReloader if config_dict["particle_type"] == "Reload old simulation" else SimulationConfig
+    return t.gen_from_dataframes(config_dict, dataframe_2)
         
 
         

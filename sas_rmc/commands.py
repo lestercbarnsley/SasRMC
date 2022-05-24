@@ -340,7 +340,7 @@ class SetSimulationState(Command):
     def gen_from_simulation(cls, simulation_params: SimulationParams, box_list: List[Box]):
         command_ledger = [SetSimulationParams.gen_from_simulation_params(simulation_params)]
         #command_ledger.append(SetSimulationParams(simulation_params, change_to_factors=simulation_params.values))
-        for box in box_list:
+        for box in box_list: # Google Python style guide says to write it this way rather than a 2-iterator list comprehension
             for particle_index, _ in enumerate(box.particles):
                 command_ledger.append(
                     SetParticleState.gen_from_particle(

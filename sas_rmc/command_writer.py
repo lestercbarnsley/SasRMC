@@ -7,8 +7,7 @@ from matplotlib.figure import Figure
 from matplotlib.axes import Axes
 from matplotlib import pyplot as plt
 
-from sas_rmc.converters import particle_to_axes
-
+from .converters import particle_to_axes
 from .box_simulation import Box
 from .particle import Particle
 
