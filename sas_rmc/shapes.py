@@ -216,7 +216,7 @@ class Cube(Shape):
         return interfaces
 
     def is_inside(self, position: Vector) -> bool:
-        return all([interface.is_inside(position) for interface in self.end_interfaces])
+        return all(interface.is_inside(position) for interface in self.end_interfaces)
 
     def closest_surface_position(self, position: Vector) -> Vector:
         distances_to_surface = []

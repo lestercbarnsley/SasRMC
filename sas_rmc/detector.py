@@ -1,7 +1,7 @@
 #%%
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, List, Tuple
+from typing import Any, Callable, Tuple#List,
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -9,7 +9,7 @@ from matplotlib.figure import Figure
 import pandas as pd
 
 from .array_cache import method_array_cache
-from .vector import Vector, broadcast_array_function, dot
+from .vector import Vector, broadcast_array_function#, dot
 from .particle import modulus_array 
 
 
@@ -114,8 +114,8 @@ class DetectorPixel:
         q_para = q_vec.unit_vector
         perp_angle = np.arctan2(q_para.y, q_para.x) + (PI/2)
         q_perp = Vector.xy_from_angle(angle=perp_angle)
-        q_para_arr = dot(q_para.unit_vector, q_offset) #q_arr_fn(q_para)
-        q_perp_arr = dot(q_perp.unit_vector, q_offset)
+        q_para_arr = q_para.unit_vector * q_offset#q_arr_fn(q_para)
+        q_perp_arr = q_perp.unit_vector * q_offset
         gaussian = np.exp(-(1/2) * ((q_para_arr / self.sigma_para)**2 + (q_perp_arr / self.sigma_perp)**2) )
 
         return gaussian / np.sum(gaussian)

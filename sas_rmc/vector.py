@@ -1,5 +1,5 @@
 #%%
-from typing import Any, Callable, List, Tuple, Type, Union
+from typing import Any, Callable, Generator, List, Tuple, Type#, Union
 from dataclasses import dataclass
 import math
 
@@ -16,7 +16,7 @@ def cross(a: Tuple, b: Tuple) -> Tuple:
     cz = ax*by-ay*bx
     return cx, cy, cz
 
-def _dot(a: Tuple, b: Tuple) -> Any:
+def dot(a: Tuple, b: Tuple) -> Any:
     ax, ay = a[:2]
     az = a[2] if len(a) > 2 else 0
     bx, by = b[:2]
@@ -42,14 +42,19 @@ class Vector:
     def mag(self) -> float:
         return math.sqrt(self.x**2 + self.y**2 + self.z**2)
 
+    def itercomps(self) -> Generator: 
+        yield self.x
+        yield self.y
+        yield self.z
+
     def to_list(self) -> list:
-        return [self.x, self.y, self.z]
+        return list(self.itercomps())#[self.x, self.y, self.z]
 
     def to_numpy(self) -> np.ndarray:
         return np.array(self.to_list())
 
     def to_tuple(self) -> Tuple[float, float, float]:
-        return self.x, self.y, self.z
+        return tuple(self.itercomps())#self.x, self.y, self.z
 
     """ def __getitem__(self, i: int) -> float:
         return self.to_list()[i] """
@@ -67,9 +72,13 @@ class Vector:
         z = self.z + vector2.z
         return type(self)(x = x, y = y, z = z)
 
+    def dot(self, vector_or_tuple) -> float:
+        vector_as_tuple = vector_or_tuple.to_tuple() if isinstance(vector_or_tuple, Vector) else vector_or_tuple
+        return dot(self.to_tuple(), vector_as_tuple)
+
     def __mul__(self, vector_or_scalar):
-        if isinstance(vector_or_scalar, Vector):# type(vector_or_scalar) == type(self): This should be hardcodes as the base class because a sub class should be multipliable by any Vector
-            return _dot(self.to_tuple(), vector_or_scalar.to_tuple())
+        if isinstance(vector_or_scalar, Vector) or type(vector_or_scalar) in [list, tuple]:# type(vector_or_scalar) == type(self): This should be hardcodes as the base class because a sub class should be multipliable by any Vector
+            return self.dot(vector_or_scalar)
         return type(self)(
             x = self.x * vector_or_scalar,
             y = self.y * vector_or_scalar,
@@ -282,9 +291,9 @@ class Interface:
         position_ref = position - self.position_marker
         return position_ref - (self.normal.unit_vector * position_ref) * self.normal.unit_vector + self.position_marker
 
-        
-def dot(a: Union[Tuple, Vector], b: Union[Tuple, Vector]) -> Tuple[float, float, float]:
-    return _dot(a.to_tuple() if isinstance(a, Vector) else a, b.to_tuple() if isinstance(b, Vector) else b)
+# Mark for deletion        
+'''def dot(a: Union[Tuple, Vector], b: Union[Tuple, Vector]) -> Tuple[float, float, float]:
+    return _dot(a.to_tuple() if isinstance(a, Vector) else a, b.to_tuple() if isinstance(b, Vector) else b)'''
 
 
 if __name__ == "__main__":

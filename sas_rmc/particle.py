@@ -1,8 +1,6 @@
 #%%
 from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
-from distutils import core
-from turtle import pos
 from typing import Callable, List, Tuple
 
 import numpy as np
@@ -10,7 +8,7 @@ import matplotlib.pyplot as plt
 from scipy import constants
 
 from .array_cache import method_array_cache, round_vector
-from .vector import Vector, VectorElement, VectorSpace, dot
+from .vector import Vector, VectorElement, VectorSpace#, dot
 from .shapes import Shape, Sphere, Cylinder, collision_detected
 
 get_physical_constant = lambda constant_str: constants.physical_constants[constant_str][0]
@@ -180,9 +178,8 @@ class Particle(ABC):
         bool
             Returns True if the position is inside the particle.
         """
-        return any(
-            (shape.is_inside(position) for shape in self.shapes) # Use a generator here to take advantage of lazy iteration
-        )
+        return any(shape.is_inside(position) for shape in self.shapes) # Use a generator here to take advantage of lazy iteration
+        
         
     def collision_detected(self, other_particle) -> bool:
         return collision_detected(self.shapes, other_particle.shapes)
@@ -201,7 +198,7 @@ class Particle(ABC):
         
     @method_array_cache
     def modulated_form_array(self, qx_array, qy_array, position: Vector, orientation: Vector) -> np.ndarray:
-        return self.form_array(qx_array, qy_array, orientation) * np.exp(1j * dot(position, (qx_array, qy_array)))#(qx_array * position.x + qy_array * position.y))
+        return self.form_array(qx_array, qy_array, orientation) * np.exp(1j * (position * (qx_array, qy_array)))#(qx_array * position.x + qy_array * position.y))
         
     @abstractmethod
     def _magnetic_form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector, magnetization: Vector) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -213,7 +210,7 @@ class Particle(ABC):
         
     @method_array_cache
     def magnetic_modulated_array(self, qx_array, qy_array, position: Vector, orientation: Vector, magnetization: Vector) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        modulated_array = np.exp(1j * dot(position, (qx_array, qy_array)))#(qx_array * position.x + qy_array * position.y))
+        modulated_array = np.exp(1j * (position * (qx_array, qy_array)))#(qx_array * position.x + qy_array * position.y))
         return [fm * modulated_array for fm in self.magnetic_form_array(qx_array, qy_array, orientation, magnetization)]
         
     def form_result(self, qx_array, qy_array) -> FormResult:
@@ -335,7 +332,7 @@ def _form_array_numerical(vector_space, qx_array, qy_array, sld_from_vs_fn, xy_a
     dx, dy, dz= [xy_project(space_arr_partial) for space_arr_partial in [dx_arr, dy_arr, dz_arr]]
     sld = np.sum(sld_from_vs_fn(x_arr, y_arr, z_arr) * dz_arr, axis = xy_axis)
     def form_f(qx: float, qy: float) -> float:
-        return np.sum(sld * np.exp(1j * dot((x, y), (qx, qy))) * dx * dy)
+        return np.sum(sld * np.exp(1j * (Vector(qx, qy) * (x, y))) * dx * dy)
     
     form_function = np.frompyfunc(form_f, 2, 1)
     return np.complex128(form_function(qx_array, qy_array))
@@ -398,9 +395,11 @@ class Dumbbell(Particle):
         return any(sphere_particle.collision_detected(other_particle) for sphere_particle in sphere_particles)
 
     def random_position_inside(self) -> Vector:
-        return np.random.choice(
+        random_particle = np.random.choice([self.particle_1, self.particle_2])
+        return random_particle.random_position_inside()
+        '''return np.random.choice(
             [particle.random_position_inside() for particle in [self.particle_1, self.particle_2]]
-        )
+        )'''
 
     def _form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector) -> np.ndarray:
         # This will never actually be called because we override modulated form array
@@ -478,9 +477,7 @@ class Dumbbell(Particle):
 
 
 def numerical_form_array(flat_sld: np.ndarray, x_arr: np.ndarray, y_arr: np.ndarray, qx: float, qy: float) -> float:
-    return np.sum(
-        flat_sld * np.exp(1j * dot(x_arr, y_arr),(qx, qy))
-        )
+    return np.sum(flat_sld * np.exp(1j * (Vector(qx, qy) * (x_arr, y_arr))))
 
 
 @dataclass

@@ -37,6 +37,17 @@ def test_vector_mul():
     assert v * f == f * v
     assert v * -f == -f * v
 
+def test_vector_dot():
+    x_arr, y_arr = np.meshgrid(np.linspace(-51.5, +51.5, num = 101), np.linspace(-100.5, +100.5, num = 101))
+    v = Vector(3.1, 2.1, 1.1)
+    dot_prod = v * (x_arr, y_arr)
+    assert type(dot_prod) == type(x_arr)
+    assert x_arr.shape == dot_prod.shape
+    dot_prod_unit_vector = v.unit_vector * (x_arr, y_arr)
+    assert type(dot_prod_unit_vector) == type(x_arr)
+    assert x_arr.shape == dot_prod_unit_vector.shape
+    assert np.sum(dot_prod) != np.sum(dot_prod_unit_vector)
+
 def test_vector_cross():
     v_1 = Vector(32,.123,23)
     v_2 = Vector(321.3,31,235123)
