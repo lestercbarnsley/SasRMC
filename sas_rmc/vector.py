@@ -1,4 +1,5 @@
 #%%
+from functools import reduce
 from typing import Any, Callable, Generator, List, Tuple, Type#, Union
 from dataclasses import dataclass
 import math
@@ -30,6 +31,10 @@ def broadcast_array_function(getter_function: Callable[[object], object], output
 def broadcast_to_numpy_array(object_array: np.ndarray, getter_function: Callable[[object], object], output_dtype: Type = np.float64) -> np.ndarray:
     array_function = broadcast_array_function(getter_function=getter_function, output_dtype=output_dtype)
     return array_function(object_array)
+
+def composite_function(*func):
+    compose = lambda f, g : lambda x : f(g(x))
+    return reduce(compose, func, initial= lambda x: x)
 
 
 @dataclass
@@ -194,11 +199,15 @@ class VectorElement:
 
 @dataclass
 class VectorSpace:
-    _vector_elements: np.ndarray
+    vector_elements: np.ndarray
 
-    def array_from_elements(self, element_function: Callable[[VectorElement], float], output_type = np.float64):
+    def array_from_elements(self, element_function: Callable[[VectorElement], float], output_type = np.float64) -> np.ndarray:
         array_function = broadcast_array_function(element_function, output_dtype=output_type)
-        return array_function(self._vector_elements)
+        return array_function(self.vector_elements)
+
+    def field_from_element(self, field_function: Callable[[VectorElement], Vector], output_type = object) -> np.ndarray:
+        field_function_arr = broadcast_array_function(field_function, output_dtype=output_type)
+        return field_function_arr(self.vector_elements)
         
     @property
     def position(self) -> np.ndarray:
@@ -242,7 +251,7 @@ class VectorSpace:
 
     def __getitem__(self, indices) -> VectorElement:
         i, j, k = indices
-        return self._vector_elements[i, j, k]
+        return self.vector_elements[i, j, k]
 
     def change_position(self, vector_offset: Vector):
         def change_element_position(element: VectorElement):
@@ -254,7 +263,7 @@ class VectorSpace:
             )
         element_space_maker = np.frompyfunc(change_element_position, 1, 1)
         return VectorSpace(
-            _vector_elements = element_space_maker(self._vector_elements)
+            vector_elements = element_space_maker(self.vector_elements)
         )
 
     @classmethod

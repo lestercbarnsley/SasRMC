@@ -1,9 +1,9 @@
-from typing import List
+from typing import List, Tuple
 from dataclasses import field, dataclass
 from abc import ABC, abstractmethod
 
 import numpy as np
-from matplotlib import pyplot as plt
+#from matplotlib import pyplot as plt
 from matplotlib import patches
 
 from .vector import Vector, Interface
@@ -27,6 +27,19 @@ class Shape(ABC):
     """
     central_position: Vector = field(default_factory=Vector.null_vector)
     orientation: Vector = field(default_factory=lambda : Vector(0,1,0))
+
+    @property
+    @abstractmethod
+    def dimensions(self) -> Tuple[float, float, float]:
+        """Get a tuple of float values indicating the relative dimensions of the shape.
+        
+        This is used to give guidance to other methods about physical boundaries required to encapsulate the shape, i.e., constructing a VectorSpace that entire encloses the shape 
+
+        Returns
+        -------
+        Tuple[float, float, float]
+            A tuple of three floats with the total extent of the shape in each dimension.
+        """
 
     @abstractmethod
     def is_inside(self, position: Vector) -> bool:
@@ -113,6 +126,10 @@ class Shape(ABC):
 class Sphere(Shape):
     radius: float = 0
 
+    @property
+    def dimensions(self) -> Tuple[float, float, float]:
+        return 2 * self.radius, 2 * self.radius, 2 * self.radius
+
     def is_inside(self, position: Vector) -> bool:
         return (position - self.central_position).mag <= self.radius
 
@@ -138,6 +155,10 @@ class Sphere(Shape):
 class Cylinder(Shape):
     radius: float = 0
     height: float = 0
+
+    @property
+    def dimensions(self) -> Tuple[float, float, float]:
+        return 2 * self.radius, 2 * self.radius, self.height
 
     @property
     def end_interfaces(self) -> List[Interface]:
@@ -198,6 +219,10 @@ class Cube(Shape):
     dimension_0: float = 0
     dimension_1: float = 0
     dimension_2: float = 0
+
+    @property
+    def dimensions(self) -> Tuple[float, float, float]:
+        return self.dimension_0, self.dimension_1, self.dimension_2
 
     @property
     def volume(self) -> float:

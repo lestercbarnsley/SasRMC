@@ -5,7 +5,7 @@ from typing import List, Tuple
 
 import pandas as pd
 
-from sas_rmc.particle import CoreShellParticle, Dumbbell, NumericalDumbell
+from .particle import CoreShellParticle, Dumbbell
 
 ALWAYS_PRESENT_DATA = [
     [None,None,None,None],
@@ -41,7 +41,7 @@ DUMBBELL_PARTICLE_DATA = [
     ["seed_magnetization",0.0,r"# Amperes/metre",None],
 ]
 
-NUMERICAL_DUMBBELL_PARTICLE = [
+'''NUMERICAL_DUMBBELL_PARTICLE = [
     ["particle_type",NumericalDumbell.__name__,None,None],
     ["core_radius",None,r"# Angstroms",None],
     ["core_polydispersity",None,r"# Fraction",None],
@@ -57,7 +57,7 @@ NUMERICAL_DUMBBELL_PARTICLE = [
     ["solvent_sld",None,r"# 10E-6 / Angstrom^2",None],
     ["core_magnetization",None,r"# Amperes/metre",None],
     ["seed_magnetization",0.0,r"# Amperes/metre",None],
-]
+]'''
 
 RELOAD_PARTICLE_DATA = [
     ["particle_type","Reload old simulation",r"# This line should stay unchanged.",None],
@@ -72,6 +72,7 @@ BOX_DATA = [
 
 SIMULATION_DATA = [
     [None,None,None,None],
+    ["result_calculator", r"Analytical", r"# Acceptable options: Analytical, Numerical", r"# Type of function to calculate particle form-factor. Take care, as some particle choices are only compatible with one type of calculator"],
     ["total_cycles",None,r"# integer",None],
     ["annealing_type",r"Very fast",r"# Acceptable options: Fast, Very Fast, Greedy",None],
     ["anneal_start_temp",10,r"# If uncertain, leave as is",None],
@@ -171,12 +172,6 @@ def generate_core_shell(output_path: Path) -> None:
 
 def generate_dumbbell(output_path: Path) -> None:
     particle_data = DUMBBELL_PARTICLE_DATA
-    simulation_data = [*BOX_DATA,*SIMULATION_DATA, *DETECTOR_DATA]
-    dfs, sheet_names = generate_normal_template(particle_data=particle_data, simulation_data=simulation_data)
-    df_list_to_excel(output_path, dfs, sheet_names)
-
-def generate_numerical_dumbbell(output_path: Path) -> None:
-    particle_data = NUMERICAL_DUMBBELL_PARTICLE
     simulation_data = [*BOX_DATA,*SIMULATION_DATA, *DETECTOR_DATA]
     dfs, sheet_names = generate_normal_template(particle_data=particle_data, simulation_data=simulation_data)
     df_list_to_excel(output_path, dfs, sheet_names)

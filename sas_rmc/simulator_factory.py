@@ -12,18 +12,23 @@ from . import commands
 from .converters import dict_to_particle
 from .acceptance_scheme import MetropolisAcceptance
 from .viewer import CLIViewer
-from .scattering_simulation import MAGNETIC_RESCALE, NUCLEAR_RESCALE, Fitter2D, ScatteringSimulation, SimulationParam, SimulationParams
+from .scattering_simulation import MAGNETIC_RESCALE, NUCLEAR_RESCALE, ScatteringSimulation, SimulationParam, SimulationParams
 from .simulator import MemorizedSimulator, MonteCarloEvaluator, Simulator
-from .vector import Vector
-from .particle import CoreShellParticle, Dumbbell, NumericalDumbell, Particle
+from .vector import Vector, VectorSpace
+from .particle import CoreShellParticle, Dumbbell, Particle
 from .box_simulation import Box
 from .detector import DetectorImage, Polarization, DetectorConfig, SimulatedDetectorImage
 from .shapes import Cube
 from .controller import Controller
+from .result_calculator import AnalyticalCalculator, NumericalCalculator, ResultCalculator
+from .fitter import Fitter2D
 
 rng = np.random.default_rng()
 PI = np.pi
 RANGE_FACTOR = 1.2
+RESOLUTION_FACTOR = 1.0
+NUMERICAL_RANGE_FACTOR = 1.05
+
 
 ParticleFactory = Callable[[], Particle]
 BoxFactory = Callable[[int,ParticleFactory], Box]
@@ -137,22 +142,22 @@ def different_random_int(n: int, number_to_avoid: int) -> int:
             return x
     return -1
 
-def box_simulation_params_factory() -> SimulationParams:
+def box_simulation_params_factory(starting_rescale: float = 1.0, starting_magnetic_rescale: float = 1.0) -> SimulationParams:
     params = [
-        SimulationParam(value = 1, name = NUCLEAR_RESCALE, bounds=(0, np.inf)), 
-        SimulationParam(value = 1, name = MAGNETIC_RESCALE, bounds=(0, np.inf))
+        SimulationParam(value = starting_rescale, name = NUCLEAR_RESCALE, bounds=(0, np.inf)), 
+        SimulationParam(value = starting_magnetic_rescale, name = MAGNETIC_RESCALE, bounds=(0, np.inf))
         ]
     return SimulationParams(params = params)
 
-@array_cache
+'''@array_cache
 def qxqy_array_from_ranges(qx_min: float, qx_max: float, qx_delta: float, qy_min: float, qy_max: float, qy_delta: float, range_factor: float = RANGE_FACTOR, resolution_increase_factor: float = 1):
     qX, qY = np.meshgrid(
         np.arange(start = range_factor * qx_min, stop = range_factor * qx_max, step = qx_delta / resolution_increase_factor),
         np.arange(start = range_factor * qy_min, stop = range_factor * qy_max, step = qy_delta / resolution_increase_factor)
     )
-    return qX, qY
+    return qX, qY'''
 
-def qxqy_array_from_detectorimage(detector_image: DetectorImage, range_factor: float = RANGE_FACTOR, resolution_increase_factor: float = 1) -> Tuple[np.ndarray, np.ndarray]:
+'''def qxqy_array_from_detectorimage(detector_image: DetectorImage, range_factor: float = RANGE_FACTOR, resolution_increase_factor: float = 1) -> Tuple[np.ndarray, np.ndarray]:
     qx_max = np.max(detector_image.qX)
     qx_min = np.min(detector_image.qX)
     delta_qx = detector_image.qx_delta
@@ -161,10 +166,11 @@ def qxqy_array_from_detectorimage(detector_image: DetectorImage, range_factor: f
     delta_qy = detector_image.qy_delta
     qX, qY = qxqy_array_from_ranges(qx_min, qx_max, delta_qx, qy_min, qy_max, delta_qy, range_factor=range_factor, resolution_increase_factor=resolution_increase_factor)
     return qX, qY
+'''
 
-
-def qxqy_array_list_from_detector_list(detector_list: List[DetectorImage], range_factor: float = RANGE_FACTOR, resolution_increase_factor: float = 1) -> List[Tuple[np.ndarray, np.ndarray]]:
+'''def qxqy_array_list_from_detector_list(detector_list: List[DetectorImage], range_factor: float = RANGE_FACTOR, resolution_increase_factor: float = 1) -> List[Tuple[np.ndarray, np.ndarray]]:
     return [qxqy_array_from_detectorimage(detector_image, range_factor=range_factor, resolution_increase_factor=resolution_increase_factor) for detector_image in detector_list]
+'''
 
 def command_factory(nominal_step_size: float, box: Box, particle_index: int, temperature: float, simulation_params: SimulationParams, spherical_particle: bool = False, magnetic_simulation: bool = False) -> commands.AcceptableCommand:
     nominal_angle_change = PI/8
@@ -292,44 +298,14 @@ def dumbbell_particle_factory(config_dict: dict) -> ParticleFactory:
         seed_magnetization=Vector.random_vector_xy(seed_magnetization)
     )
 
-def numerical_dumbbell_particle_factory(config_dict: dict) -> ParticleFactory:
-    core_radius = config_dict.get("core_radius", 0.0)
-    core_polydispersity = config_dict.get("core_polydispersity", 0.0)
-    core_sld= config_dict.get("core_sld", 0.0)
-    seed_radius = config_dict.get("seed_radius", 0.0)
-    seed_polydispersity = config_dict.get("seed_polydispersity", 0.0)
-    seed_sld = config_dict.get("seed_sld", 0.0)
-    shell_thickness = config_dict.get("shell_thickness", 0.0)
-    shell_polydispersity = config_dict.get("shell_polydispersity", 0.0)
-    shell_sld = config_dict.get("shell_sld", 0.0)
-    centre_to_centre_separation = config_dict.get("centre_to_centre_separation", 0.0)
-    centre_to_centre_polydispersity = config_dict.get("centre_to_centre_polydispersity", 0.0)
-    solvent_sld = config_dict.get("solvent_sld", 0.0)
-    core_magnetization = config_dict.get("core_magnetization", 0.0)
-    seed_magnetization= config_dict.get("seed_magnetization", 0.0)
-    
-    return lambda : NumericalDumbell.gen_from_parameters(
-        core_radius=polydisperse_parameter(core_radius, polyd=core_polydispersity),
-        seed_radius=polydisperse_parameter(seed_radius, polyd=seed_polydispersity),
-        shell_thickness=polydisperse_parameter(shell_thickness, polyd=shell_polydispersity),
-        centre_to_centre=polydisperse_parameter(centre_to_centre_separation, centre_to_centre_polydispersity),
-        core_sld=core_sld,
-        seed_sld=seed_sld,
-        shell_sld=shell_sld,
-        solvent_sld=solvent_sld,
-        position=Vector.null_vector(),
-        orientation=Vector.random_vector_xy()
-    )
-
 def generate_particle_factory_from_config_dict(config_dict: dict) -> ParticleFactory:
     particle_type= config_dict.get("particle_type", "CoreShellParticle")
     if particle_type == CoreShellParticle.__name__:
         return core_shell_particle_factory(config_dict)
     if particle_type == Dumbbell.__name__:
         return dumbbell_particle_factory(config_dict)
-    if particle_type == NumericalDumbell.__name__:
-        return numerical_dumbbell_particle_factory(config_dict)
     
+
 
 
 @dataclass
@@ -485,11 +461,50 @@ def generate_file_path_maker(output_folder: Path, description: str = "") -> Call
     datetime_string = datetime.now().strftime(datetime_format)
     return lambda comment, file_format: generate_save_file(datetime_string, output_folder, description, comment, file_format)
 
+def qxqy_from_detector(detector: DetectorImage, range_factor: float, resolution_factor: float):
+    detector_qx, detector_qy = detector.qX, detector.qY
+    detector_delta_qx, detector_delta_qy = detector.qx_delta, detector.qy_delta
+    line_maker = lambda starting_q_min, starting_q_max, starting_q_step : np.arange(start = range_factor * starting_q_min, stop = +range_factor * starting_q_max, step = starting_q_step / resolution_factor)
+    qx_linear = line_maker(np.min(detector_qx), np.max(detector_qx), detector_delta_qx)
+    qy_linear = line_maker(np.min(detector_qy), np.max(detector_qy), detector_delta_qy)
+    qx, qy = np.meshgrid(qx_linear, qy_linear)
+    return qx, qy
+
+def analytical_calculator_maker(detector: DetectorImage, range_factor: float, resolution_factor: float):
+    qx, qy = qxqy_from_detector(detector, range_factor, resolution_factor)
+    return AnalyticalCalculator(qx, qy)
+
+def numerical_calculator_maker(detector: DetectorImage, particle_factory: ParticleFactory, range_factor: float, resolution_factor: float):
+    biggest_dimension_0, biggest_dimension_1, biggest_dimension_2 = 0, 0, 0
+    for _ in range(10000):
+        particle = particle_factory()
+        for shape in particle.shapes:
+            d_0, d_1, d_2 = shape.dimensions
+            biggest_dimension_0 = np.max(NUMERICAL_RANGE_FACTOR *  d_0, biggest_dimension_0)
+            biggest_dimension_1 = np.max(NUMERICAL_RANGE_FACTOR *  d_1, biggest_dimension_1)
+            biggest_dimension_2 = np.max(NUMERICAL_RANGE_FACTOR *  d_2, biggest_dimension_2)
+    vector_space_resolution = PI / np.max(detector.q)
+    vector_space = VectorSpace.gen_from_bounds(
+        x_min = -biggest_dimension_0 / 2, x_max = biggest_dimension_0 / 2, x_num = int(biggest_dimension_0 / vector_space_resolution),
+        y_min = -biggest_dimension_1 / 2, y_max = biggest_dimension_1 / 2, y_num = int(biggest_dimension_1 / vector_space_resolution),
+        z_min = -biggest_dimension_2 / 2, z_max = biggest_dimension_2 / 2, z_num = int(biggest_dimension_2 / vector_space_resolution)
+    )
+    qx, qy = qxqy_from_detector(detector, range_factor, resolution_factor)
+    return NumericalCalculator(qx, qy, vector_space)
+    
+def generate_result_calculator_maker(particle_factory: ParticleFactory, calculator_type: str = "Analytical", range_factor: float = RANGE_FACTOR, resolution_factor: float = RESOLUTION_FACTOR) -> Callable[[DetectorImage], ResultCalculator]:
+    if calculator_type == "Analytical":
+        return lambda detector : analytical_calculator_maker(detector, range_factor=range_factor, resolution_factor=resolution_factor)
+    if calculator_type == "Numerical":
+        return lambda detector : numerical_calculator_maker(detector, particle_factory, range_factor=range_factor, resolution_factor=resolution_factor)
+    raise Exception(f"Your entered calculator type: {calculator_type}, isn't a valid entry for 'calculator_type'")
+
 
 @dataclass
 class SimulationConfig:
     simulation_title: str
     particle_factory: ParticleFactory
+    result_calculator_maker : Callable[[DetectorImage], ResultCalculator]
 
     nominal_concentration: float
     particle_number: int
@@ -535,14 +550,11 @@ class SimulationConfig:
         #return generate_save_file(output_folder=output_folder, description=self.simulation_title, file_format="xlsx")
 
     def generate_scattering_simulation(self, detector_list: List[DetectorImage], box_list: List[Box]) -> ScatteringSimulation:
-        qxqy_list = qxqy_array_list_from_detector_list(detector_list, range_factor=RANGE_FACTOR)
         fitter = Fitter2D.generate_standard_fitter(
-            simulated_detectors=detector_list,
-            box_list=box_list,
-            qxqy_list=qxqy_list
-        ) if self.detector_smearing else Fitter2D.generate_no_smear_fitter(
-            simulated_detectors=detector_list,
-            box_list=box_list
+            detector_list=detector_list,
+            box_list = box_list,
+            result_calculator_maker=self.result_calculator_maker,
+            smearing=self.detector_smearing
         )
         return ScatteringSimulation(fitter = fitter, simulation_params=box_simulation_params_factory())
 
@@ -606,9 +618,11 @@ class SimulationConfig:
             annealing_stop_cycle_number=annealing_stop_cycle_as_read
         )
         detector_data_configs = [DetectorDataConfig.generate_detectorconfig_from_dict(config_dict)] if (config_dict.get("Data Source", "")) else DetectorDataConfig.generate_detectorconfig_list_from_dataframe(dataframe_2)
+        particle_factory = generate_particle_factory_from_config_dict(config_dict)
         return cls(
             simulation_title = config_dict.get("simulation_title", ""),
             particle_factory = generate_particle_factory_from_config_dict(config_dict),
+            result_calculator_maker = generate_result_calculator_maker(particle_factory, config_dict.get("result_calculator", "Analytical")),
             nominal_concentration=config_dict.get("nominal_concentration", 0.0),
             particle_number=config_dict.get("particle_number", 0),
             box_number=config_dict.get("box_number", 0),

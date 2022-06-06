@@ -1,0 +1,123 @@
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Callable, Protocol, Tuple
+
+import numpy as np
+
+from .particle import Particle, ParticleComposite, magnetic_sld_in_angstrom_minus_2
+from .vector import Vector, VectorSpace, composite_function
+from .array_cache import method_array_cache
+
+
+@dataclass
+class FormResult:
+    form_nuclear: np.ndarray
+    form_magnetic_x: np.ndarray
+    form_magnetic_y: np.ndarray
+    form_magnetic_z: np.ndarray
+
+
+@dataclass
+class ResultCalculator(ABC):
+    qx_array: np.ndarray
+    qy_array: np.ndarray
+
+    @abstractmethod
+    def form_result(self, particle: Particle) -> FormResult:
+        pass
+
+
+@dataclass
+class AnalyticalCalculator(ResultCalculator):
+    
+    @method_array_cache(cache_holder_keysize=2)
+    def modulated_form_array_calculator(self, particle: Particle, orientation: Vector) -> Callable[[Vector], np.ndarray]:
+        form_array = particle.form_array(self.qx_array, self.qy_array, orientation)
+        return lambda position : form_array * np.exp(1j * (position * (self.qx_array, self.qy_array)))
+
+    @method_array_cache(cache_holder_keysize=2)
+    def modulated_form_array(self, particle: Particle, orientation: Vector, position: Vector) -> np.ndarray:
+        if isinstance(particle, ParticleComposite):
+            return np.sum([self.modulated_form_array(particle_component, particle_component.orientation, particle_component.position) for particle_component in particle.particle_list], axis=0)        
+        modulated_array_calculator = self.modulated_form_array_calculator(particle, orientation)
+        return modulated_array_calculator(position)
+
+    @method_array_cache(cache_holder_keysize=2)
+    def magnetic_modulated_array_calculator(self, particle: Particle, orientation: Vector, magnetization: Vector) -> Callable[[Vector],Tuple[np.ndarray, np.ndarray, np.ndarray]]:
+        magnetic_form_arrays = particle.magnetic_form_array(self.qx_array, self.qy_array, orientation, magnetization)
+        return lambda position : [magnetic_form_array * np.exp(1j * (position * (self.qx_array, self.qy_array))) for magnetic_form_array in magnetic_form_arrays]
+
+    @method_array_cache(cache_holder_keysize=2)
+    def magnetic_modulated_array(self, particle: Particle, orientation: Vector, magnetization: Vector, position: Vector) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        if isinstance(particle, ParticleComposite):
+            mag_arrs = [self.magnetic_modulated_array(particle_component, particle_component.orientation, particle_component.magnetization, particle_component.position) for particle_component in particle.particle_list]
+            get_added_mag_comp = lambda i: np.sum([m[i] for m in mag_arrs], axis=0)
+            return [get_added_mag_comp(i) for i in range(3)]
+        magnetic_array_calculator = self.magnetic_modulated_array_calculator(particle, orientation, magnetization)
+        return magnetic_array_calculator(position)
+    
+    def form_result(self, particle: Particle) -> FormResult:
+        form_nuclear = self.modulated_form_array(particle, particle.orientation, particle.position)
+        form_magnetic_x, form_magnetic_y, form_magnetic_z = self.magnetic_modulated_array(particle, particle.orientation, particle.magnetization, particle.position)
+        return FormResult(
+            form_nuclear=form_nuclear,
+            form_magnetic_x=form_magnetic_x,
+            form_magnetic_y=form_magnetic_y,
+            form_magnetic_z=form_magnetic_z
+        )
+
+
+def numerical_form_array(sld_arr: np.ndarray, vector_space: VectorSpace, qx_array: np.ndarray, qy_array: np.ndarray, xy_axis: int = 2) -> np.ndarray:
+    flat_sld = np.sum(sld_arr * vector_space.dz, axis = xy_axis)
+    x = np.average(vector_space.x, axis = xy_axis)
+    y = np.average(vector_space.y, axis = xy_axis)
+    form_f = lambda qx, qy: np.sum(flat_sld * np.exp(1j * (Vector(qx, qy) * (x, y))) * vector_space.dx * vector_space.dy)
+    form_calculator = np.frompyfunc(form_f, 2, 1)
+    return form_calculator(qx_array, qy_array).astype(np.complex128)
+
+
+@dataclass
+class ParticleNumerical(Protocol):
+    def get_sld(self, relative_position: Vector) -> float:
+        pass
+
+    def get_magnetization(self, relative_position: Vector) -> Vector:
+        pass
+
+
+@dataclass
+class NumericalCalculator(AnalyticalCalculator):
+    vector_space: VectorSpace
+
+    def sld_from_vector_space(self, get_sld: Callable[[Vector], float], delta_sld: Callable[[float], float]) -> np.ndarray:
+        element_to_delta_sld = composite_function(
+            delta_sld,
+            get_sld,
+            lambda element: element.position
+        )
+        return self.vector_space.array_from_elements(element_to_delta_sld)
+
+    @method_array_cache(cache_holder_keysize=2)
+    def modulated_form_array_calculator(self, particle: ParticleNumerical, orientation: Vector) -> Callable[[Vector], np.ndarray]:
+        sld_arr = self.sld_from_vector_space(particle.get_sld)
+        form_array = numerical_form_array(sld_arr, self.vector_space, self.qx_array, self.qy_array)
+        return lambda position : form_array * np.exp(1j * (position * (self.qx_array, self.qy_array)))
+
+    def magnetic_sld_from_vector_space(self, get_magnetization: Callable[[Vector], Vector]) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        element_to_magnetization = composite_function(
+            get_magnetization,
+            lambda element: element.position
+        )
+        m_field = self.vector_space.field_from_element(element_to_magnetization)
+        sld_getters = np.frompyfunc(magnetic_sld_in_angstrom_minus_2, 1, 3)
+        mag_sld_x, mag_sld_y, mag_sld_z = sld_getters(m_field)
+        return [mag_sld.astype(np.float64) for mag_sld in [mag_sld_x, mag_sld_y, mag_sld_z]]
+
+    @method_array_cache(cache_holder_keysize=2)
+    def magnetic_modulated_array_calculator(self, particle: ParticleNumerical, orientation: Vector, magnetization: Vector) -> Callable[[Vector],Tuple[np.ndarray, np.ndarray, np.ndarray]]:
+        magnetic_slds = self.magnetic_sld_from_vector_space(particle.get_magnetization)
+        magnetic_form_arrays = [numerical_form_array(magnetic_sld, self.vector_space, self.qx_array, self.qy_array) for magnetic_sld in magnetic_slds]
+        return lambda position : [magnetic_form_array * np.exp(1j * (position * (self.qx_array, self.qy_array))) for magnetic_form_array in magnetic_form_arrays]
+
+
+

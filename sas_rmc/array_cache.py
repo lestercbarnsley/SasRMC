@@ -22,7 +22,7 @@ def _round_vector_comp(comp: float, precision: float):
             return int(comp * 10**(precision + i)) / 10**(precision + i)
 
 def round_vector(vector: Vector, precision: int = DEFAULT_PRECISION) -> Tuple[float, float, float]:
-    return _round_vector_comp(vector.x, precision), _round_vector_comp(vector.y, precision), _round_vector_comp(vector.z, precision)
+    return tuple(_round_vector_comp(comp, precision) for comp in vector.itercomps())
 
 def pass_arg(arg):
     if type(arg) in immutable_types:
@@ -37,43 +37,59 @@ def pass_arg(arg):
         return tuple((pass_arg(k), pass_arg(v)) for k, v in arg.items())
     return id(arg)
 
-def array_cache(func, max_size: int = MAX_SIZE):
-    cache = {}
+def array_cache(func = None, max_size: int = None):
+    if max_size is None:
+        max_size = MAX_SIZE
+    def _array_cache(func):
+        cache = {}
 
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        kwarg_tuple = pass_arg(kwargs)
-        argument_tuple = pass_arg(args) + kwarg_tuple
-        if argument_tuple not in cache:
-            if len(cache) >= max_size:
-                keys = list(cache.keys())
-                uncached = [cache.pop(key) for key in keys[:-int(max_size / 2)]]
-            result = func(*args, **kwargs)
-            cache[argument_tuple] = result
-        return cache[argument_tuple]
-      
-    return wrapper
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            kwarg_tuple = pass_arg(kwargs)
+            argument_tuple = pass_arg(args) + kwarg_tuple
+            if argument_tuple not in cache:
+                if len(cache) >= max_size:
+                    keys = list(cache.keys())
+                    uncached = [cache.pop(key) for key in keys[-int(max_size / 2):]]
+                result = func(*args, **kwargs)
+                cache[argument_tuple] = result
+            return cache[argument_tuple]
+        
+        return wrapper
+    if func is not None:
+        return _array_cache(func)
+    return _array_cache
 
-def method_array_cache(func, max_size: int = CLASS_MAX_SIZE):
-    cache = {}
+def method_array_cache(func = None, max_size: int = None, cache_holder_keysize: int = None):
+    if max_size is None:
+        max_size = CLASS_MAX_SIZE
+    if cache_holder_keysize is None:
+        cache_holder_keysize = 1
+    def _method_array_cache(func):
+        cache = {}
 
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        kwarg_tuple = tuple((k, pass_arg(v)) for k, v in kwargs.items())
-        argument_tuple = tuple(pass_arg(arg) for arg in args) + kwarg_tuple
-        object_id, cache_key = argument_tuple[0], argument_tuple[1:]
-        if object_id not in cache:
-            cache[object_id] = {}
-        object_cache = cache[object_id]
-        if cache_key not in object_cache:
-            if len(object_cache) >= max_size:
-                keys = list(object_cache.keys())
-                uncached = [object_cache.pop(key) for key in keys[:-2]]
-            result = func(*args, **kwargs)
-            object_cache[cache_key] = result
-        return object_cache[cache_key]
-      
-    return wrapper
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            cache_holder_items, other_args =  args[:cache_holder_keysize], args[cache_holder_keysize:]
+            object_id = pass_arg(cache_holder_items)
+            kwarg_tuple = tuple((k, pass_arg(v)) for k, v in kwargs.items())
+            argument_tuple = tuple(pass_arg(arg) for arg in other_args) + kwarg_tuple
+            #object_id, cache_key = argument_tuple[0], argument_tuple[1:]
+            if object_id not in cache:
+                cache[object_id] = {}
+            object_cache = cache[object_id]
+            if argument_tuple not in object_cache:
+                if len(object_cache) >= max_size:
+                    keys = list(object_cache.keys())
+                    uncached = [object_cache.pop(key) for key in keys[-2:]]
+                result = func(*args, **kwargs)
+                object_cache[argument_tuple] = result
+            return object_cache[argument_tuple]
+        
+        return wrapper
+    if func is not None:
+        return _method_array_cache(func)
+    return _method_array_cache
 
 
 

@@ -12,7 +12,7 @@ from .box_simulation import Box
 from .detector import DetectorImage
 from .logger import Logger
 from .simulator_factory import gen_config_from_dataframes, generate_file_path_maker
-from .template_generator import generate_core_shell, generate_dumbbell, generate_numerical_dumbbell, generate_reload
+from .template_generator import generate_core_shell, generate_dumbbell, generate_reload
 
 
 @dataclass
@@ -103,10 +103,6 @@ TEMPLATE_PARAMS = {
     "generate dumbbell template":{
         "template_name" : "Dumbell_Simulation_Input",
         "template_generating_method" : generate_dumbbell
-        },
-    "generate numerical dumbbell template":{
-        "template_name" : "Numerical_Dumbell_Simulation_Input",
-        "template_generating_method" : generate_numerical_dumbbell
         },
     "generate reload template":{
         "template_name" : "Reload_Simulation_Input",
