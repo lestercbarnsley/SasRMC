@@ -154,6 +154,7 @@ class JumpParticleTo(ParticleCommand):
         particle = self.particle
         reference_particle = self.box[self.reference_particle_index]
         jump_vector = Vector(np.inf, np.inf, np.inf)
+        pointing_vector = reference_particle.closest_surface_position(particle.position)
         for shape in particle.shapes:
             for shape_2 in reference_particle.shapes:
                 pointing_vector = shape_2.closest_surface_position(shape.central_position)

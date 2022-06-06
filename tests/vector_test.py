@@ -18,6 +18,9 @@ def test_vector_mag():
     assert v.mag == pytest.approx(v_mag)
     assert type(v.mag) == type(v_mag)
     assert type(v.mag) != np.ndarray
+    assert Vector.null_vector().mag == 0
+    v_1 = Vector(1, 1, 1).unit_vector
+    assert [v_1_c == pytest.approx(v_1_unit_c) for v_1_c, v_1_unit_c in zip(v_1.itercomps(), v_1.unit_vector.itercomps())]
 
 def test_vector_to_list():
     v = Vector(2351,123,2231)

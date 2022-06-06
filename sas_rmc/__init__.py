@@ -1,6 +1,6 @@
 #%%
 
-from . import commands, particle, scattering_simulation, simulator, acceptance_scheme, viewer, shapes, array_cache, simulator_factory
+from . import commands, particle, scattering_simulation, simulator, acceptance_scheme, viewer, shapes, array_cache, simulator_factory, result_calculator, form_calculator
 
 from .rmc_runner import RmcRunner, load_config
 

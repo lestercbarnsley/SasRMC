@@ -9,9 +9,10 @@ import sas_rmc
 
 from sas_rmc.box_simulation import Box
 from sas_rmc.controller import Controller
-from sas_rmc.particle import CoreShellParticle, Dumbbell
-from sas_rmc.scattering_simulation import MAGNETIC_RESCALE, NUCLEAR_RESCALE, Fitter2D, ScatteringSimulation
+from sas_rmc.particle import CoreShellParticle, Dumbbell, Particle
+from sas_rmc.scattering_simulation import MAGNETIC_RESCALE, NUCLEAR_RESCALE, ScatteringSimulation
 from sas_rmc import Vector, SimulatedDetectorImage, Polarization, DetectorConfig, commands, shapes
+from sas_rmc.fitter import Fitter2D
 
 
 PI = np.pi
@@ -19,7 +20,7 @@ PI = np.pi
 def default_cube() -> shapes.Cube:
     return shapes.Cube(dimension_0=10000, dimension_1=10000, dimension_2=10000)
 
-def default_particles(particle_number = 20):
+def default_particles(particle_number = 20) -> List[CoreShellParticle]:
     radius = 100
     return [CoreShellParticle.gen_from_parameters(
         position = Vector(0, 2 * i * radius, 0),
@@ -28,15 +29,17 @@ def default_particles(particle_number = 20):
         core_sld = 6
     ) for i in range(particle_number)]
 
-def default_box(particle_number = 20) -> Box:
+def default_box(particles: List[Particle] = None) -> Box:
+    if particles is None:
+        particles = default_particles()
     box = Box(
-        particles = default_particles(particle_number),
+        particles = particles,
         cube = default_cube()
     )
     box.force_inside_box()
     return box
 
-def default_dumbbell_particles(particle_number = 20):
+def default_dumbbell_particles(particle_number = 20) -> List[Dumbbell]:
     p1_radius = 30
     p2_radius = 50
     return [Dumbbell.gen_from_parameters(
@@ -48,12 +51,6 @@ def default_dumbbell_particles(particle_number = 20):
         shell_sld = 1,
         solvent_sld = 0,
         ) for _ in range(particle_number)]
-
-def default_dumbbell_box(particle_number = 20):
-    return Box(
-        particles = default_dumbbell_particles(particle_number),
-        cube = default_cube()
-    )
 
 
 def default_detector_image() -> SimulatedDetectorImage:
@@ -79,9 +76,9 @@ def default_simulation(box_list: List[Box]) -> ScatteringSimulation:
     detector = default_detector_image()
     qx, qy = detector.qX, detector.qY
     fitter = Fitter2D.generate_standard_fitter(
-        simulated_detectors=[detector],
-        box_list=box_list,
-        qxqy_list=[(qx, qy)]
+        detector_list=[detector],
+        box_list = box_list,
+        result_calculator_maker=lambda detector : sas_rmc.result_calculator.AnalyticalCalculator(detector.qX, detector.qY)
     )
     return ScatteringSimulation(fitter=fitter, simulation_params=sas_rmc.simulator_factory.box_simulation_params_factory())
 
@@ -143,7 +140,7 @@ def test_particle_jump():
         assert box.collision_test() == False
 
 def test_dumbbell_jump():
-    box = default_dumbbell_box()
+    box = default_box(default_dumbbell_particles())
     for in_plane in [True, False]:
         happened = []
         for _ in range(50):
@@ -154,8 +151,8 @@ def test_dumbbell_jump():
             particle_2 = box[2]
             particle_3 = box[3]
             separations, radii_sums = [], []
-            for p in [particle_2.particle_1, particle_2.particle_2]:
-                for p_3 in [particle_3.particle_1, particle_3.particle_2]:
+            for p in particle_2.particle_list:
+                for p_3 in particle_3.particle_list:
                     separations.append(p.position.distance_from_vector(p_3.position))
                     radii_sums.append(p.shapes[1].radius + p_3.shapes[1].radius)
             if box.collision_test() == False:
@@ -197,13 +194,16 @@ def test_large_move():
 def test_modulated_form_cache():
     box = default_box()
     box.force_inside_box()
+    
     position = Vector(2144.6643,1231.12315,1532.123)
     command = commands.MoveParticleTo(box, 14, position)
     detector_image = DEFAULT_DETECTOR_IMAGE
     qx_array, qy_array = detector_image.qX, detector_image.qY
-    d1 = box[13].modulated_form_array(qx_array, qy_array, position=box[13].position, orientation=box[13].orientation)
+    form_calculator = sas_rmc.result_calculator.AnalyticalCalculator(qx_array, qy_array)
+    get_modulated_form_array = lambda : form_calculator.modulated_form_array(box[13], orientation=box[13].orientation, position=box[13].position)
+    d1 = get_modulated_form_array()
     command.execute()
-    d2 = box[13].modulated_form_array(qx_array, qy_array, position=box[13].position, orientation=box[13].orientation)
+    d2 = get_modulated_form_array()
     assert np.average(d2 - d1) == 0
     assert id(d2) == id(d1)
 
@@ -216,13 +216,15 @@ def test_modulated_form_cache_polish():
     command2 = commands.MoveParticleTo(box, 14, position_2)
     detector_image = DEFAULT_DETECTOR_IMAGE
     qx_array, qy_array = detector_image.qX, detector_image.qY
-    d1 = box[14].modulated_form_array(qx_array, qy_array, position=box[14].position, orientation=box[14].orientation)
+    form_calculator = sas_rmc.result_calculator.AnalyticalCalculator(qx_array, qy_array)
+    get_modulated_form = lambda : form_calculator.modulated_form_array(box[14], orientation=box[14].orientation, position=box[14].position)
+    d1 = get_modulated_form()
     f1 = box[14].form_array(qx_array, qy_array, orientation=box[14].orientation)
     command.execute()
-    d2 = box[14].modulated_form_array(qx_array, qy_array, position=box[14].position, orientation=box[14].orientation)
+    d2 = get_modulated_form()
     f2 = box[14].form_array(qx_array, qy_array, orientation=box[14].orientation)
     command2.execute()
-    d3 = box[14].modulated_form_array(qx_array, qy_array, position=box[14].position, orientation=box[14].orientation)
+    d3 = get_modulated_form()
     f3 = box[14].form_array(qx_array, qy_array, orientation=box[14].orientation)
     assert np.average(d3 - d1) == 0
     assert id(d3) == id(d1)
@@ -230,37 +232,37 @@ def test_modulated_form_cache_polish():
     assert id(d3) != id(d2)
     assert np.average(f2 - f1) == 0
     assert np.average(f3 - f1) == 0
-    assert id(f1) == id(f2)
-    assert id(f1) == id(f3)
+    assert id(f1) != id(f2)
+    assert id(f1) != id(f3)
 
 def test_dumbbell_modulated_and_form_array():
     detector_image = DEFAULT_DETECTOR_IMAGE
     qx_array, qy_array = detector_image.qX, detector_image.qY
+    form_calculator = sas_rmc.result_calculator.AnalyticalCalculator(qx_array, qy_array)
     get_current_form_array = lambda p: p.form_array(qx_array, qy_array, orientation = p.orientation)
-    get_current_modulated_form_array = lambda p: p.modulated_form_array(qx_array, qy_array, position = p.position, orientation = p.orientation)
+    get_current_modulated_form_array = lambda p: form_calculator.modulated_form_array(p , position = p.position, orientation = p.orientation)
     for _ in range(50):
-        box = default_dumbbell_box()
-        box.force_inside_box()
+        box = default_box(default_dumbbell_particles())
         position = Vector(2144.6643,1231.12315,1532.123)
         position_2 = box[14].position
-        position_d2 = box[14].particle_2.position
+        position_d2 = box[14].seed_particle.position
         command = commands.MoveParticleTo(box, 14, position)
         command2 = commands.MoveParticleTo(box, 14, position_2)
         d1 = get_current_modulated_form_array(box[14])#.modulated_form_array(qx_array, qy_array, position=box[14].position, orientation=box[14].orientation)
         f1 = get_current_form_array(box[14])#.form_array(qx_array, qy_array, orientation=box[14].orientation)
-        dcore_01 = get_current_modulated_form_array(box[14].particle_1)#.modulated_form_array(qx_array, qy_array, position=box[14].particle_1.position, orientation=box[14].particle_1.orientation)
-        dcore_02 = get_current_modulated_form_array(box[14].particle_2)#.modulated_form_array(qx_array, qy_array,position=box[14].particle_2.position, orientation=box[14].particle_2.orientation)
+        dcore_01 = get_current_modulated_form_array(box[14].core_particle)#.modulated_form_array(qx_array, qy_array, position=box[14].particle_1.position, orientation=box[14].particle_1.orientation)
+        dcore_02 = get_current_modulated_form_array(box[14].seed_particle)#.modulated_form_array(qx_array, qy_array,position=box[14].particle_2.position, orientation=box[14].particle_2.orientation)
         command.execute()
         d2 = get_current_modulated_form_array(box[14])#box[14].modulated_form_array(qx_array, qy_array, position=box[14].position, orientation=box[14].orientation)
         f2 = get_current_form_array(box[14])#box[14].form_array(qx_array, qy_array, orientation=box[14].orientation)
-        dcore_11 = get_current_modulated_form_array(box[14].particle_1)#box[14].particle_1.modulated_form_array(qx_array, qy_array, position=box[14].particle_1.position, orientation=box[14].particle_1.orientation)
-        dcore_12 = get_current_modulated_form_array(box[14].particle_2)#box[14].particle_2.modulated_form_array(qx_array, qy_array,position=box[14].particle_2.position, orientation=box[14].particle_2.orientation)
+        dcore_11 = get_current_modulated_form_array(box[14].core_particle)#box[14].particle_1.modulated_form_array(qx_array, qy_array, position=box[14].particle_1.position, orientation=box[14].particle_1.orientation)
+        dcore_12 = get_current_modulated_form_array(box[14].seed_particle)#box[14].particle_2.modulated_form_array(qx_array, qy_array,position=box[14].particle_2.position, orientation=box[14].particle_2.orientation)
         command2.execute()
         d3 = get_current_modulated_form_array(box[14])#box[14].modulated_form_array(qx_array, qy_array, position=box[14].position, orientation=box[14].orientation)
         f3 = get_current_form_array(box[14])#box[14].form_array(qx_array, qy_array, orientation=box[14].orientation)
-        position_d22 = box[14].particle_2.position
-        dcore_21 = get_current_modulated_form_array(box[14].particle_1)#box[14].particle_1.modulated_form_array(qx_array, qy_array, position=box[14].particle_1.position, orientation=box[14].particle_1.orientation)
-        dcore_22 = get_current_modulated_form_array(box[14].particle_2)#box[14].particle_2.modulated_form_array(qx_array, qy_array,position=box[14].particle_2.position, orientation=box[14].particle_2.orientation)
+        position_d22 = box[14].seed_particle.position
+        dcore_21 = get_current_modulated_form_array(box[14].core_particle)#box[14].particle_1.modulated_form_array(qx_array, qy_array, position=box[14].particle_1.position, orientation=box[14].particle_1.orientation)
+        dcore_22 = get_current_modulated_form_array(box[14].seed_particle)#box[14].particle_2.modulated_form_array(qx_array, qy_array,position=box[14].particle_2.position, orientation=box[14].particle_2.orientation)
         assert box[14].position == position_2
         assert (position_d2 - position_d22).mag == pytest.approx(0)
         assert np.average(d3 - d1) == pytest.approx(0)
@@ -279,8 +281,9 @@ def test_modulated_and_form_array():
     box.force_inside_box()
     detector_image = DEFAULT_DETECTOR_IMAGE
     qx_array, qy_array = detector_image.qX, detector_image.qY
+    form_calculator = sas_rmc.result_calculator.AnalyticalCalculator(qx_array, qy_array)
     ff = box[13].form_array(qx_array, qy_array, orientation=box[13].orientation)
-    fm = box[13].modulated_form_array(qx_array, qy_array, position=box[13].position, orientation=box[13].orientation)
+    fm = form_calculator.modulated_form_array( box[13], position=box[13].position, orientation=box[13].orientation)
     fm2 = ff * np.exp(1j * (qx_array * box[13].position.x + qy_array * box[13].position.y))
     assert np.average(fm2 - fm) == 0
 
@@ -290,8 +293,9 @@ def test_box_intensity():
     box.force_inside_box()
     detector_image = DEFAULT_DETECTOR_IMAGE
     qx_array, qy_array = detector_image.qX, detector_image.qY
-    b_tensity = box_intensity(box, qx_array, qy_array)
-    get_mfas = lambda : [p.form_result(qx_array, qy_array).form_nuclear for p in box.particles]
+    form_calculator = sas_rmc.result_calculator.AnalyticalCalculator(qx_array, qy_array)
+    b_tensity = box_intensity([form_calculator.form_result(p) for p in box.particles], box.volume, qx_array, qy_array)
+    get_mfas = lambda : [form_calculator.form_result(p).form_nuclear for p in box.particles]
     mfas_prior = get_mfas()
     command = commands.MoveParticleBy(box, 15, Vector(20,20,20))
     command.execute()
@@ -304,7 +308,7 @@ def test_box_intensity():
             assert np.average(mfa_after - mfa_prior) == 0
             assert id(mfa_after) == id(mfa_prior)
 
-    b_tensity_after = box_intensity(box, qx_array, qy_array)
+    b_tensity_after = box_intensity([form_calculator.form_result(p) for p in box.particles], box.volume, qx_array, qy_array)
     assert b_tensity.shape == b_tensity_after.shape
     assert np.average(b_tensity_after - b_tensity) != 0
 
@@ -463,7 +467,7 @@ def test_controller_acceptance_independence():
 def test_dumbbell_rotation():
     for _ in range(50):
         dumbbell = Dumbbell.gen_from_parameters(50, 50, 10, 4, 6, 1, 0)
-        distance_calc = lambda : dumbbell.particle_1.position.distance_from_vector(dumbbell.particle_2.position)
+        distance_calc = lambda : dumbbell.particle_list[0].position.distance_from_vector(dumbbell.particle_list[1].position)
         orientation_calc = lambda : dumbbell.orientation
         old_distance = distance_calc()
         old_orientation = orientation_calc()
