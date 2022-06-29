@@ -85,6 +85,8 @@ class Fitter2D:
     def generate_standard_fitter(cls, detector_list: List[SimulatedDetectorImage], box_list: List[Box], result_calculator_maker: Callable[[DetectorImage], ResultCalculator], weighting_function: Callable[[DetectorImage], np.ndarray] = None, masking_function: Callable[[DetectorImage], np.ndarray] = None, smearing: bool = True):
         if weighting_function is None:
             weighting_function = default_detector_to_weighting_function
+        if masking_function is None:
+            masking_function = lambda detector : detector.shadow_factor
         calculating_function = intensity_calculator_and_smearer_from_detector if smearing else intensity_calculator_no_smearer
         intensity_calculators = [calculating_function(detector, box_list, result_calculator_maker) for detector in detector_list]
         arrays_fitter = lambda simulated_intensities : average_chi_squared_fitter(detector_list, simulated_intensities, weighting_function, masking_function)

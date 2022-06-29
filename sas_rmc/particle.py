@@ -4,7 +4,6 @@ from abc import ABC, abstractmethod
 from typing import List, Tuple
 
 import numpy as np
-import matplotlib.pyplot as plt
 from scipy import constants
 
 from .array_cache import round_vector
@@ -61,6 +60,7 @@ class Particle(ABC):
         return self._shapes
 
     @property
+    @abstractmethod
     def volume(self) -> float:
         """The volume of the particle.
 
@@ -164,9 +164,10 @@ class Particle(ABC):
         return shape.random_position_inside()
 
     def closest_surface_position(self, position: Vector) -> Vector:
-        shape = self.shapes[np.argmax([shape.volume for shape in self.shapes])]
-        return shape.closest_surface_position(position)
-
+        surface_positions = [shape.closest_surface_position(position) for shape in self.shapes]
+        return min(surface_positions, key = lambda surface_position : (surface_position - position).mag)
+        #return surface_positions[np.argmin([(surface_position - position).mag for surface_position in surface_positions])]
+        
     @abstractmethod
     def form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector) -> np.ndarray:
         pass
@@ -245,6 +246,11 @@ class SphericalParticle(Particle):
 
     def closest_surface_position(self, position: Vector) -> Vector:
         return self.shapes[0].closest_surface_position(position)
+
+    def get_average_sld(self, radius: float) -> float:
+        if radius < self.shapes[0].radius:
+            return self.sphere_sld
+        return self.solvent_sld
 
 
 @dataclass
@@ -331,6 +337,13 @@ class CoreShellParticle(Particle):
     def closest_surface_position(self, position: Vector) -> Vector:
         return self.shell_sphere.closest_surface_position(position)
 
+    def get_average_sld(self, radius: float) -> float:
+        if radius < self.core_sphere.radius:
+            return self.core_sld
+        if radius < self.shell_sphere.radius:
+            return self.shell_sld
+        return self.solvent_sld
+
     def get_loggable_data(self) -> dict:
         core_radius = self.core_sphere.radius
         overall_radius = self.shell_sphere.radius
@@ -359,20 +372,6 @@ class CoreShellParticle(Particle):
             shell_sld=shell_sld,
             solvent_sld=solvent_sld
             )
-        
-''' # Mark for deletion
-def _form_array_numerical(vector_space, qx_array, qy_array, sld_from_vs_fn, xy_axis = 0):
-    xy_project = lambda arr: np.average(arr, axis = xy_axis)
-    x_arr, y_arr, z_arr = [vector_space.x_arr, vector_space.y_arr, vector_space.z_arr]
-    dx_arr, dy_arr, dz_arr = [vector_space.dx_arr, vector_space.dy_arr, vector_space.dz_arr]
-    x, y, z = [xy_project(space_arr) for space_arr in [x_arr, y_arr, z_arr]]
-    dx, dy, dz= [xy_project(space_arr_partial) for space_arr_partial in [dx_arr, dy_arr, dz_arr]]
-    sld = np.sum(sld_from_vs_fn(x_arr, y_arr, z_arr) * dz_arr, axis = xy_axis)
-    def form_f(qx: float, qy: float) -> float:
-        return np.sum(sld * np.exp(1j * (Vector(qx, qy) * (x, y))) * dx * dy)
-    
-    form_function = np.frompyfunc(form_f, 2, 1)
-    return np.complex128(form_function(qx_array, qy_array))'''
 
 
 @dataclass
@@ -390,6 +389,10 @@ class ParticleComposite(Particle):
     @property
     def scattering_length(self) -> float:
         return np.sum([particle.scattering_length for particle in self.particle_list])
+
+    @property
+    def volume(self) -> float:
+        return np.sum([particle.volume for particle in self.particle_list])
 
     @property
     def position(self) -> Vector:
@@ -431,7 +434,8 @@ class ParticleComposite(Particle):
 
     def closest_surface_position(self, position: Vector) -> Vector:
         surface_positions = [particle.closest_surface_position(position) for particle in self.particle_list]
-        return surface_positions[np.argmin([(surface_position - position).mag for surface_position in surface_positions])]
+        return min(surface_positions, key = lambda surface_position : (surface_position - position).mag)
+        #return surface_positions[np.argmin([(surface_position - position).mag for surface_position in surface_positions])]
 
 
 @dataclass
@@ -562,6 +566,72 @@ class Dumbbell(ParticleComposite):
         dumbell.set_orientation(orientation)
         return dumbell
 
+@dataclass
+class CylindricalParticle(Particle):
+    _shapes: List[Cylinder] = field(
+        default_factory=lambda : [Cylinder()]
+    )
+    cylinder_sld: float = 0
+
+    @property
+    def shapes(self) -> List[Cylinder]:
+        return super().shapes
+
+    @property
+    def volume(self):
+        return super().volume
+
+    def is_spherical(self) -> bool:
+        return False
+
+    @property
+    def scattering_length(self) -> float:
+        return self.delta_sld(self.cylinder_sld) * self.volume
+
+    def get_sld(self, position: Vector) -> float:
+        relative_position = position - self.position
+        return self.delta_sld(self.cylinder_sld) if self.is_inside(relative_position) else self.delta_sld(self.solvent_sld)
+
+    def get_average_sld(self, radius: float) -> float:
+        cylinder_radius = self.shapes[0].radius
+        cylinder_height = self.shapes[0].height
+        if 2 * cylinder_radius < cylinder_height:
+            if radius < cylinder_radius:
+                return self.cylinder_sld
+            if radius > cylinder_height / 2:
+                return self.solvent_sld
+            average_fraction = (radius - np.sqrt(radius**2 - cylinder_radius**2)) / radius
+            return self.solvent_sld + (self.cylinder_sld - self.solvent_sld) * average_fraction
+        else:
+            if radius < cylinder_height / 2:
+                return self.cylinder_sld
+            if radius > cylinder_radius:
+                return self.solvent_sld
+            average_fraction = cylinder_height / (2 * radius)
+            return self.solvent_sld + (self.cylinder_sld - self.solvent_sld) * average_fraction
+
+    @classmethod
+    def gen_from_parameters(cls, radius, height, cylinder_sld, solvent_sld = 0, position = None, orientation = None):
+        if position is None:
+            position = Vector.null_vector()
+        if orientation is None:
+            orientation = Vector(0,1,0)
+        return cls(
+            _shapes = [Cylinder(
+                central_position = position,
+                orientation = orientation,
+                radius = radius,
+                height = height
+                )],
+            cylinder_sld=cylinder_sld,
+            solvent_sld=solvent_sld
+            )
+
+    def form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector) -> np.ndarray:
+        return super().form_array(qx_array, qy_array, orientation)
+
+    def magnetic_form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector, magnetization: Vector) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        return super().magnetic_form_array(qx_array, qy_array, orientation, magnetization)
 
 '''
 @dataclass

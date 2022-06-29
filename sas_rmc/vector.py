@@ -306,9 +306,17 @@ class Interface:
 
 
 if __name__ == "__main__":
-    v = Vector(2,0)
-    a = np.float64(4.89)
-    #a.__mul__(v)
+    from matplotlib import pyplot as plt
+
+    fig = plt.figure()
+    ax = fig.add_subplot(projection = '3d')
+
+    vectors = [Vector.random_vector(1) for _ in range(100)]
+    for vector in vectors:
+        ax.scatter(vector.x, vector.y, vector.z, color = 'b', marker = 'o')
+    plt.show()    
 
 
+
+#%%
 

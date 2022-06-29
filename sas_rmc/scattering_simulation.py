@@ -147,7 +147,7 @@ class ScatteringSimulation:
     def update_goodness_of_fit(self, new_goodness_of_fit: float) -> None:
         self.current_goodness_of_fit = new_goodness_of_fit
 
-    def get_physical_acceptance(self) -> bool: # Mark for deletion
+    def get_physical_acceptance(self) -> bool: # Mark for deletion # Why is this marked for deletion? It's still being used.
         return self.simulation_params.get_physical_acceptance()
 
 

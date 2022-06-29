@@ -4,8 +4,8 @@ from typing import Callable, Protocol, Tuple
 
 import numpy as np
 
-from .particle import Particle, ParticleComposite, magnetic_sld_in_angstrom_minus_2
-from .vector import Vector, VectorSpace, composite_function
+from .particle import PI, Particle, ParticleComposite, magnetic_sld_in_angstrom_minus_2
+from .vector import Vector, VectorSpace, broadcast_to_numpy_array, composite_function
 from .array_cache import method_array_cache
 
 
@@ -120,4 +120,40 @@ class NumericalCalculator(AnalyticalCalculator):
         return lambda position : [magnetic_form_array * np.exp(1j * (position * (self.qx_array, self.qy_array))) for magnetic_form_array in magnetic_form_arrays]
 
 
+
+
+@dataclass
+class NumericalProfileCalculator:
+    q_array: np.ndarray
+    r_array: np.ndarray
+    average_sphere_points: int = 100
+
+    @method_array_cache(cache_holder_keysize=2)
+    def form_profile(self, particle: ParticleNumerical):
+        #average_sld = [np.average([particle.get_sld(Vector.random_vector(r)) for _ in range(1000)]) for r in self.r_array]
+        average_sld_fn = lambda r : np.average([particle.delta_sld( particle.get_sld(Vector.random_vector(r))) for _ in range(self.average_sphere_points)])
+        average_sld = broadcast_to_numpy_array(self.r_array, average_sld_fn)
+        dr = np.gradient(self.r_array)
+        sin_q_fn = lambda q : np.sum(average_sld * np.sinc(q * self.r_array / PI) * dr * (self.r_array ** 2)) # Using np.sinc here guarantees sin(qr)/qr = 1 if qr = 0
+        return broadcast_to_numpy_array(self.q_array, sin_q_fn)
+
+@dataclass
+class ParticleAverageNumerical(Protocol):
+    def delta_sld(self, sld: float) -> float:
+        pass
+
+    def get_average_sld(self, radius: float) -> float:
+        pass
+
+@dataclass
+class ProfileCalculator:
+    q_array: np.ndarray
+    r_array: np.ndarray
+
+    @method_array_cache(cache_holder_keysize=2)
+    def form_profile(self, particle: ParticleAverageNumerical):
+        average_sld = broadcast_to_numpy_array(self.r_array, particle.get_average_sld)
+        dr = np.gradient(self.r_array)
+        sin_q_fn = lambda q : np.sum(average_sld * np.sinc(q * self.r_array / PI) * dr * (self.r_array ** 2)) # Using np.sinc here guarantees sin(qr)/qr = 1 if qr = 0
+        return broadcast_to_numpy_array(self.q_array, sin_q_fn)
 

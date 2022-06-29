@@ -195,7 +195,7 @@ class Cylinder(Shape):
             if not interface.is_inside(position_copy):
                 position_copy = interface.project_onto_surface(position_copy)
         axis_projection = self._project_to_cylinder_axis(position_copy)
-        pointing_vector = (position - axis_projection).mag
+        pointing_vector = (position - axis_projection).unit_vector
         return self.radius * pointing_vector + axis_projection
 
     def random_position_inside(self) -> Vector:
@@ -216,6 +216,7 @@ class Cylinder(Shape):
     
 @dataclass
 class Cube(Shape):
+    orientation: Vector = field(default_factory=lambda : Vector(0, 0, 1))
     dimension_0: float = 0
     dimension_1: float = 0
     dimension_2: float = 0
@@ -229,7 +230,7 @@ class Cube(Shape):
         return self.dimension_0 * self.dimension_1 * self.dimension_2
 
     @property
-    def end_interfaces(self):
+    def end_interfaces(self) -> List[Interface]:
         central_position = self.central_position
         basis_c, basis_a, basis_b = self.orientation.rotated_basis()
         interfaces = []
@@ -246,7 +247,7 @@ class Cube(Shape):
     def closest_surface_position(self, position: Vector) -> Vector:
         distances_to_surface = []
         positions_on_surface = []
-        for interface in self.end_interfaces():
+        for interface in self.end_interfaces:
             position_on_surface = interface.project_onto_surface(position)
             distance_to_surface = (positions_on_surface - position).mag
             distances_to_surface.append(distance_to_surface)

@@ -47,18 +47,15 @@ class Box:
         return self.cube.is_inside(position)
 
     def is_magnetic(self) -> bool:
-        return any([particle.is_magnetic() for particle in self.particles])
+        return any(particle.is_magnetic() for particle in self.particles)
     
     def wall_or_particle_collision(self, i: int, half_test = False) -> bool:
-        compare_to_i = (lambda j: i < j) if half_test else (lambda j: i != j)#lambda j: (i < j) if half_test else (i != j)
         particle = self.particles[i]
         if not self.is_inside(particle.position):
             return True
+        compare_to_i = (lambda j: i < j) if half_test else (lambda j: i != j) #There's no way to get around this step, it will be done one way or another
         return any(compare_to_i(j) and particle.collision_detected(particle2) for j, particle2 in enumerate(self.particles))
-        '''for j, particle2 in enumerate(self.particles):
-            if compare_to_i(j) and particle.collision_detected(particle2):
-                return True
-        return False'''
+        
 
     def move_inside_box(self, i: int, in_plane: bool = False) -> None:
         particle = self.particles[i]
@@ -86,11 +83,11 @@ class Box:
      
 
     def get_nearest_particle(self, particle: Particle) -> Particle:
-        #particle = self.particles[particle_index]
-        def distance(particle2: Particle):
+        def get_distance_from_particle(particle2: Particle):
             return np.inf if particle is particle2 else (particle.position - particle2.position).mag
-        distances = [distance(particle2) for particle2 in self.particles]
-        return self.particles[np.argmin(distances)]
+        return min(self.particles, key = get_distance_from_particle)
+        #distances = [distance(particle2) for particle2 in self.particles]
+        #return self.particles[np.argmin(distances)]
 
     def plot_particle_positions(self, symbol: str = 'b.') -> None: # Mark for deletion
         plt.plot([p.position.x for p in self.particles], [p.position.y for p in self.particles], symbol)
