@@ -119,6 +119,14 @@ class Shape(ABC):
     def get_patches(self, **kwargs) -> patches.Patch:
         pass
 
+    @abstractmethod
+    def change_position(self, position: Vector):
+        pass
+
+    @abstractmethod
+    def change_orientation(self, orientation: Vector):
+        pass
+
 
 
 
@@ -150,6 +158,12 @@ class Sphere(Shape):
             radius = self.radius,
             **kwargs
         )
+
+    def change_position(self, position: Vector):
+        return Sphere(central_position=position,radius = self.radius)
+
+    def change_orientation(self, orientation: Vector):
+        return self
 
 @dataclass
 class Cylinder(Shape):
@@ -213,6 +227,22 @@ class Cylinder(Shape):
             angle = np.arctan2(self.orientation.y, self.orientation.x),
             **kwargs
         )
+
+    def change_position(self, position: Vector):
+        return type(self)(
+            central_position=position,
+            orientation=self.orientation,
+            radius=self.radius,
+            height=self.height
+        )
+
+    def change_orientation(self, orientation: Vector):
+        return type(self)(
+            central_position=self.central_position,
+            orientation=orientation,
+            radius=self.radius,
+            height=self.height
+        )
     
 @dataclass
 class Cube(Shape):
@@ -266,6 +296,24 @@ class Cube(Shape):
             height = 2 * self.dimension_1,
             angle = np.arctan2(self.orientation.y, self.orientation.x),
             **kwargs
+        )
+
+    def change_position(self, position: Vector):
+        return Cube(
+            central_position=position,
+            orientation=self.orientation,
+            dimension_0=self.dimension_0,
+            dimension_1=self.dimension_1,
+            dimension_2=self.dimension_2
+        )
+
+    def change_orientation(self, orientation: Vector):
+        return Cube(
+            central_position=self.central_position,
+            orientation=orientation,
+            dimension_0=self.dimension_0,
+            dimension_1=self.dimension_1,
+            dimension_2=self.dimension_2
         )
     
 

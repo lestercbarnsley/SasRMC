@@ -23,11 +23,11 @@ def default_cube() -> shapes.Cube:
 def default_particles(particle_number = 20) -> List[CoreShellParticle]:
     radius = 100
     return [CoreShellParticle.gen_from_parameters(
-        position = Vector(0, 2 * i * radius, 0),
+        position = Vector(0, 0, 0),
         core_radius=radius,
         thickness = 10,
         core_sld = 6
-    ) for i in range(particle_number)]
+    ) for _ in range(particle_number)]
 
 def default_box(particles: List[Particle] = None) -> Box:
     if particles is None:
@@ -38,6 +38,13 @@ def default_box(particles: List[Particle] = None) -> Box:
     )
     box.force_inside_box()
     return box
+
+def structure_box(box: Box) -> None:
+    radius =  np.average([p.shapes[1].radius for p in box.particles])
+    for i, particle in enumerate(box.particles):
+        box.particles[i] = particle.set_position(Vector(0, 2.2 * i * radius))
+
+
 
 def default_dumbbell_particles(particle_number = 20) -> List[Dumbbell]:
     p1_radius = 30
@@ -124,8 +131,8 @@ def test_collision_detection():
 def test_particle_collision_detection():
     core_shell_particles = default_particles()
     assert core_shell_particles[0].collision_detected(core_shell_particles[1]) == True
-    core_shell_particles[1].set_position(Vector(2000, 2000))
-    assert core_shell_particles[0].collision_detected(core_shell_particles[1]) == False
+    new_particle_1 = core_shell_particles[1].set_position(Vector(2000, 2000))
+    assert core_shell_particles[0].collision_detected(new_particle_1) == False
 
 
 def test_particle_jump():
@@ -227,7 +234,7 @@ def test_modulated_form_cache_polish():
     d3 = get_modulated_form()
     f3 = box[14].form_array(qx_array, qy_array, orientation=box[14].orientation)
     assert np.average(d3 - d1) == 0
-    assert id(d3) == id(d1)
+    #assert id(d3) == id(d1) # This worked when particles were mutable, so I might delete this!
     assert np.average(d3 - d2) != 0
     assert id(d3) != id(d2)
     assert np.average(f2 - f1) == 0
@@ -268,8 +275,8 @@ def test_dumbbell_modulated_and_form_array():
         assert np.average(d3 - d1) == pytest.approx(0)
         assert np.average(dcore_01 - dcore_21) == pytest.approx(0)
         assert np.average(dcore_02 - dcore_22) == pytest.approx(0)
-        assert id(dcore_01) == id(dcore_21)
-        assert id(dcore_02) == id(dcore_22)
+        #assert id(dcore_01) == id(dcore_21)
+        #assert id(dcore_02) == id(dcore_22) This probably only passes if the particle is mutable
         assert np.average(d3 - d2) != pytest.approx(0)
         assert np.average(dcore_11 - dcore_21) != pytest.approx(0)
         assert np.average(dcore_12 - dcore_22) != pytest.approx(0)
@@ -428,10 +435,11 @@ def test_acceptable_command():
 
 def test_controller_acceptance_independence():
     box_list = [default_box()]
-    simulation = default_simulation(box_list=box_list)
+    #simulation = default_simulation(box_list=box_list)
     box = box_list[0]
+    structure_box(box)
     positions = [
-        Vector(0, 50, 100),
+        Vector(0, 50, 500),
         Vector(15,15,15),
         Vector(-400, -400, 0),
         Vector(1e7, 1e7, 1e7),
@@ -467,17 +475,17 @@ def test_controller_acceptance_independence():
 def test_dumbbell_rotation():
     for _ in range(50):
         dumbbell = Dumbbell.gen_from_parameters(50, 50, 10, 4, 6, 1, 0)
-        distance_calc = lambda : dumbbell.particle_list[0].position.distance_from_vector(dumbbell.particle_list[1].position)
-        orientation_calc = lambda : dumbbell.orientation
-        old_distance = distance_calc()
-        old_orientation = orientation_calc()
-        dumbbell.set_position( dumbbell.position + Vector(50,50,50) )
-        assert old_distance == pytest.approx(distance_calc())
-        assert old_orientation == orientation_calc()
+        distance_calc = lambda db : db.particle_list[0].position.distance_from_vector(db.particle_list[1].position)
+        orientation_calc = lambda db : db.orientation
+        old_distance = distance_calc(dumbbell)
+        old_orientation = orientation_calc(dumbbell)
+        dumbbell = dumbbell.set_position( dumbbell.position + Vector(50,50,50) )
+        assert old_distance == pytest.approx(distance_calc(dumbbell))
+        assert old_orientation == orientation_calc(dumbbell)
         new_orientation = Vector(np.random.rand(), np.random.rand(), np.random.rand())
-        dumbbell.set_orientation(new_orientation )
-        assert old_distance == pytest.approx(distance_calc())
-        assert (new_orientation.unit_vector - orientation_calc()).mag == pytest.approx(0)
+        dumbbell = dumbbell.set_orientation(new_orientation )
+        assert old_distance == pytest.approx(distance_calc(dumbbell))
+        assert (new_orientation.unit_vector - orientation_calc(dumbbell)).mag == pytest.approx(0)
 
 def test_set_particle_state():
     for _ in range(50):
@@ -487,8 +495,9 @@ def test_set_particle_state():
         orientation = box[4].orientation
         magnetization = box[4].magnetization
         random_vec = lambda : Vector(np.random.rand(), np.random.rand(), np.random.rand())
-        command_1 = commands.SetParticleState(box, 4, position=position, orientation=orientation, magnetization=magnetization)
-        command_2 = commands.SetParticleState(box, 4, random_vec(), random_vec(), random_vec())
+        command_1 = commands.SetParticleState(box, 4, box[4])
+        command_2 = commands.SetParticleState(box, 4, box[4].set_magnetization(random_vec()).set_position(random_vec())
+        )
         command_2.execute()
         assert box[4].position != position
         assert box[4].orientation == orientation # These are default particles, so orientation changes are not allowed

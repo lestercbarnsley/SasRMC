@@ -84,12 +84,15 @@ class MonteCarloEvaluator:
 class MemorizedSimulator(Simulator):
     simulation: ScatteringSimulation
     box_list: List[Box]
-    state_controller: Controller = field(init = False, default_factory=Controller)
+    state_command: commands.Command = field(init = False, default_factory=lambda : None)
+    #state_controller: Controller = field(init = False, default_factory=Controller)
 
     def compute_states(self) -> None:
-        if self.state_controller.ledger:
+        '''if self.state_controller.ledger:
             latest_state_command = self.state_controller.ledger[-1]
-            latest_state_command.execute()
+            latest_state_command.execute()'''
+        if self.state_command:
+            self.state_command.execute()
         else:
             self.controller.compute_states()
 
@@ -99,8 +102,8 @@ class MemorizedSimulator(Simulator):
         command.execute()
         acceptable = self.evaluator.evaluate(command)
         if acceptable:
-            state_command = commands.SetSimulationState.gen_from_simulation(self.simulation.simulation_params, self.box_list)
-            self.state_controller.add_command(state_command)
+            self.state_command = commands.SetSimulationState.gen_from_simulation(self.simulation.simulation_params, self.box_list)
+            #self.state_controller.add_command(state_command)
 
     @timeit
     def simulate(self) -> None:

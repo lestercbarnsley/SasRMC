@@ -31,10 +31,9 @@ POLARIZATION = "Polarization"
 
 
 def get_slicing_func_from_gaussian(gaussian: np.ndarray, slicing_range: int = 0) -> Callable[[np.ndarray], np.ndarray]:
-    arg_of_max = np.where(gaussian == np.amax(gaussian)) # I really don't understand this line of code but apparently it works
+    arg_of_max = np.where(gaussian == np.amax(gaussian)) 
     if slicing_range == 0:
         slicing_range = int(np.max(gaussian.shape) / DEFAULT_SLICING_FRACTION_DENOM)
-    #slicing_range_use = slicing_range if slicing_range else int(np.max(gaussian.shape) / DEFAULT_SLICING_FRACTION_DENOM) 
     i_min = np.max([arg_of_max[0][0] - int(slicing_range / 2), 0])
     i_max = np.min([i_min + slicing_range, gaussian.shape[0] - 1])
     if i_max == gaussian.shape[0] - 1:
@@ -44,6 +43,28 @@ def get_slicing_func_from_gaussian(gaussian: np.ndarray, slicing_range: int = 0)
     if j_max == gaussian.shape[1] - 1:
         j_min = j_max - slicing_range
     return lambda arr: arr[i_min:i_max, j_min:j_max]
+
+def test_uniques(test_space: np.ndarray, arr: np.ndarray) -> np.ndarray:
+    closest_in_space = lambda v : test_space[np.argmin(np.abs(test_space - v))]
+    return np.array([closest_in_space(a) for a in arr]) # I can't use broadcast because the pandas method passes in a data series rather than a numpy array
+    '''closest_in_space_arr_fn = broadcast_array_function(closest_in_space)
+    closest_arr = closest_in_space_arr_fn(arr)
+    return closest_arr'''
+
+def fuzzy_unique(arr: np.ndarray) -> np.ndarray:
+    unique_arr = np.unique(arr)
+    test_range = 4 * int(np.sqrt(arr.shape[0]))
+    if unique_arr.shape[0] < test_range:
+        return unique_arr
+
+    test_space_maker = lambda num : np.linspace(np.min(arr), np.max(arr), num = num) if num !=0 else np.array([np.inf])
+    for i in range(5, test_range):#_ in enumerate(first_guess):
+        test_space = test_space_maker(i)
+        closest_arr = test_uniques(test_space, arr)
+        if not all(t in closest_arr for t in test_space):
+            return test_space_maker(i-1)
+    raise Exception("Unable to find enough unique values in Q-space to map detector to 2-D grid")
+    
 
 
 class Polarization(Enum):
@@ -276,22 +297,17 @@ class DetectorImage:
     def plot_intensity(self, log_intensity = True, show_crosshair = True, levels = 30, cmap = 'jet', show_fig: bool = True) -> Figure:
         return type(self).plot_intensity_matrix(self.intensity, self.qX, self.qY, log_intensity=log_intensity, show_crosshair=show_crosshair, levels=levels, cmap = cmap, show_fig=show_fig)
     
-    def get_pandas(self):
+    def get_pandas(self) -> pd.DataFrame:
         d = [pixel.to_dict() for _, pixel in np.ndenumerate(self._detector_pixels)]
         d[0].update({POLARIZATION : self.polarization.value})
-        '''for i, pixel in enumerate(self._detector_pixels.flatten()):
-            pixel_data = pixel.to_dict()
-            if i == 0:
-                pixel_data.update({"Polarization": self.polarization.value})
-            d.append(pixel_data)'''
         return pd.DataFrame(d)
 
     @classmethod
     def gen_from_data(cls, data_dict: dict, detector_config: DetectorConfig = None):
         qX_data = data_dict[QX]
         qY_data = data_dict[QY]
-        qX_1d = np.unique(qX_data).tolist()
-        qY_1d = np.unique(qY_data).tolist()
+        qX_1d = fuzzy_unique(qX_data)#.tolist() Ultimately, this should be a strategy somehow
+        qY_1d = fuzzy_unique(qY_data)#.tolist()
         qx, qy = np.meshgrid(qX_1d, qY_1d)
         blank_canvas_pixel = lambda qx_i, qy_i : DetectorPixel.row_to_pixel({QX : qx_i, QY : qy_i, INTENSITY : 0}, detector_config= detector_config)
         make_blank_canvas = np.frompyfunc(blank_canvas_pixel, 2, 1)
@@ -310,8 +326,8 @@ class DetectorImage:
                 SHADOW_FACTOR : get_item(SHADOW_FACTOR),
                 SIMULATED_INTENSITY : get_item(SIMULATED_INTENSITY)
             }
-            i = qX_1d.index(qX)
-            j = qY_1d.index(qY)
+            i = np.argmin(np.abs(qX_1d - qX))#qX_1d.index(qX)
+            j = np.argmin(np.abs(qY_1d - qY))#qY_1d.index(qY)
             detector_pixels[j, i] = DetectorPixel.row_to_pixel(row, detector_config=detector_config)
         polarization = detector_config.polarization if detector_config else Polarization(data_dict.get(POLARIZATION, Polarization.UNPOLARIZED.value))
         return cls(

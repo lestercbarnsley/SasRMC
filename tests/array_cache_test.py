@@ -26,7 +26,7 @@ add_to_threes = functional_cache(np.array([3,3,3,3]))
 for _ in range(10):
     add_to_threes(np.random.rand(4))
 
-def testing_numerical():
+def numerical_test():
     profile_calculator = ProfileCalculator(q_array=np.linspace(1e-3, .5, num = 1000), r_array=np.linspace(0,130000, num = 10000))
     particle_number = 100
     particles = [CoreShellParticle.gen_from_parameters(
@@ -50,7 +50,7 @@ def testing_numerical():
 
     box.plot_particle_positions('b.')
 
-def testing_average_sld_func_for_cylinder():
+def average_sld_func_for_cylinder_test():
     r_array=np.linspace(0,1300, num = 200)
     radius = 20
     height = 1000
@@ -84,9 +84,8 @@ def testing_average_sld_func_for_cylinder():
 
 
 
-
 if __name__ == "__main__":
-    testing_numerical()
+    numerical_test()
     #testing_average_sld_func_for_cylinder()
     
 #%%

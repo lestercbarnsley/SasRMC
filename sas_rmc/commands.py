@@ -88,12 +88,24 @@ class ParticleCommand(Command):
         return not self.box.wall_or_particle_collision(self.particle_index)
 
 
-def check_and_set(attr_getter: Callable[[None], object], attr_setter: Callable[[object], None], value: object) -> None:
+def check_and_set(attr_getter: Callable[[], object], attr_setter: Callable[[object], None], value: object) -> None:
     if attr_getter() != value:
         attr_setter(value)
 
 
 @dataclass
+class SetParticleState(ParticleCommand):
+    new_particle: Particle
+
+    def execute(self) -> None:
+        self.box.particles[self.particle_index] = self.new_particle
+
+    @classmethod
+    def gen_from_particle(cls, box: Box, particle_index: int):
+        return cls(box, particle_index, new_particle = box[particle_index])
+
+
+'''@dataclass
 class SetParticleState(ParticleCommand):
     position: Vector
     orientation: Vector
@@ -120,7 +132,7 @@ class SetParticleState(ParticleCommand):
             position = particle.position,
             orientation = particle.orientation,
             magnetization = particle.magnetization
-        )
+        )'''
 
 
 @dataclass
@@ -129,10 +141,11 @@ class MoveParticleTo(ParticleCommand):
 
     def execute(self) -> None:
         particle = self.particle
-        check_and_set(
+        SetParticleState(self.box, self.particle_index, particle.set_position(self.position_new)).execute()
+        '''check_and_set(
             lambda : particle.position,
             lambda position : particle.set_position(position),
-            self.position_new)
+            self.position_new)'''
         
 
 @dataclass

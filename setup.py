@@ -11,7 +11,7 @@ with open('README.md') as rm:
 
 setup(
     name='sas_rmc',
-    version='0.0.2',
+    version='0.0.3',
     author='Lester Barnsley',
     author_email='lester.barnsley@gmail.com',
     long_description=LONG_DESCRIPTION,

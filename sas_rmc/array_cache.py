@@ -60,24 +60,21 @@ def array_cache(func = None, max_size: int = None):
         return _array_cache(func)
     return _array_cache
 
-def method_array_cache(func = None, max_size: int = None, cache_holder_keysize: int = None):
-    if max_size is None:
-        max_size = CLASS_MAX_SIZE
-    if cache_holder_keysize is None:
-        cache_holder_keysize = 1
+key_cache_avoider = ''.join(np.random.choice(['dsfa','ewrf','werfj','gjowq','glks','fjkds','jtks','dsaa','jgkda','ewiq']) for _ in range(10))
+
+def method_array_cache(func = None, max_size: int = CLASS_MAX_SIZE, cache_holder_index: int = 0):
     def _method_array_cache(func):
-        cache = {}
+        cache_name = f'_method_cache_{func.__name__}_{key_cache_avoider}_'
 
         @wraps(func)
         def wrapper(*args, **kwargs):
-            cache_holder_items, other_args =  args[:cache_holder_keysize], args[cache_holder_keysize:]
-            object_id = pass_arg(cache_holder_items)
+            obj = args[cache_holder_index]
+            other_args = [a for i, a in enumerate(args) if i!=cache_holder_index]
             kwarg_tuple = tuple((k, pass_arg(v)) for k, v in kwargs.items())
             argument_tuple = tuple(pass_arg(arg) for arg in other_args) + kwarg_tuple
-            #object_id, cache_key = argument_tuple[0], argument_tuple[1:]
-            if object_id not in cache:
-                cache[object_id] = {}
-            object_cache = cache[object_id]
+            if not hasattr(obj, cache_name):
+                setattr(obj, cache_name, {})
+            object_cache = getattr(obj, cache_name)
             if argument_tuple not in object_cache:
                 if len(object_cache) >= max_size:
                     keys = list(object_cache.keys())

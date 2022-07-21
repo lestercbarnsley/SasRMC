@@ -59,6 +59,10 @@ class Particle(ABC):
     def shapes(self) -> List[Shape]:
         return self._shapes
 
+    @abstractmethod
+    def _change_shapes(self, shape_list: List[Shape]):
+        pass
+
     @property
     @abstractmethod
     def volume(self) -> float:
@@ -99,7 +103,7 @@ class Particle(ABC):
         """
         return self.shapes[0].central_position
 
-    def set_position(self, position: Vector) -> None:
+    def set_position(self, position: Vector):
         """Set the position vector of a Particle object.
 
         Parameters
@@ -107,9 +111,9 @@ class Particle(ABC):
         position : Vector
             The new position vector of the particle, in Angstrom.
         """
-        position_delta = position - self.position
-        for shape in self.shapes:
-            shape.central_position = shape.central_position + position_delta
+        position_change = position - self.position
+        new_shapes = [shape.change_position(shape.central_position + position_change) for shape in self.shapes]
+        return self._change_shapes(new_shapes)
 
     def is_spherical(self) -> bool: # Don't allow orientation changes to a spherical particle
         """Check if the particle is spherical.
@@ -128,17 +132,19 @@ class Particle(ABC):
     def orientation(self) -> Vector:
         return self.shapes[0].orientation
 
-    def set_orientation(self, orientation: Vector) -> None:
-        if not self.is_spherical(): # Don't allow orientation changes to a spherical particle
-            for shape in self.shapes:
-                shape.orientation = orientation
+    def set_orientation(self, orientation: Vector):
+        if self.is_spherical():
+            return self
+        new_shapes = [shape.change_orientation(orientation) for shape in self.shapes]
+        return self._change_shapes(new_shapes)
 
     @property
     def magnetization(self) -> Vector:
         return self._magnetization
 
+    @abstractmethod
     def set_magnetization(self, magnetization: Vector) -> None:
-        self._magnetization = magnetization
+        pass
 
     def is_inside(self, position: Vector) -> bool:
         """Method for determining if a position in space is inside a particle.
@@ -201,9 +207,29 @@ class SphericalParticle(Particle):
     _shapes: List[Sphere] = field(default_factory=lambda : [Sphere()])
     sphere_sld: float = 0
 
+    @classmethod
+    def gen_from_parameters(cls, position: Vector, magnetization: Vector = None, sphere_radius: float = 0, sphere_sld: float = 0, solvent_sld: float = 0):
+        return cls(
+            _magnetization = magnetization,
+            _shapes = [Sphere(
+                central_position=position,
+                radius=sphere_radius
+                )],
+            solvent_sld=solvent_sld,
+            sphere_sld=sphere_sld
+        )
+
     @property
     def shapes(self) -> List[Sphere]:
         return super().shapes
+
+    def _change_shapes(self, shape_list: List[Shape]):
+        return type(self)(
+            _magnetization = self._magnetization,
+            _shapes = shape_list,
+            solvent_sld=self.solvent_sld,
+            sphere_sld=self.sphere_sld
+        )
 
     @property
     def volume(self) -> float:
@@ -216,11 +242,18 @@ class SphericalParticle(Particle):
     def scattering_length(self) -> float:
         return self.delta_sld(self.sphere_sld) * self.volume
 
-    def set_position(self, position: Vector) -> None:
-        self.shapes[0].central_position = position
+    def set_position(self, position: Vector) -> Particle:
+        sphere_list = [sphere.change_position(position) for sphere in self.shapes]
+        return self._change_shapes(sphere_list)
 
-    def set_orientation(self, orientation: Vector) -> None:
-        return super().set_orientation(self.orientation)
+    def set_magnetization(self, magnetization: Vector) -> None:
+        return type(self).gen_from_parameters(
+            position=self.position,
+            magnetization=magnetization,
+            sphere_radius=self.shapes[0].radius,
+            sphere_sld=self.sphere_sld,
+            solvent_sld=self.solvent_sld
+        ) 
 
     def form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector) -> np.ndarray:
         q = modulus_array(qx_array, qy_array)
@@ -261,9 +294,32 @@ class CoreShellParticle(Particle):
     core_sld: float = 0
     shell_sld: float = 0
 
+    @classmethod
+    def gen_from_parameters(cls, position: Vector, magnetization: Vector = None, core_radius: float = 0, thickness: float = 0, core_sld: float = 0, shell_sld: float = 0, solvent_sld: float = 0):
+        sphere_inner = Sphere(central_position=position, radius=core_radius)
+        sphere_outer = Sphere(central_position=position, radius= core_radius + thickness)
+        if magnetization is None:
+            magnetization = Vector.null_vector()
+        return cls(
+            _magnetization=magnetization,
+            _shapes = [sphere_inner, sphere_outer],
+            core_sld=core_sld,
+            shell_sld=shell_sld,
+            solvent_sld=solvent_sld
+            )
+
     @property
     def shapes(self) -> List[Sphere]:
         return super().shapes
+
+    def _change_shapes(self, shape_list: List[Shape]):
+        return CoreShellParticle(
+            _magnetization = self._magnetization,
+            _shapes = shape_list,
+            solvent_sld=self.solvent_sld,
+            core_sld=self.core_sld,
+            shell_sld=self.shell_sld
+        )
     
     def is_spherical(self) -> bool:
         return True
@@ -275,6 +331,12 @@ class CoreShellParticle(Particle):
     @property
     def shell_sphere(self) -> Sphere:
         return self.shapes[1]
+
+    @property
+    def shell_thickness(self) -> float:
+        core_radius = self.core_sphere.radius
+        overall_radius = self.shell_sphere.radius
+        return overall_radius - core_radius
 
     def is_inside(self, position: Vector) -> bool:
         return self.shell_sphere.is_inside(position)
@@ -293,12 +355,20 @@ class CoreShellParticle(Particle):
     def position(self) -> Vector:
         return super().position
 
-    def set_position(self, position: Vector) -> None:
-        for shape in self.shapes:
-            shape.central_position = position
+    def set_position(self, position: Vector):
+        spheres = [sphere.change_position(position) for sphere in self.shapes]
+        return self._change_shapes(spheres)
 
-    def set_orientation(self, orientation: Vector) -> None:
-        super().set_orientation(self.orientation) # This will block changes to orientation
+    def set_magnetization(self, magnetization: Vector):
+        return CoreShellParticle.gen_from_parameters(
+            position=self.position,
+            magnetization=magnetization,
+            core_radius=self.core_sphere.radius,
+            thickness=self.shell_thickness,
+            core_sld=self.core_sld,
+            shell_sld=self.shell_sld,
+            solvent_sld=self.solvent_sld
+        )
 
     def form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector) -> np.ndarray:
         q = modulus_array(qx_array, qy_array)
@@ -345,13 +415,10 @@ class CoreShellParticle(Particle):
         return self.solvent_sld
 
     def get_loggable_data(self) -> dict:
-        core_radius = self.core_sphere.radius
-        overall_radius = self.shell_sphere.radius
-        thickness = overall_radius - core_radius
         data = {
             'Particle type': "",
-            'Core radius': core_radius,
-            'Shell thickness': thickness,
+            'Core radius': self.core_sphere.radius,
+            'Shell thickness': self.shell_thickness,
             'Core SLD': self.core_sld,
             'Shell SLD' : self.shell_sld,
             'Solvent SLD': self.solvent_sld,
@@ -359,19 +426,7 @@ class CoreShellParticle(Particle):
         data.update(super().get_loggable_data())
         return data
 
-    @classmethod
-    def gen_from_parameters(cls, position: Vector, magnetization: Vector = None, core_radius: float = 0, thickness: float = 0, core_sld: float = 0, shell_sld: float = 0, solvent_sld: float = 0):
-        sphere_inner = Sphere(central_position=position, radius=core_radius)
-        sphere_outer = Sphere(central_position=position, radius= core_radius + thickness)
-        if magnetization is None:
-            magnetization = Vector.null_vector()
-        return cls(
-            _magnetization=magnetization,
-            _shapes = [sphere_inner, sphere_outer],
-            core_sld=core_sld,
-            shell_sld=shell_sld,
-            solvent_sld=solvent_sld
-            )
+    
 
 
 @dataclass
@@ -386,6 +441,13 @@ class ParticleComposite(Particle):
                 shapes_list.append(shape)
         return shapes_list
 
+    def _change_shapes(self, shape_list: List[Shape]):
+        return super()._change_shapes(shape_list)
+
+    @abstractmethod
+    def change_particle_list(self, particle_list: List[Particle]):
+        pass
+
     @property
     def scattering_length(self) -> float:
         return np.sum([particle.scattering_length for particle in self.particle_list])
@@ -398,10 +460,10 @@ class ParticleComposite(Particle):
     def position(self) -> Vector:
         return self.particle_list[0]
 
-    def set_position(self, position: Vector) -> None:
+    def set_position(self, position: Vector):
         position_change = position - self.position
-        for particle in self.particle_list:
-            particle.set_position(particle.position + position_change)
+        particle_list = [particle.set_position(particle.position + position_change) for particle in self.particle_list]
+        return self.change_particle_list(particle_list)
 
     @property
     def orientation(self) -> Vector:
@@ -442,6 +504,15 @@ class ParticleComposite(Particle):
 class Dumbbell(ParticleComposite):
     particle_list: List[CoreShellParticle] = field(default_factory=lambda : [CoreShellParticle(), CoreShellParticle()])
     _centre_to_centre_distance: float = 0
+
+    def change_particle_list(self, particle_list: List[Particle]):
+        return Dumbbell(
+            _magnetization = self._magnetization,
+            _shapes = self._shapes,
+            solvent_sld=self.solvent_sld,
+            particle_list=particle_list,
+            _centre_to_centre_distance = self._centre_to_centre_distance
+        )
     
     def is_spherical(self) -> bool:
         return False
@@ -466,19 +537,22 @@ class Dumbbell(ParticleComposite):
     def orientation(self) -> Vector:
         return (self.seed_particle.position - self.core_particle.position).unit_vector
 
-    def set_orientation(self, orientation: Vector) -> None:
+    def set_orientation(self, orientation: Vector):
         orientation_new = orientation.unit_vector
         distance = self.centre_to_centre_distance
-        self.seed_particle.set_position(self.core_particle.position + distance * orientation_new)
+        new_seed = self.seed_particle.set_position(self.core_particle.position + distance * orientation_new)
+        particle_list = [self.core_particle, new_seed]
+        return self.change_particle_list(particle_list)
 
-    def set_position(self, position: Vector) -> None:
-        orientation = self.orientation
-        self.core_particle.set_position(position)
-        self.set_orientation(orientation)
+    def set_position(self, position: Vector):
+        return super().set_position(position)
 
-    def set_centre_to_centre_distance(self, centre_to_centre_distance: float) -> None:
-        self._centre_to_centre_distance = centre_to_centre_distance
-        self.set_orientation(self.orientation)
+    def set_centre_to_centre_distance(self, centre_to_centre_distance: float):
+        orientation_new = self.orientation.unit_vector
+        distance = centre_to_centre_distance
+        new_seed = self.seed_particle.set_position(self.core_particle.position + distance * orientation_new)
+        particle_list = [self.core_particle, new_seed]
+        return self.change_particle_list(particle_list)
 
     def get_sld(self, relative_position: Vector) -> float:
         position = relative_position + self.position
@@ -502,15 +576,17 @@ class Dumbbell(ParticleComposite):
     def magnetization(self) -> Vector:
         return self.core_particle.magnetization
 
-    def set_magnetization(self, magnetization: Vector) -> None:
-        self.core_particle.set_magnetization(magnetization)
+    def set_magnetization(self, magnetization: Vector):
+        core_particle = self.core_particle.set_magnetization(magnetization)
+        return self.change_particle_list([core_particle, self.seed_particle])
 
     @property
     def seed_magnetization(self) -> Vector:
         return self.seed_particle.magnetization
 
-    def set_seed_magnetization(self, magnetization: Vector) -> None:
-        self.seed_particle.set_magnetization(magnetization)
+    def set_seed_magnetization(self, magnetization: Vector):
+        seed_particle = self.seed_particle.set_magnetization(magnetization)
+        return self.change_particle_list([self.core_particle, seed_particle])
 
     def get_loggable_data(self) -> dict:
         core_radius = self.core_particle.shapes[0].radius
@@ -563,8 +639,8 @@ class Dumbbell(ParticleComposite):
             particle_list=[core_shell, seed_shell],
             _centre_to_centre_distance = centre_to_centre_distance
         )
-        dumbell.set_orientation(orientation)
-        return dumbell
+        return dumbell.set_orientation(orientation)
+        #return dumbell
 
 @dataclass
 class CylindricalParticle(Particle):
@@ -576,6 +652,22 @@ class CylindricalParticle(Particle):
     @property
     def shapes(self) -> List[Cylinder]:
         return super().shapes
+
+    def _change_shapes(self, shape_list: List[Shape]):
+        return CylindricalParticle(
+            _magnetization = self._magnetization,
+            _shapes = shape_list,
+            solvent_sld=self.solvent_sld,
+            cylinder_sld=self.cylinder_sld
+        )
+
+    def set_magnetization(self, magnetization: Vector):
+        return CylindricalParticle(
+            _magnetization = magnetization,
+            _shapes = self._shapes,
+            solvent_sld=self.solvent_sld,
+            cylinder_sld=self.cylinder_sld
+        )
 
     @property
     def volume(self):

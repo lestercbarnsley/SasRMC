@@ -1,3 +1,4 @@
+#%%
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Callable, Protocol, Tuple
@@ -30,24 +31,24 @@ class ResultCalculator(ABC):
 @dataclass
 class AnalyticalCalculator(ResultCalculator):
     
-    @method_array_cache(cache_holder_keysize=2)
+    @method_array_cache(cache_holder_index=1)
     def modulated_form_array_calculator(self, particle: Particle, orientation: Vector) -> Callable[[Vector], np.ndarray]:
         form_array = particle.form_array(self.qx_array, self.qy_array, orientation)
         return lambda position : form_array * np.exp(1j * (position * (self.qx_array, self.qy_array)))
 
-    @method_array_cache(cache_holder_keysize=2)
+    @method_array_cache(cache_holder_index=1)
     def modulated_form_array(self, particle: Particle, orientation: Vector, position: Vector) -> np.ndarray:
         if isinstance(particle, ParticleComposite):
             return np.sum([self.modulated_form_array(particle_component, particle_component.orientation, particle_component.position) for particle_component in particle.particle_list], axis=0)        
         modulated_array_calculator = self.modulated_form_array_calculator(particle, orientation)
         return modulated_array_calculator(position)
 
-    @method_array_cache(cache_holder_keysize=2)
+    @method_array_cache(cache_holder_index=1)
     def magnetic_modulated_array_calculator(self, particle: Particle, orientation: Vector, magnetization: Vector) -> Callable[[Vector],Tuple[np.ndarray, np.ndarray, np.ndarray]]:
         magnetic_form_arrays = particle.magnetic_form_array(self.qx_array, self.qy_array, orientation, magnetization)
         return lambda position : [magnetic_form_array * np.exp(1j * (position * (self.qx_array, self.qy_array))) for magnetic_form_array in magnetic_form_arrays]
 
-    @method_array_cache(cache_holder_keysize=2)
+    @method_array_cache(cache_holder_index=1)
     def magnetic_modulated_array(self, particle: Particle, orientation: Vector, magnetization: Vector, position: Vector) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         if isinstance(particle, ParticleComposite):
             mag_arrs = [self.magnetic_modulated_array(particle_component, particle_component.orientation, particle_component.magnetization, particle_component.position) for particle_component in particle.particle_list]
@@ -97,7 +98,7 @@ class NumericalCalculator(AnalyticalCalculator):
         )
         return self.vector_space.array_from_elements(element_to_delta_sld)
 
-    @method_array_cache(cache_holder_keysize=2)
+    @method_array_cache(cache_holder_index=1)
     def modulated_form_array_calculator(self, particle: ParticleNumerical, orientation: Vector) -> Callable[[Vector], np.ndarray]:
         sld_arr = self.sld_from_vector_space(particle.get_sld)
         form_array = numerical_form_array(sld_arr, self.vector_space, self.qx_array, self.qy_array)
@@ -113,7 +114,7 @@ class NumericalCalculator(AnalyticalCalculator):
         mag_sld_x, mag_sld_y, mag_sld_z = sld_getters(m_field)
         return [mag_sld.astype(np.float64) for mag_sld in [mag_sld_x, mag_sld_y, mag_sld_z]]
 
-    @method_array_cache(cache_holder_keysize=2)
+    @method_array_cache(cache_holder_index=1)
     def magnetic_modulated_array_calculator(self, particle: ParticleNumerical, orientation: Vector, magnetization: Vector) -> Callable[[Vector],Tuple[np.ndarray, np.ndarray, np.ndarray]]:
         magnetic_slds = self.magnetic_sld_from_vector_space(particle.get_magnetization)
         magnetic_form_arrays = [numerical_form_array(magnetic_sld, self.vector_space, self.qx_array, self.qy_array) for magnetic_sld in magnetic_slds]
@@ -128,7 +129,7 @@ class NumericalProfileCalculator:
     r_array: np.ndarray
     average_sphere_points: int = 100
 
-    @method_array_cache(cache_holder_keysize=2)
+    @method_array_cache(cache_holder_index=1)
     def form_profile(self, particle: ParticleNumerical):
         #average_sld = [np.average([particle.get_sld(Vector.random_vector(r)) for _ in range(1000)]) for r in self.r_array]
         average_sld_fn = lambda r : np.average([particle.delta_sld( particle.get_sld(Vector.random_vector(r))) for _ in range(self.average_sphere_points)])
@@ -150,10 +151,16 @@ class ProfileCalculator:
     q_array: np.ndarray
     r_array: np.ndarray
 
-    @method_array_cache(cache_holder_keysize=2)
+    @method_array_cache(cache_holder_index=1)
     def form_profile(self, particle: ParticleAverageNumerical):
         average_sld = broadcast_to_numpy_array(self.r_array, particle.get_average_sld)
         dr = np.gradient(self.r_array)
         sin_q_fn = lambda q : np.sum(average_sld * np.sinc(q * self.r_array / PI) * dr * (self.r_array ** 2)) # Using np.sinc here guarantees sin(qr)/qr = 1 if qr = 0
         return broadcast_to_numpy_array(self.q_array, sin_q_fn)
 
+
+
+if __name__ == "__main__":
+    pass
+
+#%%
