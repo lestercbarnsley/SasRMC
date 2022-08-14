@@ -62,11 +62,9 @@ class Box:
         position = self.cube.random_position_inside()
         if in_plane:
             self.particles[i] = particle.set_position(Vector(position.x, position.y, z = 0)).set_orientation(Vector.random_vector_xy())
-            #self.particles[i] = particle.set_orientation(Vector.random_vector_xy())
         else:
             self.particles[i] = particle.set_position(position).set_orientation(Vector.random_vector())
-            #self.particles[i] = particle.set_orientation(Vector.random_vector())
-
+            
     def _force_particle_inside_box(self, i, half_test = False, in_plane = False) -> None:
         for _ in range(100000):
             if not self.wall_or_particle_collision(i, half_test=half_test):

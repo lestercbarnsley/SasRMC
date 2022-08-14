@@ -47,20 +47,18 @@ def get_slicing_func_from_gaussian(gaussian: np.ndarray, slicing_range: int = 0)
 def test_uniques(test_space: np.ndarray, arr: np.ndarray) -> np.ndarray:
     closest_in_space = lambda v : test_space[np.argmin(np.abs(test_space - v))]
     return np.array([closest_in_space(a) for a in arr]) # I can't use broadcast because the pandas method passes in a data series rather than a numpy array
-    '''closest_in_space_arr_fn = broadcast_array_function(closest_in_space)
-    closest_arr = closest_in_space_arr_fn(arr)
-    return closest_arr'''
-
-def fuzzy_unique(arr: np.ndarray) -> np.ndarray:
+    
+def fuzzy_unique(arr: np.ndarray, array_filterer: Callable[[np.ndarray], np.ndarray] = None) -> np.ndarray:
     unique_arr = np.unique(arr)
     test_range = 4 * int(np.sqrt(arr.shape[0]))
     if unique_arr.shape[0] < test_range:
         return unique_arr
 
     test_space_maker = lambda num : np.linspace(np.min(arr), np.max(arr), num = num) if num !=0 else np.array([np.inf])
+    filtered_array = array_filterer(arr) if array_filterer else arr
     for i in range(5, test_range):#_ in enumerate(first_guess):
         test_space = test_space_maker(i)
-        closest_arr = test_uniques(test_space, arr)
+        closest_arr = test_uniques(test_space, filtered_array)
         if not all(t in closest_arr for t in test_space):
             return test_space_maker(i-1)
     raise Exception("Unable to find enough unique values in Q-space to map detector to 2-D grid")
@@ -106,6 +104,17 @@ class DetectorConfig:
         return sigma_para
 
 
+def orthogonal_vector(vector: Vector) -> Vector: # If I find I need this function a lot, I'll make it a method in the Vector class, but for now I'm happy for it to be a helper function
+    if vector.z:
+        raise ValueError("this function was only designed for 2-D vectors")
+    v = vector.unit_vector
+    if not v.mag:
+        return v
+    orth_y = 0.0 if v.x == 0 else np.sqrt(1 / (1 + (v.y / v.x)**2)) * np.sign(v.x)
+    orth_x = -1.0 if v.x == 0 else -(v.y / v.x) * orth_y
+    return Vector(orth_x, orth_y)
+
+
 @dataclass
 class DetectorPixel:
     qX: float
@@ -123,19 +132,14 @@ class DetectorPixel:
     def q_vector(self) -> Vector:
         return Vector(self.qX, self.qY, self.qZ)
 
-    # I'd rather calculate this differently, using a pyfunc, but this has been the fastest method I've come up with to do this calculation
     def _resolution_function_calculator(self, qx_array: np.ndarray, qy_array: np.ndarray) -> np.ndarray:
         qx_offset = qx_array - self.qX
         qy_offset = qy_array - self.qY
         q_offset = (qx_offset, qy_offset, 0)
-        ''' def q_arr_fn(q_vec_comp: Vector): #I'd rather use a lambda than a closure, but there's no point in this instance
-            q_unit = q_vec_comp.unit_vector
-            return qx_offset * q_unit.x + qy_offset * q_unit.y'''
         q_vec = Vector(self.qX, self.qY)
         q_para = q_vec.unit_vector
-        perp_angle = np.arctan2(q_para.y, q_para.x) + (PI/2)
-        q_perp = Vector.xy_from_angle(angle=perp_angle)
-        q_para_arr = q_para.unit_vector * q_offset#q_arr_fn(q_para)
+        q_perp = orthogonal_vector(q_para)
+        q_para_arr = q_para.unit_vector * q_offset
         q_perp_arr = q_perp.unit_vector * q_offset
         gaussian = np.exp(-(1/2) * ((q_para_arr / self.sigma_para)**2 + (q_perp_arr / self.sigma_perp)**2) )
 
@@ -172,11 +176,10 @@ class DetectorPixel:
 
     @classmethod
     def row_to_pixel(cls, data_row: dict, detector_config: DetectorConfig = None):
-        #get_element = lambda k, default_v = 0 : data_row[k] if k in data_row else default_v
         qx_i = data_row[QX]
         qy_i = data_row[QY]
         intensity = data_row[INTENSITY]
-        intensity_error = data_row.get(INTENSITY_ERROR, 0)#get_element('intensity_error')
+        intensity_error = data_row.get(INTENSITY_ERROR, 0)
         qZ = data_row.get(QZ, 0)
         sigma_para = data_row.get(SIGMA_PARA, 0) if detector_config is None else detector_config.get_sigma_parallel(qx_i, qy_i)
         sigma_perp = data_row.get(SIGMA_PERP, 0) if detector_config is None else detector_config.get_sigma_geometric()
@@ -262,6 +265,13 @@ class DetectorImage:
         get_shadow_factor = lambda pixel: pixel.shadow_factor
         return self.array_from_pixels(get_shadow_factor, output_dtype=bool)
 
+    @shadow_factor.setter
+    def shadow_factor(self, new_shadow_factor: np.ndarray) -> None:
+        def set_shadow_factor(pixel: DetectorPixel, new_shadow: bool):
+            pixel.shadow_factor = bool(new_shadow)
+        set_intensity_err_matrix = np.frompyfunc(set_shadow_factor, 2, 0)
+        set_intensity_err_matrix(self._detector_pixels, new_shadow_factor)
+
     @property
     def qx_delta(self) -> float:
         return np.average(np.diff(self.qX[0,:]))
@@ -306,8 +316,8 @@ class DetectorImage:
     def gen_from_data(cls, data_dict: dict, detector_config: DetectorConfig = None):
         qX_data = data_dict[QX]
         qY_data = data_dict[QY]
-        qX_1d = fuzzy_unique(qX_data)#.tolist() Ultimately, this should be a strategy somehow
-        qY_1d = fuzzy_unique(qY_data)#.tolist()
+        qX_1d = fuzzy_unique(qX_data, lambda a: a[np.abs(qY_data) < 0.025 * np.max(qY_data)])#.tolist() Ultimately, this should be a strategy somehow
+        qY_1d = fuzzy_unique(qY_data, lambda a: a[np.abs(qX_data) < 0.025 * np.max(qX_data)])#.tolist()
         qx, qy = np.meshgrid(qX_1d, qY_1d)
         blank_canvas_pixel = lambda qx_i, qy_i : DetectorPixel.row_to_pixel({QX : qx_i, QY : qy_i, INTENSITY : 0}, detector_config= detector_config)
         make_blank_canvas = np.frompyfunc(blank_canvas_pixel, 2, 1)
@@ -326,8 +336,8 @@ class DetectorImage:
                 SHADOW_FACTOR : get_item(SHADOW_FACTOR),
                 SIMULATED_INTENSITY : get_item(SIMULATED_INTENSITY)
             }
-            i = np.argmin(np.abs(qX_1d - qX))#qX_1d.index(qX)
-            j = np.argmin(np.abs(qY_1d - qY))#qY_1d.index(qY)
+            i = np.argmin(np.abs(qX_1d - qX)) # This now finds the closest value rather than an exact match, then it overwrites the pixel
+            j = np.argmin(np.abs(qY_1d - qY))
             detector_pixels[j, i] = DetectorPixel.row_to_pixel(row, detector_config=detector_config)
         polarization = detector_config.polarization if detector_config else Polarization(data_dict.get(POLARIZATION, Polarization.UNPOLARIZED.value))
         return cls(
@@ -337,6 +347,7 @@ class DetectorImage:
 
     @classmethod
     def gen_from_txt(cls, file_location, detector_config: DetectorConfig = None, skip_header: int = 2, transpose = False):
+        # This is an impure function
         all_data = np.genfromtxt(file_location, skip_header = skip_header)
         rows, cols = all_data.shape
         fil_all_data = lambda column_index: np.zeros(rows) if column_index >= cols else all_data[:, column_index]

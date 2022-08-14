@@ -12,7 +12,7 @@ from .scattering_simulation import SimulationParams
 from .vector import Vector
 
 
-rng = np.random.default_rng()
+# rng = np.random.default_rng() There is a strong argument that all of these functions should be pure
 
 def small_angle_change(vector: Vector, angle_change: float, reference_vector: Vector = None) -> Vector:
     ref_vec = reference_vector if reference_vector is not None else Vector.null_vector()
@@ -88,9 +88,9 @@ class ParticleCommand(Command):
         return not self.box.wall_or_particle_collision(self.particle_index)
 
 
-def check_and_set(attr_getter: Callable[[], object], attr_setter: Callable[[object], None], value: object) -> None:
+'''def check_and_set(attr_getter: Callable[[], object], attr_setter: Callable[[object], None], value: object) -> None:
     if attr_getter() != value:
-        attr_setter(value)
+        attr_setter(value)'''
 
 
 @dataclass
@@ -105,35 +105,6 @@ class SetParticleState(ParticleCommand):
         return cls(box, particle_index, new_particle = box[particle_index])
 
 
-'''@dataclass
-class SetParticleState(ParticleCommand):
-    position: Vector
-    orientation: Vector
-    magnetization: Vector
-
-    def execute(self) -> None:
-        particle = self.particle
-        getters = [lambda : particle.position, lambda : particle.orientation, lambda : particle.magnetization]
-        setters = [
-            lambda position : particle.set_position(position), 
-            lambda orientation : particle.set_orientation(orientation), 
-            lambda magnetization : particle.set_magnetization(magnetization)
-            ]
-        values = [self.position, self.orientation, self.magnetization]
-        for getter, setter, value in zip(getters, setters, values):
-            check_and_set(getter, setter, value)
-
-    @classmethod
-    def gen_from_particle(cls, box: Box, particle_index: int):
-        particle = box.particles[particle_index]
-        return cls(
-            box = box,
-            particle_index = particle_index,
-            position = particle.position,
-            orientation = particle.orientation,
-            magnetization = particle.magnetization
-        )'''
-
 
 @dataclass
 class MoveParticleTo(ParticleCommand):
@@ -142,10 +113,7 @@ class MoveParticleTo(ParticleCommand):
     def execute(self) -> None:
         particle = self.particle
         SetParticleState(self.box, self.particle_index, particle.set_position(self.position_new)).execute()
-        '''check_and_set(
-            lambda : particle.position,
-            lambda position : particle.set_position(position),
-            self.position_new)'''
+        
         
 
 @dataclass
@@ -200,10 +168,12 @@ class ReorientateParticle(ParticleCommand):
 
     def execute(self) -> None:
         particle = self.particle
-        check_and_set(
+        particle = self.particle
+        SetParticleState(self.box, self.particle_index, particle.set_orientation(self.orientation_new)).execute()
+        '''check_and_set(
             lambda : particle.orientation,
             lambda orientation : particle.set_orientation(orientation),
-            self.orientation_new)
+            self.orientation_new)'''
         
 
 @dataclass
@@ -221,10 +191,11 @@ class MagnetizeParticle(ParticleCommand):
 
     def execute(self) -> None:
         particle = self.particle
-        check_and_set(
+        SetParticleState(self.box, self.particle_index, particle.set_magnetization(self.magnetization)).execute()
+        '''check_and_set(
             lambda : particle.magnetization,
             lambda magnetization : particle.set_magnetization(magnetization),
-            self.magnetization)
+            self.magnetization)'''
 
 
 @dataclass
@@ -235,6 +206,14 @@ class RotateMagnetization(ParticleCommand):
         magnetization_old = self.particle.magnetization
         magnetization_new = small_angle_change(magnetization_old, self.relative_angle)
         MagnetizeParticle(self.box, self.particle_index, magnetization_new).execute()
+
+@dataclass
+class FlipMagnetization(ParticleCommand):
+    def execute(self) -> None:
+        magnetization_old = self.particle.magnetization
+        magnetization_new = -1 * magnetization_old
+        MagnetizeParticle(self.box, self.particle_index, magnetization_new).execute()
+
 
 
 @dataclass

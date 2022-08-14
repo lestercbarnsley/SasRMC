@@ -69,10 +69,13 @@ class AnalyticalCalculator(ResultCalculator):
 
 
 def numerical_form_array(sld_arr: np.ndarray, vector_space: VectorSpace, qx_array: np.ndarray, qy_array: np.ndarray, xy_axis: int = 2) -> np.ndarray:
+    average_projection = lambda arr : np.average(arr, axis = xy_axis)
     flat_sld = np.sum(sld_arr * vector_space.dz, axis = xy_axis)
-    x = np.average(vector_space.x, axis = xy_axis)
-    y = np.average(vector_space.y, axis = xy_axis)
-    form_f = lambda qx, qy: np.sum(flat_sld * np.exp(1j * (Vector(qx, qy) * (x, y))) * vector_space.dx * vector_space.dy)
+    x = average_projection(vector_space.x)# np.average(vector_space.x, axis = xy_axis)
+    y = average_projection(vector_space.y)#np.average(vector_space.y, axis = xy_axis)
+    dx = average_projection(vector_space.dx)#np.average(vector_space.dx, axis = xy_axis)
+    dy = average_projection(vector_space.dy)#np.average(vector_space.dy, axis = xy_axis)
+    form_f = lambda qx, qy: np.sum(flat_sld * np.exp(1j * (Vector(qx, qy) * (x, y))) * dx * dy)
     form_calculator = np.frompyfunc(form_f, 2, 1)
     return form_calculator(qx_array, qy_array).astype(np.complex128)
 
@@ -83,6 +86,9 @@ class ParticleNumerical(Protocol):
         pass
 
     def get_magnetization(self, relative_position: Vector) -> Vector:
+        pass
+
+    def delta_sld(self, sld: float) -> float:
         pass
 
 
@@ -100,7 +106,7 @@ class NumericalCalculator(AnalyticalCalculator):
 
     @method_array_cache(cache_holder_index=1)
     def modulated_form_array_calculator(self, particle: ParticleNumerical, orientation: Vector) -> Callable[[Vector], np.ndarray]:
-        sld_arr = self.sld_from_vector_space(particle.get_sld)
+        sld_arr = self.sld_from_vector_space(particle.get_sld, particle.delta_sld)
         form_array = numerical_form_array(sld_arr, self.vector_space, self.qx_array, self.qy_array)
         return lambda position : form_array * np.exp(1j * (position * (self.qx_array, self.qy_array)))
 

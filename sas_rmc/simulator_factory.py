@@ -7,7 +7,6 @@ from typing import Callable, List, Tuple, Type, Union
 import numpy as np
 import pandas as pd
 
-from .array_cache import array_cache
 from . import commands
 from .converters import dict_to_particle
 from .acceptance_scheme import MetropolisAcceptance
@@ -149,34 +148,14 @@ def box_simulation_params_factory(starting_rescale: float = 1.0, starting_magnet
         ]
     return SimulationParams(params = params)
 
-'''@array_cache
-def qxqy_array_from_ranges(qx_min: float, qx_max: float, qx_delta: float, qy_min: float, qy_max: float, qy_delta: float, range_factor: float = RANGE_FACTOR, resolution_increase_factor: float = 1):
-    qX, qY = np.meshgrid(
-        np.arange(start = range_factor * qx_min, stop = range_factor * qx_max, step = qx_delta / resolution_increase_factor),
-        np.arange(start = range_factor * qy_min, stop = range_factor * qy_max, step = qy_delta / resolution_increase_factor)
-    )
-    return qX, qY'''
-
-'''def qxqy_array_from_detectorimage(detector_image: DetectorImage, range_factor: float = RANGE_FACTOR, resolution_increase_factor: float = 1) -> Tuple[np.ndarray, np.ndarray]:
-    qx_max = np.max(detector_image.qX)
-    qx_min = np.min(detector_image.qX)
-    delta_qx = detector_image.qx_delta
-    qy_max = np.max(detector_image.qY)
-    qy_min = np.min(detector_image.qY)
-    delta_qy = detector_image.qy_delta
-    qX, qY = qxqy_array_from_ranges(qx_min, qx_max, delta_qx, qy_min, qy_max, delta_qy, range_factor=range_factor, resolution_increase_factor=resolution_increase_factor)
-    return qX, qY
-'''
-
-'''def qxqy_array_list_from_detector_list(detector_list: List[DetectorImage], range_factor: float = RANGE_FACTOR, resolution_increase_factor: float = 1) -> List[Tuple[np.ndarray, np.ndarray]]:
-    return [qxqy_array_from_detectorimage(detector_image, range_factor=range_factor, resolution_increase_factor=resolution_increase_factor) for detector_image in detector_list]
-'''
 
 def command_factory(nominal_step_size: float, box: Box, particle_index: int, temperature: float, simulation_params: SimulationParams, spherical_particle: bool = False, magnetic_simulation: bool = False) -> commands.AcceptableCommand:
     nominal_angle_change = PI/8
     nominal_rescale= 0.02#0.005
     change_by_factor = rng.normal(loc = 1.0, scale = nominal_rescale)
-    position_delta = Vector.random_vector_xy(rng.normal(loc = 0, scale = nominal_step_size) )
+    position_delta = Vector.random_vector_xy(rng.normal(loc = 0.0, scale = nominal_step_size) )
+    actual_angle_change = rng.normal(loc = 0.0, scale = nominal_angle_change)
+    massive_angle_change = rng.uniform(low = -PI, high = PI)
     move_by = lambda : commands.MoveParticleBy(
         box=box,
         particle_index=particle_index,
@@ -190,7 +169,7 @@ def command_factory(nominal_step_size: float, box: Box, particle_index: int, tem
     orbit = lambda : commands.OrbitParticle(
         box=box,
         particle_index=particle_index,
-        relative_angle=nominal_angle_change
+        relative_angle=actual_angle_change
     )
     position_old = box[particle_index].position
     position_new = box.cube.random_position_inside()
@@ -204,17 +183,26 @@ def command_factory(nominal_step_size: float, box: Box, particle_index: int, tem
     rotate_particle = lambda : commands.RotateParticle(
         box = box,
         particle_index=particle_index,
-        relative_angle=nominal_angle_change
+        relative_angle=actual_angle_change
     )
     rotate_magnetization = lambda : commands.RotateMagnetization(
         box = box,
         particle_index= particle_index,
-        relative_angle=nominal_angle_change
+        relative_angle=actual_angle_change
+    )
+    rotate_magnetization_large = lambda : commands.RotateMagnetization(
+        box = box,
+        particle_index= particle_index,
+        relative_angle=massive_angle_change
     )
     rescale_single_magnetization = lambda : commands.RescaleMagnetization(
         box = box,
         particle_index= particle_index,
         change_by_factor=change_by_factor
+    )
+    flip_single_magnetization = lambda : commands.FlipMagnetization(
+        box = box,
+        particle_index= particle_index
     )
     nuclear_rescale = lambda : commands.NuclearRescale(
         simulation_params=simulation_params,
@@ -238,8 +226,13 @@ def command_factory(nominal_step_size: float, box: Box, particle_index: int, tem
     if not spherical_particle:
         command_choices.append(rotate_particle)
     if magnetic_simulation:
-        command_choices.append(rescale_single_magnetization)
-        command_choices.append(rotate_magnetization)
+        command_choices.extend([
+            rescale_single_magnetization, 
+            rotate_magnetization,
+            rotate_magnetization_large,
+            flip_single_magnetization,
+            ])
+        
     
     return commands.AcceptableCommand(
         base_command= rng.choice(command_choices)(),
@@ -263,7 +256,7 @@ def core_shell_particle_factory(config_dict: dict) -> ParticleFactory:#core_radi
     solvent_sld = config_dict.get("solvent_sld", 0.0)
     return lambda : CoreShellParticle.gen_from_parameters(
         position=Vector.null_vector(),
-        magnetization=Vector.random_vector_xy(core_magnetization),
+        magnetization=Vector.random_vector_xy(core_magnetization),#Vector(0, core_magnetization, 0),#
         core_radius=polydisperse_parameter(loc = core_radius, polyd = core_polydispersity),
         thickness=polydisperse_parameter(loc = shell_thickness, polyd=shell_polydispersity),
         core_sld=core_sld,
@@ -359,6 +352,7 @@ def subtract_buffer_intensity(detector: DetectorImage, buffer: Union[float, Dete
         detector.intensity_err = np.sqrt(detector.intensity_err**2 + buffer.intensity_err**2) # This is the proper way to do this, since the errors add in quadrature. If the buffer intensity error isn't present, the total error won't change
     elif isinstance(buffer, float):
         detector.intensity = detector.intensity - buffer
+    #detector.shadow_factor = detector.shadow_factor * (detector.intensity > detector.intensity_err)
     return detector
 
 polarization_dict = {
@@ -633,7 +627,7 @@ class SimulationConfig:
             detector_smearing=config_dict.get("detector_smearing", True),
             field_direction=config_dict.get("field_direction", "Y"),
             force_log = config_dict.get("force_log_file", True),
-            output_plot_format = config_dict.get("output_plot_format", "NONE").lower(),
+            output_plot_format = config_dict.get("output_plot_format", "PDF").lower(),
             box_template = (
                 config_dict.get("box_dimension_1", 0),
                 config_dict.get("box_dimension_2", 0),
@@ -667,6 +661,7 @@ def get_final_simulation_params(simulation_data: pd.DataFrame) -> Tuple[float, f
             if valid_non_zero_float(current_magnetic_rescale):
                 magnetic_rescale = float(current_magnetic_rescale)
     return nuclear_rescale, magnetic_rescale
+
 
 @dataclass
 class SimulationReloader(SimulationConfig):
@@ -737,15 +732,13 @@ class SimulationReloader(SimulationConfig):
             detector_smearing=config_dict.get("detector_smearing", True),
             field_direction=config_dict.get("field_direction", "Y"),
             force_log = config_dict.get("force_log_file", True),
-            output_plot_format = config_dict.get("output_plot_format", "NONE").lower(),
+            output_plot_format = config_dict.get("output_plot_format", "PDF").lower(),
             box_template = (
                 config_dict.get("box_dimension_1", 0),
                 config_dict.get("box_dimension_2", 0),
                 config_dict.get("box_dimension_3", 0)
             )
-        )
-
-    
+        )    
 
 
 def gen_config_from_dataframes(data_frames: dict) -> SimulationConfig:

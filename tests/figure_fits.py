@@ -6,20 +6,25 @@ import numpy as np
 from matplotlib import pyplot as plt
 from scipy import interpolate, optimize
 import pandas as pd
+from uncertainties import unumpy, ufloat
 
 import sas_rmc
 
 from sas_rmc import DetectorImage, Vector, VectorSpace, SimulatedDetectorImage, DetectorConfig, Polarization
+from sas_rmc import result_calculator
 from sas_rmc.box_simulation import Box
 from sas_rmc.command_writer import BoxWriter
 from sas_rmc.form_calculator import box_intensity_average
-from sas_rmc.particle import CoreShellParticle, NumericalParticle, NumericalParticleCustom, Particle
+from sas_rmc.particle import CoreShellParticle, Dumbbell, Particle
+from sas_rmc.result_calculator import AnalyticalCalculator, NumericalCalculator, ParticleNumerical
 from sas_rmc.scattering_simulation import SimulationParam, SimulationParams
 from sas_rmc.shapes import Cube
-from sas_rmc.simulator_factory import is_float, subtract_buffer_intensity
-from sas_rmc.scattering_simulation import detector_smearer
+from sas_rmc.simulator_factory import is_float,  subtract_buffer_intensity
+from sas_rmc.fitter import smear_simulated_intensity
 
 file_maker = sas_rmc.simulator_factory.generate_file_path_maker(Path.cwd(), description="figures")
+file_maker = sas_rmc.simulator_factory.generate_file_path_maker(r'J:\Uni\Programming\SasRMC\data\results', description="figures")
+
 
 PI = np.pi
 mod = lambda arr: np.real(arr * np.conj(arr))
@@ -39,11 +44,12 @@ def default_detector_image() -> SimulatedDetectorImage:
     detector_image = SimulatedDetectorImage.gen_from_txt(FILE, DETECTOR_CONFIG_C14D14)
     return detector_image
 
-
-def show_particle(particle: NumericalParticle):
+def show_particle(particle: ParticleNumerical, numerical_calculator: NumericalCalculator):
     xy_axis = 2
-    sld = particle.sld_from_vector_space()
-    vector_space = particle.vector_space
+    #sld = particle.sld_from_vector_space()
+    vector_space = numerical_calculator.vector_space
+    get_sld = lambda position : particle.get_sld(position - particle.position)
+    sld = numerical_calculator.sld_from_vector_space(get_sld, particle.delta_sld)
     flat_sld = np.sum(sld, axis=xy_axis)
     x_arr = np.average(vector_space.x, axis= xy_axis)
     y_arr = np.average(vector_space.y, axis = xy_axis)
@@ -76,11 +82,6 @@ def intensity_at_qxqy(intensity_array, qx_array, qy_array, qx_i, qy_i):
         return 0
     if not np.min(qy_array) < qy_i < np.max(qy_array):
         return 0
-    '''i = np.argmin(np.abs(qx_array[0:,] - qx_i))
-    j = np.argmin(np.abs(qy_array[:,0] - qy_i))
-    i_s = adjust_i_array([i-1, i, i+1], i, len(qx_array[0:,]))
-    j_s = adjust_i_array([j -1, j, j+1], j, len(qy_array[:,0]))'''
-
     i_s = subset_array(qx_array[0:,], qx_i, 5)
     j_s = subset_array(qy_array[:,0], qy_i, 5)
     
@@ -94,8 +95,6 @@ def intensity_at_qxqy(intensity_array, qx_array, qy_array, qx_i, qy_i):
 def radial_average(i_array: np.ndarray, qx_array: np.ndarray, qy_array: np.ndarray, sector: Tuple[float, float] = (0, np.inf)):
     q_mod = np.sqrt(qx_array**2 + qy_array**2)
 
-    '''step = np.average(np.diff(qx_array[0,:]))
-    print(step)'''
     
     q = np.arange(
         start = np.min(np.where(i_array != 0, q_mod, np.inf)),
@@ -103,26 +102,25 @@ def radial_average(i_array: np.ndarray, qx_array: np.ndarray, qy_array: np.ndarr
         step = np.average(np.diff(qx_array[0,:]))
         )
     
-    #interpolator = interpolate.interp2d(qx_array, qy_array, i_array, kind='cubic')
     def i_of_q(q_c):
         angles = np.linspace(-PI, +PI, num = 180)
         sector_filter = np.abs(angles - sector[0]) < sector[1] / 2
         qx, qy = q_c * np.cos(angles)[sector_filter], q_c * np.sin(angles)[sector_filter]
-        #print(q_c, np.average(np.sqrt(qx**2 + qy**2)))
-        #print(len(qx))
+        
         if len(qx) == 0:
             return 0
         
         intensities = np.frompyfunc(lambda x, y: intensity_at_qxqy(i_array, qx_array, qy_array, x, y),2,1)(qx, qy).astype(np.float64)
-        #print(np.std(intensities) / np.average(intensities))
+        
         if len(intensities[intensities != 0]) == 0:
             return 0
         return np.average(intensities[intensities > 0])
+
     averager = np.frompyfunc(i_of_q, 1, 1)
     return q, averager(q).astype(np.float64)
 
-def sin_2_theta(theta, a, offset = 0):
-    return a * (np.sin(theta)**2) + offset
+def sin_2_theta(theta, a, offset = 0, theta_offset = 0 ):
+    return a * (np.sin(theta + theta_offset)**2) + offset
     
 
 def unpol_analysis(detector_up: DetectorImage, detector_down: DetectorImage, intensity_getter = None):
@@ -147,32 +145,37 @@ def unpol_analysis(detector_up: DetectorImage, detector_down: DetectorImage, int
 
     def fn_fm(q_c):
         angles = np.linspace(-PI, +PI, num = 180)
-        qx, qy = q_c * np.cos(angles), q_c * np.sin(angles)
+        qx, qy = q_c * np.cos(angles + PI/2), q_c * np.sin(angles + PI/2)
         if len(qx) == 0:
             return 0
         fnfm_intensities = np.frompyfunc(lambda x, y: intensity_at_qxqy(i_diff_array, qx_array, qy_array, x, y),2,1)(qx, qy).astype(np.float64)
         if len(fnfm_intensities[fnfm_intensities!=0]) < 6:
             return 0, 0, 0
         popt, pcov = optimize.curve_fit(
-            sin_2_theta, angles[fnfm_intensities!=0], fnfm_intensities[fnfm_intensities!=0], p0 = [np.max(fnfm_intensities)]
+            sin_2_theta, angles[fnfm_intensities!=0], fnfm_intensities[fnfm_intensities!=0], p0 = [np.max(fnfm_intensities)]#, 0, 0]
         )
-        fnfm = popt[0] / 4
+        fnfm = ufloat(popt[0] / 4, pcov[0,0] / 4)
 
         unpol_intensities = np.frompyfunc(lambda x, y: intensity_at_qxqy(i_unpol_array, qx_array, qy_array, x, y),2,1)(qx, qy).astype(np.float64)
 
         popt_u, pcov_u = optimize.curve_fit(
-            sin_2_theta, angles[unpol_intensities!=0], unpol_intensities[unpol_intensities!=0], p0 = [np.max(unpol_intensities), np.min(unpol_intensities)]
+            sin_2_theta, angles[unpol_intensities!=0], unpol_intensities[unpol_intensities!=0], p0 = [np.max(unpol_intensities), np.min(unpol_intensities)]#, 0]
         )
-        fn2 = popt_u[1]
+        fn2 = ufloat(popt_u[1] , pcov_u[1,1])
 
         fm2 = fnfm**2 / fn2
-
+        #fm2 = #ufloat(popt_u[0], pcov_u[0,0])
         return fn2, fnfm, fm2
 
 
     sin_2_fitter = np.frompyfunc(fn_fm, 1, 3)
-    f_nuc, cross_term, f_mag = sin_2_fitter(q)
-    return q[f_nuc != 0], f_nuc.astype(np.float64)[f_nuc != 0], cross_term.astype(np.float64)[f_nuc != 0], f_mag.astype(np.float64)[f_nuc != 0]
+    f_nuc_uf, cross_term_uf, f_mag_uf = sin_2_fitter(q)
+    nom_and_stdev = lambda arr : (unumpy.nominal_values(arr), unumpy.std_devs(arr))
+    f_nuc, f_nuc_err = nom_and_stdev(f_nuc_uf)
+    cross_term, cross_term_err = nom_and_stdev(cross_term_uf)
+    f_mag, f_mag_err = nom_and_stdev(f_mag_uf)
+    as_type_and_filter = lambda arr : arr.astype(np.float64)[f_nuc != 0]
+    return q[f_nuc != 0], as_type_and_filter(f_nuc), as_type_and_filter(cross_term), as_type_and_filter(f_mag), as_type_and_filter(f_nuc_err), as_type_and_filter(cross_term_err), as_type_and_filter(f_mag_err)
     
 
 FONT_SIZE = 14
@@ -188,12 +191,12 @@ def figure_form_factors():
 
     
 
-    def onion_sld(position: Vector) -> float:
+    '''def onion_sld(position: Vector) -> float:
         if position.mag < 100:
             return 10
         if position.mag < 120:
             return 5
-        return 0
+        return 0'''
 
     core_shell_particle = CoreShellParticle.gen_from_parameters(
         position=Vector.null_vector(),
@@ -205,7 +208,7 @@ def figure_form_factors():
         solvent_sld=0,
     )
 
-    def dumbbell_sld(position: Vector) -> float:
+    '''def dumbbell_sld(position: Vector) -> float:
         shell_thickness = 10
         position_1 = Vector.null_vector()
         position_2 = 100 * (Vector(1, 1).unit_vector)#Vector(70, 70, 30)
@@ -219,17 +222,36 @@ def figure_form_factors():
             return 5
         if (position - position_2).mag < (radius_2 + shell_thickness):
             return 5
-        return 0
+        return 0'''
+    dumbbell = Dumbbell.gen_from_parameters(
+        core_radius = 80,
+        seed_radius=90,
+        shell_thickness=10,
+        core_sld = 20,
+        seed_sld = 10,
+        shell_sld = 5,
+        solvent_sld=0,
+        centre_to_centre_distance=100,
+        orientation=Vector(-1,-1).unit_vector,
+        position=100 * (Vector(1,1).unit_vector)
+    )
 
-    onion_particle = NumericalParticleCustom(
+    '''onion_particle = NumericalParticleCustom(
         get_sld_function=onion_sld,
         vector_space=VectorSpace.gen_from_bounds(
             x_min = -160, x_max= 160, x_num = 40,
             y_min = -160, y_max= 160, y_num = 40,
             z_min = -160, z_max= 160, z_num = 40,
         )
-    )
-    x_arr, y_arr, flat_sld = show_particle(onion_particle)
+    )'''
+    detector = default_detector_image()
+    qx, qy = detector.qX, detector.qY
+    numerical_calculator = NumericalCalculator(qx_array=qx, qy_array=qy, vector_space=VectorSpace.gen_from_bounds(
+            x_min = -160, x_max= 160, x_num = 40,
+            y_min = -160, y_max= 160, y_num = 40,
+            z_min = -160, z_max= 160, z_num = 40,
+        ))
+    x_arr, y_arr, flat_sld = show_particle(core_shell_particle, numerical_calculator=numerical_calculator)
 
     
     
@@ -242,11 +264,10 @@ def figure_form_factors():
     axs[0,0].text(0.05, 0.95, '(a)', color = "white", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=axs[0,0].transAxes)
     axs[0,0].text(0.05, 0.05, 'Core-shell particle', color = "white", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=axs[0,0].transAxes)
     
-    detector = default_detector_image()
-    qx, qy = detector.qX, detector.qY
+    
 
-    form_array = onion_particle.form_array(qx, qy, orientation=Vector(0,0,1))
-
+    #form_array = core_shell_particle.form_array(qx, qy, orientation=Vector(0,0,1))
+    form_array = numerical_calculator.form_result(core_shell_particle).form_nuclear
     axs[0,1].contourf(qx, qy, mod(form_array), levels = 20)
     #axs[0,1].set_xlabel(r'Q$_{x}$ ($\AA^{-1}$)',fontsize =  FONT_SIZE)#, fontsize=10)
     axs[0,1].set_ylabel(r'Q$_{y}$ ($\AA^{-1}$)',fontsize =  FONT_SIZE)#, fontsize='medium')
@@ -254,7 +275,13 @@ def figure_form_factors():
     axs[0,1].text(0.05, 0.95, '(b)', color = "white", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=axs[0,1].transAxes)
     
     qx_large, qy_large = np.meshgrid(np.linspace(-0.5, +0.5, 400),np.linspace(-0.5, +0.5, 400))
-    form_array_2 = onion_particle.form_array(qx_large, qy_large, orientation=Vector(0,0,1))
+    numerical_calculator_large = NumericalCalculator(qx_array=qx_large, qy_array=qy_large, vector_space=VectorSpace.gen_from_bounds(
+            x_min = -160, x_max= 160, x_num = 40,
+            y_min = -160, y_max= 160, y_num = 40,
+            z_min = -160, z_max= 160, z_num = 40,
+        ))
+    #form_array_2 = core_shell_particle.form_array(qx_large, qy_large, orientation=Vector(0,0,1))
+    form_array_2 = numerical_calculator_large.form_result(core_shell_particle).form_nuclear
     i_array = mod(form_array_2)
     #q = np.linspace(2e-3, 4e-1, num  = 300)
     
@@ -280,30 +307,34 @@ def figure_form_factors():
 
     #axs[0,0].imshow()
 
-    dumbell_particle = NumericalParticleCustom(
+    '''dumbell_particle = NumericalParticleCustom(
         get_sld_function=dumbbell_sld,
         vector_space=VectorSpace.gen_from_bounds(
             x_min = -160, x_max= 160, x_num = 40,
             y_min = -160, y_max= 160, y_num = 40,
             z_min = -160, z_max= 160, z_num = 40,
         )
-    )
-    x_arr, y_arr, flat_sld = show_particle(dumbell_particle)
+    )'''
+    dumbell_particle = dumbbell
+    x_arr, y_arr, flat_sld = show_particle(dumbell_particle, numerical_calculator=numerical_calculator)
     axs[1,0].pcolormesh(x_arr / 10, y_arr / 10, flat_sld, shading = 'auto')
     axs[1,0].set_xlabel('X (nm)',fontsize =  FONT_SIZE)#, fontsize=10)
     axs[1,0].set_ylabel('Y (nm)',fontsize =  FONT_SIZE)#, fontsize='medium')
     axs[1,0].text(0.05, 0.95, '(d)', color = "white", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=axs[1,0].transAxes)
     axs[1,0].text(0.05, 0.05, 'Dumbbell particle', color = "white", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=axs[1,0].transAxes)
     
-    form_array = dumbell_particle.form_array(qx, qy, orientation=Vector(0,0,1))
-
+    #form_array = dumbell_particle.form_array(qx, qy, orientation=Vector(0,0,1))
+    form_array = numerical_calculator.form_result(dumbell_particle).form_nuclear
+    
     axs[1,1].contourf(qx, qy, mod(form_array), levels = 20)
     axs[1,1].set_xlabel(r'Q$_{x}$ ($\AA^{-1}$)',fontsize =  FONT_SIZE)#, fontsize=10)
     axs[1,1].set_ylabel(r'Q$_{y}$ ($\AA^{-1}$)',fontsize =  FONT_SIZE)#, fontsize='medium')
     axs[1,1].text(0.05, 0.95, '(e)', color = "white", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=axs[1,1].transAxes)
     
     #qx_large, qy_large = np.meshgrid(np.linspace(-0.5, +0.5, 200),np.linspace(-0.5, +0.5, 200))
-    form_array_2 = dumbell_particle.form_array(qx_large, qy_large, orientation=Vector(0,0,1))
+    #form_array_2 = dumbell_particle.form_array(qx_large, qy_large, orientation=Vector(0,0,1))
+    form_array_2 = numerical_calculator_large.form_result(dumbell_particle).form_nuclear
+    
     i_array = mod(form_array_2)
 
     
@@ -442,12 +473,7 @@ def figure_particle_maps():
     ax2.text(0.05, 0.95, '(b)', color = "black", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=ax2.transAxes)
     
     
-    '''axs[0,0].contourf(detector.qX, detector.qY, np.log(intensity_matrix), levels = 30, cmap = 'jet')
-    axs[0,0].set_xlabel(r'Q$_{x}$ ($\AA^{-1}$)',fontsize =  16)#'x-large')
-    axs[0,0].set_ylabel(r'Q$_{y}$ ($\AA^{-1}$)',fontsize =  16)#'x-large')
-    axs[0,0].text(-0.025, -0.025, "Experiment",fontsize =  14)
-    axs[0,0].text(+0.005, -0.025, "Simulation",fontsize =  14)
-    axs[0,0].text(-0.025, +0.023, "(a)",fontsize =  14)'''
+    
 
     for ax in (ax1, ax2, ax3):
         ax.xaxis.set_ticklabels([])
@@ -461,12 +487,6 @@ def figure_particle_maps():
         skip_header=1,
     )
     
-    #intensity_matrix = np.where(detector.qX < 0, detector.experimental_intensity, detector.simulated_intensity)
-    
-    
-
-    #ax3 = fig.add_subplot(gs[1, 0])
-
     ax4.contourf(smeared_detector.qX, smeared_detector.qY, smeared_intensity_matrix, levels = levels, cmap = 'jet')
     ax4.set_xlabel(r'Q$_{x}$ ($\AA^{-1}$)',fontsize =  FONT_SIZE)#'x-large')
     ax4.set_ylabel(r'Q$_{y}$ ($\AA^{-1}$)',fontsize =  FONT_SIZE)#'x-large')
@@ -625,12 +645,41 @@ def figure_algorithm_performance():
     fig.savefig(file_maker("algorithm_performance", ".eps"))
     fig.savefig(file_maker("algorithm_performance", ".pdf"))
 
+def sector_subfigure(ax, detector_up: SimulatedDetectorImage, detector_down: SimulatedDetectorImage):
+    unpolarized_intensity = (detector_up.experimental_intensity + detector_down.experimental_intensity) /2
+    fn_q, fn_intensity = radial_average(unpolarized_intensity, detector_down.qX, detector_down.qY, sector = (PI/2, PI/10))
+    '''difference_intensity = detector_up.experimental_intensity - detector_down.experimental_intensity
+    #plt.imshow(np.log(difference_intensity))
+    #plt.show()
+    cross_q, cross_intensity = radial_average(difference_intensity, detector_down.qX, detector_down.qY, sector = (0, PI/10))
+    fnfm_intensity = cross_intensity / 4
+    fm_q, fnaddfm_intensity = radial_average(unpolarized_intensity, detector_down.qX, detector_down.qY, sector=(0, PI/10))
+    q_up, i_up = radial_average(detector_up.experimental_intensity, detector_up.qX, detector_up.qY, sector=(0, PI/10))
+    fm_intensity  = fnaddfm_intensity - fn_intensity'''
+    #fm_intensity = fnfm_intensity**2 / fn_intensity
+    up_q, up_intensiyt = radial_average(detector_up.experimental_intensity, detector_up.qX, detector_up.qY, sector = (0, PI/10))
+    down_q, down_intensiyt = radial_average(detector_down.experimental_intensity, detector_down.qX, detector_down.qY, sector = (0, PI/10))
+    b_term = up_intensiyt - fn_intensity
+    c_term = down_intensiyt - fn_intensity
+    fm_intensity = (b_term + c_term) / 2
+    cross_q = down_q
+    q_up = up_q
+    fnfm_intensity = (b_term - c_term) / 4
+
+
+    exp_filter=  lambda arr : arr[10:-5:2]
+    ax.loglog(exp_filter(fn_q), exp_filter(fn_intensity), 'b.')
+    ax.loglog(exp_filter(cross_q), exp_filter(fnfm_intensity), 'r.')
+    ax.loglog(exp_filter(q_up), exp_filter(fm_intensity), 'g.')
+    #plt.show()
+
 
 def angle_subfigure(ax, detector_up: SimulatedDetectorImage, detector_down:SimulatedDetectorImage):
     angles = np.linspace(-PI, +PI)
     q_values = [0.01, 0.02, 0.03, 0.04]
     intensity = detector_up.intensity - detector_down.intensity
     simulated_intensity = detector_up.simulated_intensity - detector_down.simulated_intensity
+    intensity_uncertainty = np.sqrt(detector_down.intensity_err**2+ detector_up.intensity_err**2)
     def intensity_v_angle(q_c, angle, i_array):
         qy, qx = q_c * np.cos(angle), q_c * np.sin(angle) # 90 degrees from normal because angle is angle wrt field
         i_of_qxqy = intensity_at_qxqy(i_array, detector_up.qX, detector_up.qY, qx, qy)
@@ -638,7 +687,14 @@ def angle_subfigure(ax, detector_up: SimulatedDetectorImage, detector_down:Simul
     for i, q in enumerate(q_values):
         intensity_angle_getter = np.frompyfunc(lambda angle_i: intensity_v_angle(q, angle_i, i_array=intensity), 1, 1)
         i_v_alpha = intensity_angle_getter(angles).astype(np.float64)
+        uncertainty_angle_getter = np.frompyfunc(lambda angle_i: intensity_v_angle(q, angle_i, i_array=intensity_uncertainty), 1, 1)
+        err_v_alpha = uncertainty_angle_getter(angles).astype(np.float64)
+        #if np.max(i_v_alpha) > np.max(err_v_alpha):
+        err_filt = lambda arr : arr[err_v_alpha < np.max(intensity)]
         ax.plot(angles, i_v_alpha, ['r.', 'b.', 'g.', 'k.'][i], label = [r'0.01 $\AA^{-1}$',r'0.02 $\AA^{-1}$', r'0.03 $\AA^{-1}$', r'0.04 $\AA^{-1}$' ][i])
+        y_bot, y_top = ax.get_ylim()
+        ax.errorbar(err_filt(angles), err_filt(i_v_alpha), yerr = err_filt(err_v_alpha), fmt = 'none', ecolor = 'lightgray', capsize = 5)
+        ax.set_ylim(bottom = y_bot, top = y_top)
 
     for i, q in enumerate(q_values):
         intensity_angle_getter = np.frompyfunc(lambda angle_i: intensity_v_angle(q, angle_i, i_array=simulated_intensity), 1, 1)
@@ -726,13 +782,13 @@ def figure_polarization():
     fig_2, (ax5,ax6,ax7) = plt.subplots(1,3)
     fig_2.set_size_inches((3.5 * 3,3 * 1))
 
-    q, fn, cross, fm = unpol_analysis(
+    q, fn, cross, fm, fn_err, cross_err, fm_err = unpol_analysis(
         detector_up,
         detector_down,
         intensity_getter= lambda d: d.intensity
     )
 
-    q_sim, fn_sim, cross_sim, fm_sim = unpol_analysis(
+    q_sim, fn_sim, cross_sim, fm_sim, fn_sim_err, cross_sim_err, fm_sim_err = unpol_analysis(
         detector_up,
         detector_down,
         intensity_getter= lambda d: d.simulated_intensity
@@ -744,11 +800,21 @@ def figure_polarization():
     ax5.text(0.05, 0.92, r'(a)', color = "black", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=ax5.transAxes)
     
 
+   
+    ax6.errorbar(
+        q, fn, yerr = fn_err, ecolor = 'lightgray', capsize = 5
+    )
     ax6.loglog(
         q, fn, 'b.'
     )
+    ax6.errorbar(
+        q, cross, yerr = cross_err, ecolor = 'lightgray', capsize = 5
+    )
     ax6.loglog(
         q, cross, 'r.'
+    )
+    ax6.errorbar(
+        q, fm, yerr = fm_err, ecolor = 'lightgray', capsize = 5
     )
     ax6.loglog(
         q, fm, 'g.'
@@ -976,25 +1042,45 @@ def figure_polarization_v2():
     rescale_factor, magnetic_rescale = [simulation_param.value for simulation_param in simulation_params.params]
     for detector in [detector_20_down, detector_20_up, detector_8_down, detector_8_up, detector_2_down, detector_2_up]:
         print(detector.qY.shape)
-        simulated_intensity = box_intensity_average(box_list, detector.qX, detector.qY, rescale_factor, magnetic_rescale, detector.polarization)
-        simulated_detector = detector_smearer(simulated_intensity, detector.qX, detector.qY, detector)
-        
-    angle_subfigure(ax1, detector_8_up, detector_8_down)
-    ax1.text(0.05, 0.92, r'(a)', color = "black", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=ax1.transAxes)
+        analytical_calculator = AnalyticalCalculator(detector.qX, detector.qY)
+        simulated_intensity = box_intensity_average(box_list, analytical_calculator, rescale_factor, magnetic_rescale, detector.polarization)
+        smeared_intensity = smear_simulated_intensity(simulated_intensity, analytical_calculator.qx_array, analytical_calculator.qy_array, detector)
     
+    if True:
+        angle_subfigure(ax1, detector_8_up, detector_8_down)
+        ax1.text(0.05, 0.92, r'(a)', color = "black", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=ax1.transAxes)
+    else:
 
+        sector_subfigure(ax1, detector_20_up, detector_20_down)
+        sector_subfigure(ax1, detector_8_up, detector_8_down)
+        sector_subfigure(ax1, detector_2_up, detector_2_down)
+        ax1.set_ylim(7.045615400141189e-07, 153.92882006237988)
     #for detector_up, detector_down in zip([detector_20_up, detector_8_up,detector_2_up ], [detector_20_down, detector_8_down,detector_2_down]):
-    q, fn, cross, fm = unpol_analysis(
+    q, fn, cross, fm, fn_err, cross_err, fm_err = unpol_analysis(
         detector_20_up,
         detector_20_down,
         intensity_getter= lambda d: d.intensity
     )
+    q_coll = np.append(q[10:-20], [])
+    fn_coll = np.append(fn[10:-20], [])
+    fn_err_coll = np.append(fn_err[10:-20], [])
+    fm_coll = np.append(fm[10:-20], [])
+    fm_err_coll = np.append(fm_err[10:-20], [])
     exp_filter = lambda arr : arr[10:-20:4]
+    ax2.errorbar(
+        exp_filter(q), exp_filter(fn), yerr = exp_filter(fn_err), fmt = 'none', ecolor = 'lightgray', capsize = 5
+    )
     ax2.loglog(exp_filter(q), exp_filter(fn), 'b.', label = 'F$_{N}^2$')
+    ax2.errorbar(
+        exp_filter(q), exp_filter(cross), yerr = exp_filter(cross_err), fmt = 'none', ecolor = 'lightgray', capsize = 5
+    )
     ax2.loglog(exp_filter(q), exp_filter(cross), 'r.', label = 'F$_{N}$F$_{M}$')
+    ax2.errorbar(
+        exp_filter(q), exp_filter(fm), yerr = exp_filter(fm_err), fmt = 'none', ecolor = 'lightgray', capsize = 5
+    )
     ax2.loglog(exp_filter(q), exp_filter(fm), 'g.', label = 'F$_{M}^2$')
 
-    q_sim, fn_sim, cross_sim, fm_sim = unpol_analysis(
+    q_sim, fn_sim, cross_sim, fm_sim, fn_sim_err, cross_sim_err, fm_sim_err = unpol_analysis(
         detector_20_up,
         detector_20_down,
         intensity_getter= lambda d: d.simulated_intensity
@@ -1003,17 +1089,31 @@ def figure_polarization_v2():
     ax2.loglog(sim_filter(q_sim), sim_filter(fn_sim), 'b-')
     ax2.loglog(sim_filter(q_sim), sim_filter(cross_sim), 'r-')
     ax2.loglog(sim_filter(q_sim), sim_filter(fm_sim), 'g-')
-    q, fn, cross, fm = unpol_analysis(
+    q, fn, cross, fm, fn_err, cross_err, fm_err = unpol_analysis(
         detector_8_up,
         detector_8_down,
         intensity_getter= lambda d: d.intensity
     )
+    q_coll = np.append(q_coll, q[10:-10])
+    fn_coll = np.append(fn_coll, fn[10:-10])
+    fn_err_coll = np.append(fn_err_coll, fn_err[10:-10])
+    fm_coll = np.append(fm_coll, fm[10:-10])
+    fm_err_coll = np.append(fm_err_coll, fm_err[10:-10])
     exp_filter = lambda arr : arr[10:-6:4]
+    ax2.errorbar(
+        exp_filter(q), exp_filter(fn), yerr = exp_filter(fn_err), fmt = 'none', ecolor = 'lightgray', capsize = 5
+    )
     ax2.loglog(exp_filter(q), exp_filter(fn), 'b.')#, label = 'F$_{N}^2$')
+    ax2.errorbar(
+        exp_filter(q), exp_filter(cross), yerr = exp_filter(cross_err), fmt = 'none', ecolor = 'lightgray', capsize = 5
+    )
     ax2.loglog(exp_filter(q), exp_filter(cross), 'r.')#, label = 'F$_{N}$F$_{M}$')
+    ax2.errorbar(
+        exp_filter(q), exp_filter(fm), yerr = exp_filter(fm_err), fmt = 'none', ecolor = 'lightgray', capsize = 5
+    )
     ax2.loglog(exp_filter(q), exp_filter(fm), 'g.')#, label = 'F$_{M}^2$')
 
-    q_sim, fn_sim, cross_sim, fm_sim = unpol_analysis(
+    q_sim, fn_sim, cross_sim, fm_sim, fn_sim_err, cross_sim_err, fm_sim_err = unpol_analysis(
         detector_8_up,
         detector_8_down,
         intensity_getter= lambda d: d.simulated_intensity
@@ -1022,17 +1122,34 @@ def figure_polarization_v2():
     ax2.loglog(sim_filter(q_sim), sim_filter(fn_sim), 'b-')
     ax2.loglog(sim_filter(q_sim), sim_filter(cross_sim), 'r-')
     ax2.loglog(sim_filter(q_sim), sim_filter(fm_sim), 'g-')
-    q, fn, cross, fm = unpol_analysis(
+    q, fn, cross, fm, fn_err, cross_err, fm_err  = unpol_analysis(
         detector_2_up,
         detector_2_down,
         intensity_getter= lambda d: d.intensity
     )
+    q_coll = np.append(q_coll, q[10:-10])
+    fn_coll = np.append(fn_coll, fn[10:-10])
+    fn_err_coll = np.append(fn_err_coll, fn_err[10:-10])
+    fm_coll = np.append(fm_coll, fm[10:-10])
+    fm_err_coll = np.append(fm_err_coll, fm_err[10:-10])
+    np.savetxt(file_maker("nuclear_form", ".txt"), np.array([(q_i, fn_i, fn_i_err) for q_i, fn_i, fn_i_err in zip(q_coll, fn_coll, fn_err_coll)]))
+    np.savetxt(file_maker("magnetic_form", ".txt"), np.array([(q_i, fm_i, fm_i_err) for q_i, fm_i, fm_i_err in zip(q_coll, fm_coll, fm_err_coll)]))
+    
     exp_filter = lambda arr : arr[10:-15:4]
+    ax2.errorbar(
+        exp_filter(q), exp_filter(fn), yerr = exp_filter(fn_err), fmt = 'none', ecolor = 'lightgray', capsize = 5
+    )
     ax2.loglog(exp_filter(q), exp_filter(fn), 'b.')#, label = 'F$_{N}^2$')
+    ax2.errorbar(
+        exp_filter(q), exp_filter(cross), yerr = exp_filter(cross_err), fmt = 'none', ecolor = 'lightgray', capsize = 5
+    )
     ax2.loglog(exp_filter(q), exp_filter(cross), 'r.')#, label = 'F$_{N}$F$_{M}$')
+    ax2.errorbar(
+        exp_filter(q), exp_filter(fm), yerr = exp_filter(fm_err), fmt = 'none', ecolor = 'lightgray', capsize = 5
+    )
     ax2.loglog(exp_filter(q), exp_filter(fm), 'g.')#, label = 'F$_{M}^2$')
 
-    q_sim, fn_sim, cross_sim, fm_sim = unpol_analysis(
+    q_sim, fn_sim, cross_sim, fm_sim, fn_sim_err, cross_sim_err, fm_sim_err = unpol_analysis(
         detector_2_up,
         detector_2_down,
         intensity_getter= lambda d: d.simulated_intensity
@@ -1046,6 +1163,7 @@ def figure_polarization_v2():
     ax2.set_ylabel(r'Intensity (cm$^{-1}$)',fontsize =  FONT_SIZE)#'x-large')
     bottom, top = ax2.get_ylim()
     ax2.set_ylim(bottom, 9 * top)
+    
 
     ax2.text(0.05, 0.92, r'(b)', color = "black", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=ax2.transAxes)
     #ax2.text(0.05, 0.92, r'(b)', color = "red", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=ax2.transAxes)
@@ -1058,7 +1176,7 @@ def figure_polarization_v2():
     mag_y = get_from_box_list(lambda particle: particle.magnetization.y)
     radius = get_from_box_list(lambda particle: particle.shapes[1].radius)
 
-   
+    
 
     #pos_x, pos_y, mag_x, mag_y, radius = [particle.position.x, particle.po for particle in box_list[0].particles]magnetic_particle_configs[:,2], magnetic_particle_configs[:,3], magnetic_particle_configs[:,8], magnetic_particle_configs[:,9], magnetic_particle_configs[:,11]
     a_x, a_y = radius* mag_x / np.sqrt(mag_x**2 + mag_y**2), radius* mag_y / np.sqrt(mag_x**2 + mag_y**2)
@@ -1099,10 +1217,10 @@ def quick_test(): # Add to version control then delete
 
 
 def main():
-    figure_form_factors()
-    figure_particle_maps()
-    figure_algorithm_performance()
-    figure_polarization()
+    #figure_form_factors()
+    #figure_particle_maps()
+    #figure_algorithm_performance()
+    #figure_polarization()
     figure_polarization_v2()
     #quick_test()
 

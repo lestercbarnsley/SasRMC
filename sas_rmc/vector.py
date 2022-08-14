@@ -34,7 +34,7 @@ def broadcast_to_numpy_array(object_array: np.ndarray, getter_function: Callable
 
 def composite_function(*func):
     compose = lambda f, g : lambda x : f(g(x))
-    return reduce(compose, func, initial= lambda x: x)
+    return reduce(compose, func, lambda x: x)
 
 
 @dataclass
@@ -282,7 +282,7 @@ class VectorSpace:
         ) for (dzi, zi) in zip(dz, z)]
         for (dyi, yi) in zip(dy, y)]
         for (dxi, xi) in zip(dx,x)]
-        return cls(_vector_elements = np.array(elements))
+        return cls(vector_elements = np.array(elements))
 
 
 @dataclass

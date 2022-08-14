@@ -37,6 +37,10 @@ def smear_simulated_intensity(unsmeared_intensity: np.ndarray, simulated_qx: np.
         qy_array = simulated_qy
     )
 
+def set_unsmeared_intensity(unsmeared_intensity: np.ndarray, simulated_qx: np.ndarray, simulated_qy: np.ndarray, simulated_detector: SimulatedDetectorImage) -> np.ndarray:
+    simulated_detector.simulated_intensity = unsmeared_intensity
+    return unsmeared_intensity
+
 def intensity_calculator(box_list: List[Box], result_calculator: ResultCalculator, simulation_params: SimulationParams, polarization: Polarization) -> np.ndarray:
     rescale_factor = simulation_params.get_value(NUCLEAR_RESCALE, default=1.0)
     magnetic_rescale = simulation_params.get_value(MAGNETIC_RESCALE, default=1.0)
@@ -56,7 +60,9 @@ def intensity_calculator_no_smearer(detector: SimulatedDetectorImage, box_list: 
     result_calculator = result_calculator_maker(detector)
     result_calculator.qx_array = detector.qX
     result_calculator.qy_array = detector.qY
-    return create_intensity_calculator(box_list, result_calculator, detector.polarization)
+    intensity_calculator_fn = create_intensity_calculator(box_list, result_calculator, detector.polarization)
+    intensity_setter = lambda simulated_intensity: set_unsmeared_intensity(simulated_intensity, detector.qX, detector.qY, detector)
+    return lambda simulated_params : intensity_setter(intensity_calculator_fn(simulated_params))
 
 def total_chi_squared(experimental_intensity: np.ndarray, simulated_intensity: np.ndarray, experimental_uncertainty: np.ndarray, mask: np.ndarray) -> Tuple[float, float]:
     reduced_array = np.where(mask, (experimental_intensity - simulated_intensity)**2 / experimental_uncertainty**2, 0)

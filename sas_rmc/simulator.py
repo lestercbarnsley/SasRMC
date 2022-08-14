@@ -85,12 +85,8 @@ class MemorizedSimulator(Simulator):
     simulation: ScatteringSimulation
     box_list: List[Box]
     state_command: commands.Command = field(init = False, default_factory=lambda : None)
-    #state_controller: Controller = field(init = False, default_factory=Controller)
 
     def compute_states(self) -> None:
-        '''if self.state_controller.ledger:
-            latest_state_command = self.state_controller.ledger[-1]
-            latest_state_command.execute()'''
         if self.state_command:
             self.state_command.execute()
         else:
