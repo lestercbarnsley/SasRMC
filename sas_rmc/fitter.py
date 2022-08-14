@@ -58,10 +58,11 @@ def intensity_calculator_and_smearer_from_detector(detector: SimulatedDetectorIm
 
 def intensity_calculator_no_smearer(detector: SimulatedDetectorImage, box_list: List[Box], result_calculator_maker: Callable[[DetectorImage], ResultCalculator]):
     result_calculator = result_calculator_maker(detector)
-    result_calculator.qx_array = detector.qX
-    result_calculator.qy_array = detector.qY
+    qX, qY, shadow_factor = detector.qX, detector.qY, detector.shadow_factor
+    result_calculator.qx_array = qX
+    result_calculator.qy_array = qY
     intensity_calculator_fn = create_intensity_calculator(box_list, result_calculator, detector.polarization)
-    intensity_setter = lambda simulated_intensity: set_unsmeared_intensity(simulated_intensity, detector.qX, detector.qY, detector)
+    intensity_setter = lambda simulated_intensity: set_unsmeared_intensity(simulated_intensity * shadow_factor, qX, qY, detector)
     return lambda simulated_params : intensity_setter(intensity_calculator_fn(simulated_params))
 
 def total_chi_squared(experimental_intensity: np.ndarray, simulated_intensity: np.ndarray, experimental_uncertainty: np.ndarray, mask: np.ndarray) -> Tuple[float, float]:

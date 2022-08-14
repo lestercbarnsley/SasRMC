@@ -143,7 +143,7 @@ class Particle(ABC):
         return self._magnetization
 
     @abstractmethod
-    def set_magnetization(self, magnetization: Vector) -> None:
+    def set_magnetization(self, magnetization: Vector):
         pass
 
     def is_inside(self, position: Vector) -> bool:
@@ -246,7 +246,7 @@ class SphericalParticle(Particle):
         sphere_list = [sphere.change_position(position) for sphere in self.shapes]
         return self._change_shapes(sphere_list)
 
-    def set_magnetization(self, magnetization: Vector) -> None:
+    def set_magnetization(self, magnetization: Vector) -> Particle:
         return type(self).gen_from_parameters(
             position=self.position,
             magnetization=magnetization,
@@ -355,11 +355,11 @@ class CoreShellParticle(Particle):
     def position(self) -> Vector:
         return super().position
 
-    def set_position(self, position: Vector):
+    def set_position(self, position: Vector) -> Particle:
         spheres = [sphere.change_position(position) for sphere in self.shapes]
         return self._change_shapes(spheres)
 
-    def set_magnetization(self, magnetization: Vector):
+    def set_magnetization(self, magnetization: Vector) -> Particle:
         return CoreShellParticle.gen_from_parameters(
             position=self.position,
             magnetization=magnetization,
