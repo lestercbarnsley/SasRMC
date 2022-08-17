@@ -227,7 +227,7 @@ def command_factory(nominal_step_size: float, box: Box, particle_index: int, tem
         command_choices.append(rotate_particle)
     if magnetic_simulation:
         command_choices.extend([
-            rescale_single_magnetization, 
+            #rescale_single_magnetization, 
             rotate_magnetization,
             rotate_magnetization_large,
             flip_single_magnetization,

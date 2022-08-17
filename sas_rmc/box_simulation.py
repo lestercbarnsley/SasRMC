@@ -59,23 +59,30 @@ class Box:
 
     def move_inside_box(self, i: int, in_plane: bool = False) -> None:
         particle = self.particles[i]
-        position = self.cube.random_position_inside()
-        if in_plane:
-            self.particles[i] = particle.set_position(Vector(position.x, position.y, z = 0)).set_orientation(Vector.random_vector_xy())
-        else:
-            self.particles[i] = particle.set_position(position).set_orientation(Vector.random_vector())
-            
+        position_factory = lambda : self.cube.random_position_inside()
+        position_setter = (lambda position : Vector(position.x, position.y, z = 0)) if in_plane else (lambda position : position)
+        orientation = Vector.random_vector_xy() if in_plane else Vector.random_vector()
+        self.particles[i] = particle.set_position(position_setter(position_factory())).set_orientation(orientation)
+        
     def _force_particle_inside_box(self, i, half_test = False, in_plane = False) -> None:
         for _ in range(100000):
             if not self.wall_or_particle_collision(i, half_test=half_test):
                 return
             self.move_inside_box(i, in_plane=in_plane)
+            '''if alpha > 4:
+                print('throw attempt', alpha)'''
         raise Exception("Failed to find unexcluded particle configuration. Try lowering number of particles in box")
         
     def force_inside_box(self, in_plane: bool = False) -> None:
         for i, _ in enumerate(self.particles):
-            self._force_particle_inside_box(i, half_test=False, in_plane=in_plane)
-            
+            get_i_position = lambda box : box.particles[i].position
+            while not self.is_inside(get_i_position(self)):
+                self.move_inside_box(i, in_plane=in_plane)
+            detect_collision = lambda j : False if i == j else self.particles[i].collision_detected(self.particles[j])
+            while any(detect_collision(j) for j, _ in enumerate(self.particles)):
+                self.move_inside_box(i, in_plane=in_plane)
+            #self._force_particle_inside_box(i, half_test=False, in_plane=in_plane)
+
     def collision_test(self) -> bool:
         return any(self.wall_or_particle_collision(i, half_test=True) for i, _ in enumerate(self.particles))
      

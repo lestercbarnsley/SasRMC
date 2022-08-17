@@ -7,7 +7,7 @@ from typing import Callable, List, Protocol
 import yaml
 import pandas as pd
 
-from .simulator import Simulator
+from .simulator import Simulator, timeit
 from .box_simulation import Box
 from .detector import DetectorImage
 from .logger import Logger
@@ -62,7 +62,7 @@ class Runner(Protocol):
     def run(self) -> None:
         pass
 
-
+@timeit
 def rmc_runner_factory(input_config_source: Path, output_path: Path) -> RmcRunner:
     print(f"Loading configuration from {input_config_source}, please wait a moment...")
     dataframes = pd.read_excel(

@@ -286,6 +286,7 @@ class DetectorImage:
 
     @staticmethod
     def plot_intensity_matrix(intensity_matrix, qx, qy , log_intensity = True, show_crosshair = True, levels = 30, cmap = 'jet', show_fig: bool = True) -> Figure:
+        # Note to self, maybe replace this with pcolormesh
         fig, ax = plt.subplots()
         range_arr = lambda arr: np.max(arr) - np.min(arr)
         aspect_ratio = range_arr(qx) / range_arr(qy)

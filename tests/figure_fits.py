@@ -421,6 +421,7 @@ def figure_particle_maps():
     )
     print(levels)
     
+    sector_angle = PI/20
 
     
     for c, angle, factor in zip(['b', 'r', 'k', 'g'], [0, PI/6, 2*PI/6, 3*PI/6], [10**0, 10**2, 10**4, 10**6]):
@@ -428,7 +429,7 @@ def figure_particle_maps():
             detector.experimental_intensity * detector.shadow_factor,
             detector.qX,
             detector.qY,
-            sector = (angle, PI / 10)
+            sector = (angle, sector_angle)
         )
         '''q_unsmeared = q_unsmeared[radial_average_unsmeared > 0]
         radial_average_smeared = radial_average_unsmeared[radial_average_unsmeared > 0]'''
@@ -439,7 +440,7 @@ def figure_particle_maps():
             detector.simulated_intensity * detector.shadow_factor,
             detector.qX,
             detector.qY,
-            sector = (angle, PI / 10)
+            sector = (angle, sector_angle)
         )
         '''q_unsmeared = q_unsmeared[radial_average_unsmeared > 0]
         radial_average_smeared = radial_average_unsmeared[radial_average_unsmeared > 0]'''
@@ -518,7 +519,7 @@ def figure_particle_maps():
         ax6.loglog(
             q_smeared, factor * radial_average_smeared, c + '.'
         )
-        
+        np.savetxt(file_maker(f"smeared_profile_{angle}", ".txt"), np.array([(q, smear_i) for q, smear_i in zip(q_smeared, radial_average_smeared)]))
         q_smeared, radial_average_smeared = radial_average(
             smeared_detector.simulated_intensity * smeared_detector.shadow_factor,
             smeared_detector.qX,
@@ -713,12 +714,12 @@ def figure_polarization():
     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
 
     detector_up = SimulatedDetectorImage.gen_from_txt(
-        file_location=r'J:\Uni\Programming\SANS_Numerical_Simulation_v2\Results\Analyzed data\F20_Up_simulated.txt',
+        file_location=r"J:\Uni\Programming\SasRMC\data\results\F20_Up_simulated_revised.txt",
         skip_header=1,
     )
 
     detector_down = SimulatedDetectorImage.gen_from_txt(
-        file_location=r"J:\Uni\Programming\SANS_Numerical_Simulation_v2\Results\Analyzed data\F20_Down_simulated.txt",
+        file_location=r"J:\Uni\Programming\SasRMC\data\results\F20_Down_simulated_revised.txt",
         skip_header=1,
     )
 
@@ -779,93 +780,6 @@ def figure_polarization():
     fig.tight_layout()
 
 
-    fig_2, (ax5,ax6,ax7) = plt.subplots(1,3)
-    fig_2.set_size_inches((3.5 * 3,3 * 1))
-
-    q, fn, cross, fm, fn_err, cross_err, fm_err = unpol_analysis(
-        detector_up,
-        detector_down,
-        intensity_getter= lambda d: d.intensity
-    )
-
-    q_sim, fn_sim, cross_sim, fm_sim, fn_sim_err, cross_sim_err, fm_sim_err = unpol_analysis(
-        detector_up,
-        detector_down,
-        intensity_getter= lambda d: d.simulated_intensity
-    )
-
-    
-    
-    angle_subfigure(ax5, detector_up, detector_down)
-    ax5.text(0.05, 0.92, r'(a)', color = "black", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=ax5.transAxes)
-    
-
-   
-    ax6.errorbar(
-        q, fn, yerr = fn_err, ecolor = 'lightgray', capsize = 5
-    )
-    ax6.loglog(
-        q, fn, 'b.'
-    )
-    ax6.errorbar(
-        q, cross, yerr = cross_err, ecolor = 'lightgray', capsize = 5
-    )
-    ax6.loglog(
-        q, cross, 'r.'
-    )
-    ax6.errorbar(
-        q, fm, yerr = fm_err, ecolor = 'lightgray', capsize = 5
-    )
-    ax6.loglog(
-        q, fm, 'g.'
-    )
-    ax6.loglog(
-        q_sim, fn_sim, 'b-'
-    )
-    ax6.loglog(
-        q_sim, cross_sim, 'r-'
-    )
-    ax6.loglog(
-        q_sim, fm_sim, 'g-'
-    )
-
-    ax6.set_xlabel(r'Q ($\AA^{-1}$)',fontsize =  FONT_SIZE)#'x-large')
-    ax6.set_ylabel(r'Intensity (cm$^{-1}$)',fontsize =  FONT_SIZE)#'x-large')
-    bottom, top = ax6.get_ylim()
-    ax6.set_ylim(bottom, 9 * top)
-
-    ax6.text(0.05, 0.92, r'(b)', color = "black", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=ax6.transAxes)
-    
-    #fig_2.set_size_inches((4 * 3,3 * 1))
-
-    magnetic_particle_configs = np.genfromtxt(
-        fname = r"J:\Uni\Programming\SANS_Numerical_Simulation_v2\Results\Analyzed data\Final_magnetic_particle_states.txt",
-        skip_header = 1
-    )
-    pos_x, pos_y, mag_x, mag_y, volume = magnetic_particle_configs[:,2], magnetic_particle_configs[:,3], magnetic_particle_configs[:,8], magnetic_particle_configs[:,9], magnetic_particle_configs[:,11]
-    radius = (3 * volume / (4*PI)) ** (1/3)
-    a_x, a_y = radius* mag_x / np.sqrt(mag_x**2 + mag_y**2), radius* mag_y / np.sqrt(mag_x**2 + mag_y**2)
-    ax7.scatter(pos_x / 10, pos_y / 10, s = 2 * (radius/10)**1, facecolors='none', edgecolors='b')
-    ARROW_MAGNIFIER = 3
-    for x, y, dx, dy in zip(pos_x, pos_y, a_x, a_y):
-        ax7.arrow(x/10, y/10,ARROW_MAGNIFIER * dx/10,ARROW_MAGNIFIER* dy/10,
-        color= 'r', width = 3,head_width = 5 * 3)
-
-    ax7.set_xlabel(r'X (nm)',fontsize =  FONT_SIZE)#'x-large')
-    ax7.set_ylabel(r'Y (nm)',fontsize =  FONT_SIZE)#'x-large')
-    
-    left, right = ax7.get_xlim()
-    bottom, top = ax7.get_xlim()
-
-    new_lims = -500, +500#np.min([left, down]), np.max([up, right])
-
-    ax7.set_xlim(new_lims[0], new_lims[1])
-    ax7.set_ylim(new_lims[0], new_lims[1])
-    ax7.text(0.05, 0.92, r'(c)', color = "black", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=ax7.transAxes)
-    
-    ax7.set_box_aspect(1)
-
-    fig_2.tight_layout()
 
     
     fig.savefig(file_maker("polarization_fig", ".eps"))
@@ -942,9 +856,9 @@ def read_simulation_output(file_path: Path) -> Tuple[List[DetectorImage], List[B
 
 def figure_polarization_v2():
 
-    fig, (ax1,ax2,ax3) = plt.subplots(1,3)
-    fig.set_size_inches((3.5 * 3,3 * 1))
-    _, box_list, simulation_params = read_simulation_output(r"J:\Uni\Programming\SasRMC\data\results\20220503204445_this_is_a_test.xlsx")
+    fig, (ax1, ax2) = plt.subplots(1, 2) #plt.subplots(1,3)
+    fig.set_size_inches((4 * 2,3 * 1))
+    _, box_list, simulation_params = read_simulation_output(r"J:\Uni\Programming\SasRMC\data\results\20220814174915_this_is_an_example.xlsx")
     #qx_large, qy_large = np.meshgrid(np.linspace(-0.5, +0.5, 400),np.linspace(-0.5, +0.5, 400))
     config_20m_down = DetectorConfig(
         detector_distance_in_m=20,
@@ -1176,8 +1090,12 @@ def figure_polarization_v2():
     mag_y = get_from_box_list(lambda particle: particle.magnetization.y)
     radius = get_from_box_list(lambda particle: particle.shapes[1].radius)
 
-    
+    angles = get_from_box_list(lambda particle : np.abs(np.arctan2(particle.magnetization.x, particle.magnetization.y)))
 
+    #count = np.sum(get_from_box_list(lambda particle : 1))
+    
+    fig2, (ax3, ax4) = plt.subplots(1, 2) #plt.subplots(1,3)
+    fig2.set_size_inches((4 * 2,4 * 1))
     #pos_x, pos_y, mag_x, mag_y, radius = [particle.position.x, particle.po for particle in box_list[0].particles]magnetic_particle_configs[:,2], magnetic_particle_configs[:,3], magnetic_particle_configs[:,8], magnetic_particle_configs[:,9], magnetic_particle_configs[:,11]
     a_x, a_y = radius* mag_x / np.sqrt(mag_x**2 + mag_y**2), radius* mag_y / np.sqrt(mag_x**2 + mag_y**2)
     ax3.scatter(pos_x / 10, pos_y / 10, s = 2 * (radius/10)**1, facecolors='none', edgecolors='b')
@@ -1196,14 +1114,36 @@ def figure_polarization_v2():
 
     ax3.set_xlim(new_lims[0], new_lims[1])
     ax3.set_ylim(new_lims[0], new_lims[1])
-    ax3.text(0.05, 0.92, r'(c)', color = "black", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=ax3.transAxes)
+    ax3.text(0.05, 0.92, r'(a)', color = "black", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=ax3.transAxes)
     
     ax3.set_box_aspect(1)
+
+    
+
+    
+    ax4.hist(angles, bins = 11, edgecolor = 'black', linewidth=1.2)
+    ax4.set_ylim(0, 60)
+    ax4.set_ylabel(r'Particles', fontsize = FONT_SIZE)
+    ax4.set_xlabel(r'Magnetization angle (rad)', fontsize = FONT_SIZE)
+    x_ticks = [i * PI/10 for i in range(6)]# + [PI/2]
+    ax4.set_xticks(x_ticks)
+    ax4.set_xticklabels([str(x_tick / PI) + r'$\pi$' for x_tick in x_ticks])
+    ax4.text(0.05, 0.92, r'(b)', color = "black", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=ax4.transAxes)
+    ax4.set_box_aspect(1)
+
 
     fig.tight_layout()
 
     fig.savefig(file_maker("magnetization_fig", ".eps"))
     fig.savefig(file_maker("magnetization_fig", ".pdf"))
+
+    
+    fig2.tight_layout()
+
+    fig2.savefig(file_maker("magnetization_dist_fig", ".eps"))
+    fig2.savefig(file_maker("magnetization_dist_fig", ".pdf"))
+    #plt.hist(angles, bins = 10)
+    #plt.show()
 
 def quick_test(): # Add to version control then delete
     box_writer = BoxWriter.standard_box_writer()
@@ -1218,10 +1158,10 @@ def quick_test(): # Add to version control then delete
 
 def main():
     #figure_form_factors()
-    #figure_particle_maps()
+    figure_particle_maps()
     #figure_algorithm_performance()
     #figure_polarization()
-    figure_polarization_v2()
+    #figure_polarization_v2()
     #quick_test()
 
 if __name__ == "__main__":
