@@ -44,6 +44,20 @@ def default_detector_image() -> SimulatedDetectorImage:
     detector_image = SimulatedDetectorImage.gen_from_txt(FILE, DETECTOR_CONFIG_C14D14)
     return detector_image
 
+def box_from_detector(detector_list: DetectorImage, particle_list: List[Particle]) -> Box:
+    dimension_0 = np.max([2 * PI / detector.qx_delta for detector in detector_list])
+    dimension_1 = np.max([2 * PI / detector.qy_delta for detector in detector_list])
+    dimension_2 = dimension_0
+    return Box(
+        particles=particle_list,
+        cube = Cube(
+            dimension_0=dimension_0,
+            dimension_1=dimension_1,
+            dimension_2=dimension_2
+        )
+    )
+
+
 def show_particle(particle: ParticleNumerical, numerical_calculator: NumericalCalculator):
     xy_axis = 2
     #sld = particle.sld_from_vector_space()
@@ -92,7 +106,7 @@ def intensity_at_qxqy(intensity_array, qx_array, qy_array, qx_i, qy_i):
     return np.average(interpolator(qx_i, qy_i))
     
 
-def radial_average(i_array: np.ndarray, qx_array: np.ndarray, qy_array: np.ndarray, sector: Tuple[float, float] = (0, np.inf)):
+def radial_average(i_array: np.ndarray, qx_array: np.ndarray, qy_array: np.ndarray, sector: Tuple[float, float] = (0, np.inf), num_of_angles = 180):
     q_mod = np.sqrt(qx_array**2 + qy_array**2)
 
     
@@ -103,7 +117,7 @@ def radial_average(i_array: np.ndarray, qx_array: np.ndarray, qy_array: np.ndarr
         )
     
     def i_of_q(q_c):
-        angles = np.linspace(-PI, +PI, num = 180)
+        angles = np.linspace(-PI, +PI, num = num_of_angles)
         sector_filter = np.abs(angles - sector[0]) < sector[1] / 2
         qx, qy = q_c * np.cos(angles)[sector_filter], q_c * np.sin(angles)[sector_filter]
         
@@ -245,6 +259,7 @@ def figure_form_factors():
         )
     )'''
     detector = default_detector_image()
+    box = box_from_detector([detector], [core_shell_particle])
     qx, qy = detector.qX, detector.qY
     numerical_calculator = NumericalCalculator(qx_array=qx, qy_array=qy, vector_space=VectorSpace.gen_from_bounds(
             x_min = -160, x_max= 160, x_num = 40,
@@ -268,7 +283,8 @@ def figure_form_factors():
 
     #form_array = core_shell_particle.form_array(qx, qy, orientation=Vector(0,0,1))
     form_array = numerical_calculator.form_result(core_shell_particle).form_nuclear
-    axs[0,1].contourf(qx, qy, mod(form_array), levels = 20)
+    intensity = box_intensity_average([box], numerical_calculator)
+    axs[0,1].contourf(qx, qy, intensity, levels = 20)
     #axs[0,1].set_xlabel(r'Q$_{x}$ ($\AA^{-1}$)',fontsize =  FONT_SIZE)#, fontsize=10)
     axs[0,1].set_ylabel(r'Q$_{y}$ ($\AA^{-1}$)',fontsize =  FONT_SIZE)#, fontsize='medium')
     axs[0,1].xaxis.set_ticklabels([])
@@ -282,7 +298,7 @@ def figure_form_factors():
         ))
     #form_array_2 = core_shell_particle.form_array(qx_large, qy_large, orientation=Vector(0,0,1))
     form_array_2 = numerical_calculator_large.form_result(core_shell_particle).form_nuclear
-    i_array = mod(form_array_2)
+    i_array = box_intensity_average([box], numerical_calculator_large)#mod(form_array_2)
     #q = np.linspace(2e-3, 4e-1, num  = 300)
     
     
@@ -292,13 +308,15 @@ def figure_form_factors():
     i_1d = i_1d[q < 4e-1]
     q = q[q < 4e-1]
 
-    i_core_shell = mod(core_shell_particle.form_array(q, np.zeros(q.shape), orientation=Vector.null_vector()))
+    analytical_calculator = AnalyticalCalculator(q, 0 * q)
 
+    #i_core_shell = mod(core_shell_particle.form_array(q, np.zeros(q.shape), orientation=Vector.null_vector()))
+    i_core_shell = box_intensity_average([box], analytical_calculator)
 
-    axs[0,2].loglog(q, i_core_shell / np.max(i_core_shell), 'r-', label = "Analytical")
-    axs[0,2].loglog(q, i_1d / np.max(i_1d), 'b.', label = "Numerical")
+    axs[0,2].loglog(q, i_core_shell , 'r-', label = "Analytical")
+    axs[0,2].loglog(q, i_1d , 'b.', label = "Numerical")
     #axs[0,2].set_xlabel(r'Q ($\AA^{-1}$)',fontsize =  FONT_SIZE)
-    axs[0,2].set_ylabel(r'I/I$_{0}$',fontsize =  FONT_SIZE)
+    axs[0,2].set_ylabel(r'Intensity (cm$^{-1}$)',fontsize =  FONT_SIZE)
     axs[0,2].xaxis.set_ticklabels([])
     bottom, top = axs[0,2].get_ylim()
     axs[0,2].set_ylim(bottom, top * 4)
@@ -324,9 +342,12 @@ def figure_form_factors():
     axs[1,0].text(0.05, 0.05, 'Dumbbell particle', color = "white", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=axs[1,0].transAxes)
     
     #form_array = dumbell_particle.form_array(qx, qy, orientation=Vector(0,0,1))
-    form_array = numerical_calculator.form_result(dumbell_particle).form_nuclear
+    box = box_from_detector([detector], [dumbell_particle])
     
-    axs[1,1].contourf(qx, qy, mod(form_array), levels = 20)
+    #form_array = numerical_calculator.form_result(dumbell_particle).form_nuclear
+    intensity = box_intensity_average([box], numerical_calculator)
+    
+    axs[1,1].contourf(qx, qy, intensity, levels = 20)
     axs[1,1].set_xlabel(r'Q$_{x}$ ($\AA^{-1}$)',fontsize =  FONT_SIZE)#, fontsize=10)
     axs[1,1].set_ylabel(r'Q$_{y}$ ($\AA^{-1}$)',fontsize =  FONT_SIZE)#, fontsize='medium')
     axs[1,1].text(0.05, 0.95, '(e)', color = "white", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=axs[1,1].transAxes)
@@ -335,7 +356,7 @@ def figure_form_factors():
     #form_array_2 = dumbell_particle.form_array(qx_large, qy_large, orientation=Vector(0,0,1))
     form_array_2 = numerical_calculator_large.form_result(dumbell_particle).form_nuclear
     
-    i_array = mod(form_array_2)
+    i_array = box_intensity_average([box], numerical_calculator_large)
 
     
 
@@ -348,15 +369,15 @@ def figure_form_factors():
     i_1d = i_1d[q < 4e-1]
     q = q[q < 4e-1]
 
-    popt, pcov = optimize.curve_fit(guinier_model, q, i_1d /np.max(i_1d), p0= [1, 100], method='lm')
+    popt, pcov = optimize.curve_fit(guinier_model, q, i_1d, p0= [1, 100], method='lm')
     print(popt, pcov)
 
     fitted_i_0, fitted_rg = popt
 
     axs[1,2].loglog(q[q * fitted_rg < (1.3 * 3)], guinier_model(q, fitted_i_0, fitted_rg)[q * fitted_rg < (1.3 * 3)], 'r-', label = "Guinier")
-    axs[1,2].loglog(q, i_1d / np.max(i_1d), 'b.', label = "Numerical")
+    axs[1,2].loglog(q, i_1d , 'b.', label = "Numerical")
     axs[1,2].set_xlabel(r'Q ($\AA^{-1}$)',fontsize =  FONT_SIZE)
-    axs[1,2].set_ylabel(r'I/I$_{0}$',fontsize =  FONT_SIZE)
+    axs[1,2].set_ylabel(r'Intensity (cm$^{-1}$)',fontsize =  FONT_SIZE)
     bottom, top = axs[1,2].get_ylim()
     axs[1,2].set_ylim(bottom, top * 4)
     axs[1,2].text(0.05, 0.95, '(f)', color = "black", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=axs[1,2].transAxes)
@@ -375,13 +396,53 @@ def intensity_matrix_from_detector(detector: SimulatedDetectorImage):
     intensity_matrix = np.where(detector.qX < 0, detector.experimental_intensity, detector.simulated_intensity * detector.shadow_factor)
     return np.log(intensity_matrix)
 
+def detector_image(ax, qx, qy, intensity, title: str, letter: str, levels = None):
+    levels = levels if levels is not None else np.linspace(np.min(intensity[~np.isinf(intensity)]), np.max(intensity[~np.isinf(intensity)]), num=30)
+    ax.contourf(qx, qy, intensity, levels = levels, cmap = 'jet')
+    ax.set_ylabel(r'Q$_{y}$ ($\AA^{-1}$)',fontsize =  FONT_SIZE)
+    ax.text(0.025, 0.05, "Experiment",fontsize =  FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=ax.transAxes)
+    ax.text(0.975, 0.05, "Simulation",fontsize =  FONT_SIZE,horizontalalignment='right', verticalalignment='center', transform=ax.transAxes)
+    ax.text(0.975, 0.95, title, color = "black", fontsize = FONT_SIZE,horizontalalignment='right', verticalalignment='center', transform=ax.transAxes)
+    ax.text(0.05, 0.95, letter, color = "black", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=ax.transAxes)
+    
+def particle_positions(ax, positions, letter, x_lims, y_lims):
+    ax.plot(positions[:,0] /10, positions[:,1] /10, 'b.') 
+    ax.set_ylabel(r'Y (nm)',fontsize =  FONT_SIZE)
+    ax.text(0.05, 0.95, letter, color = "black", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=ax.transAxes)
+    ax.set_xlim(np.min(x_lims), np.max(x_lims))
+    ax.set_ylim(np.min(y_lims), np.max(y_lims))
+
+def share_lims(axs, ax_getter, ax_setter):
+    ax_lims = np.array([ax_getter(ax) for ax in axs])
+    new_ax = np.min(ax_lims[:,0]), np.max(ax_lims[:,1])
+    for ax in axs:
+        ax_setter(ax, new_ax)
+
+def profiles(ax, experimental_average_fn, simulated_average_fn, sector_tuples, letter: str, factor_difference = 100):
+    for i, sector_tuple in enumerate(sector_tuples):
+        factor = factor_difference**i
+        angle, col = sector_tuple
+        q, sector_average = experimental_average_fn(angle)
+        ax.loglog(
+            q[sector_average > 0], factor * sector_average[sector_average > 0], col + '.'
+            )
+        q_sim, sector_average_sim = simulated_average_fn(angle)
+        ax.loglog(
+            q_sim[sector_average_sim > 0], factor * sector_average_sim[sector_average_sim > 0], col + '-'
+        )
+    ax.set_ylabel(r'Intensity (cm$^{-1}$)',fontsize =  FONT_SIZE)
+    ax.text(0.05, 0.95, letter, color = "black", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=ax.transAxes)
+
+def box_to_position_array(box: Box) -> np.ndarray:
+    return np.array([[particle.position.x, particle.position.y] for particle in box.particles])
+
 def figure_particle_maps():
     #from matplotlib.gridspec import GridSpec
 
-    fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3)
+    fig, ((ax1, ax2, ax3), (ax4, ax5, ax6), (ax7, ax8, ax9)) = plt.subplots(3, 3)
 
     
-    fig.set_size_inches((4 * 3,3.5 * 2))
+    fig.set_size_inches((4.2 * 3,3.5 * 3))
 
     unsmeared_positions = np.genfromtxt(
         fname = r"J:\Uni\Programming\SANS_Numerical_Simulation_v2\Results\Analyzed data\Unsmeared_particle_positions.txt",
@@ -406,6 +467,9 @@ def figure_particle_maps():
     
     smeared_intensity_matrix = intensity_matrix_from_detector(smeared_detector)
 
+    saxs_detectors, saxs_boxes, _ = read_simulation_output(r"J:\Uni\Programming\SasRMC\data\results\20220818211718_this_is_a_test.xlsx")
+    saxs_detector = saxs_detectors[0]
+
     def of_two_arrays(a, b, func):
         def clean_and_process_data(arr):
             a_1 = arr[~np.isnan(arr)]
@@ -420,134 +484,60 @@ def figure_particle_maps():
         num  = 30
     )
     print(levels)
-    
-    sector_angle = PI/20
 
+    detector_image(ax1, detector.qX, detector.qY, intensity_matrix, title = "SANS no smearing", letter = "(a)", levels = levels)
+    detector_image(ax4, smeared_detector.qX, smeared_detector.qY, smeared_intensity_matrix, title = "SANS with smearing", letter = "(d)", levels = levels)
+    detector_image(ax7, saxs_detector.qX, saxs_detector.qY, intensity_matrix_from_detector(saxs_detector),title = "SAXS no smearing", letter = "(g)")
     
-    for c, angle, factor in zip(['b', 'r', 'k', 'g'], [0, PI/6, 2*PI/6, 3*PI/6], [10**0, 10**2, 10**4, 10**6]):
-        q_unsmeared, radial_average_unsmeared = radial_average(
-            detector.experimental_intensity * detector.shadow_factor,
-            detector.qX,
-            detector.qY,
-            sector = (angle, sector_angle)
-        )
-        '''q_unsmeared = q_unsmeared[radial_average_unsmeared > 0]
-        radial_average_smeared = radial_average_unsmeared[radial_average_unsmeared > 0]'''
-        ax3.loglog(
-            q_unsmeared[radial_average_unsmeared > 0], factor * radial_average_unsmeared[radial_average_unsmeared > 0], c + '.'
-        )
-        q_unsmeared, radial_average_unsmeared = radial_average(
-            detector.simulated_intensity * detector.shadow_factor,
-            detector.qX,
-            detector.qY,
-            sector = (angle, sector_angle)
-        )
-        '''q_unsmeared = q_unsmeared[radial_average_unsmeared > 0]
-        radial_average_smeared = radial_average_unsmeared[radial_average_unsmeared > 0]'''
-        ax3.loglog(
-            q_unsmeared[radial_average_unsmeared > 0], factor * radial_average_unsmeared[radial_average_unsmeared > 0], c + '-'
-        )
-    #ax3.set_xlabel(r'Q ($\AA^{-1}$)',fontsize =  16)
-    ax3.set_ylabel(r'Intensity (cm$^{-1}$)',fontsize =  FONT_SIZE)
-    ax3.text(0.05, 0.95, '(c)', color = "black", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=ax3.transAxes)
-    
-    #radial_average(detector.experimental_intensity, detector.qX, detector.qY, 
+    x_lims = (-14070.66526562795/20, +14070.66526562795/20)
+    y_lims = (-14070.66526562795/20, +14070.66526562795/20)
 
-    #ax1 = fig.add_subplot(gs[0,0])
-    ax1.contourf(detector.qX, detector.qY, intensity_matrix, levels = levels, cmap = 'jet')
-    #ax1.set_xlabel(r'Q$_{x}$ ($\AA^{-1}$)',fontsize =  16)#'x-large')
-    ax1.set_ylabel(r'Q$_{y}$ ($\AA^{-1}$)',fontsize =  FONT_SIZE)
-    ax1.text(0.025, 0.05, "Experiment",fontsize =  FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=ax1.transAxes)
-    ax1.text(0.975, 0.05, "Simulation",fontsize =  FONT_SIZE,horizontalalignment='right', verticalalignment='center', transform=ax1.transAxes)
-    #ax1.text(+0.005, -0.025, "Simulation",fontsize =  FONT_SIZE)
-    ax1.text(0.975, 0.95, "No smearing", color = "black", fontsize = FONT_SIZE,horizontalalignment='right', verticalalignment='center', transform=ax1.transAxes)
-    ax1.text(0.05, 0.95, '(a)', color = "black", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=ax1.transAxes)
-    
-    #ax2 = fig.add_subplot(gs[0,1])
+    particle_positions(ax2, unsmeared_positions, letter = "(b)", x_lims=x_lims, y_lims=y_lims)
+    particle_positions(ax5, smeared_positions, letter = "(e)", x_lims=x_lims, y_lims=y_lims)
+    particle_positions(ax8, box_to_position_array(saxs_boxes[0]), letter = "(h)", x_lims=x_lims, y_lims=y_lims)
 
-    '''axs[0,1].plot(unsmeared_positions[:,0] /10, unsmeared_positions[:,1] /10, 'b.')
-    axs[0,1].set_xlabel(r'X (nm)',fontsize =  16)
-    axs[0,1].set_ylabel(r'Y (nm)',fontsize =  16)'''
-    ax2.plot(unsmeared_positions[:,0] /10, unsmeared_positions[:,1] /10, 'b.')
-    #ax2.set_xlabel(r'X (nm)',fontsize =  16)
-    ax2.set_ylabel(r'Y (nm)',fontsize =  FONT_SIZE)
-    ax2.text(0.05, 0.95, '(b)', color = "black", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=ax2.transAxes)
-    
-    
+
+    sector_angle = 10 * PI/180
+    num_of_angles = 360
+
+    experimental_average_maker = lambda detector : (lambda angle : radial_average(
+        detector.experimental_intensity * detector.shadow_factor,
+        detector.qX,
+        detector.qY,
+        sector = (angle, sector_angle ),
+        num_of_angles=num_of_angles)
+        )
+    simulatated_average_maker = lambda detector : (lambda angle : radial_average(
+        detector.simulated_intensity * detector.shadow_factor,
+        detector.qX,
+        detector.qY,
+        sector = (angle, sector_angle ),
+        num_of_angles=num_of_angles)
+        )
+
+    sector_tuples = [(0, 'b'), ( PI/6, 'r'), (2*PI/6,'k' ), (3*PI/6,'g' ) ]
+
+    profiles(ax3, experimental_average_maker(detector), simulatated_average_maker(detector), sector_tuples=sector_tuples, letter = "(c)")
+    profiles(ax6, experimental_average_maker(smeared_detector), simulatated_average_maker(smeared_detector), sector_tuples=sector_tuples, letter = "(f)")
+    profiles(ax9, experimental_average_maker(saxs_detector), simulatated_average_maker(saxs_detector), sector_tuples=sector_tuples, letter = "(i)")
+
+    share_lims([ax1, ax4, ax7], ax_getter= lambda ax: ax.get_xlim(), ax_setter=lambda ax, lims : ax.set_xlim(left=lims[0], right=lims[1]))
+    share_lims([ax2, ax5, ax8], ax_getter= lambda ax: ax.get_xlim(), ax_setter=lambda ax, lims : ax.set_xlim(left=lims[0], right=lims[1]))
+    share_lims([ax3, ax6, ax9], ax_getter= lambda ax: ax.get_xlim(), ax_setter=lambda ax, lims : ax.set_xlim(left=lims[0], right=lims[1]))
     
 
-    for ax in (ax1, ax2, ax3):
-        ax.xaxis.set_ticklabels([])
-
-    smeared_positions = np.genfromtxt(
-        fname = r"J:\Uni\Programming\SANS_Numerical_Simulation_v2\Results\Analyzed data\Smeared_particle_positions_200.txt",
-        skip_header = 1
-    )
-    detector = SimulatedDetectorImage.gen_from_txt(
-        file_location=r"J:\Uni\Programming\SANS_Numerical_Simulation_v2\Results\Analyzed data\Smeared_detector_200.txt",
-        skip_header=1,
-    )
-    
-    ax4.contourf(smeared_detector.qX, smeared_detector.qY, smeared_intensity_matrix, levels = levels, cmap = 'jet')
-    ax4.set_xlabel(r'Q$_{x}$ ($\AA^{-1}$)',fontsize =  FONT_SIZE)#'x-large')
-    ax4.set_ylabel(r'Q$_{y}$ ($\AA^{-1}$)',fontsize =  FONT_SIZE)#'x-large')
-    ax4.text(0.025, 0.05, "Experiment",fontsize =  FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=ax4.transAxes)
-    ax4.text(0.975, 0.05, "Simulation",fontsize =  FONT_SIZE,horizontalalignment='right', verticalalignment='center', transform=ax4.transAxes)
-    #ax4.text(-0.025, +0.023, "With smearing",fontsize =  FONT_SIZE)
-    ax4.text(0.975, 0.95, "With smearing", color = "black", fontsize = FONT_SIZE,horizontalalignment='right', verticalalignment='center', transform=ax4.transAxes)
-    ax4.text(0.05, 0.95, '(d)', color = "black", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=ax4.transAxes)
-
-    #ax4 = fig.add_subplot(gs[1, 1])
-    ax5.plot(smeared_positions[:,0] /10, smeared_positions[:,1] /10, 'b.')
-    ax5.set_xlabel(r'X (nm)',fontsize =  FONT_SIZE)
-    ax5.set_ylabel(r'Y (nm)',fontsize =  FONT_SIZE)
-    ax5.text(0.05, 0.95, '(e)', color = "black", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=ax5.transAxes)
-    
-    for ax in ax2, ax5:
-        ax.set_xlim(-14070.66526562795/20, +14070.66526562795/20)
-        ax.set_ylim(-14070.66526562795/20, +14070.66526562795/20)
-  
-    for c, angle, factor in zip(['b', 'r', 'k', 'g'], [0, PI/6, 2*PI/6, 3*PI/6], [10**0, 10**2, 10**4, 10**6]):
-        q_smeared, radial_average_smeared = radial_average(
-            smeared_detector.experimental_intensity * smeared_detector.shadow_factor,
-            smeared_detector.qX,
-            smeared_detector.qY,
-            sector = (angle, PI / 10)
-        )
-        q_smeared = q_smeared[radial_average_smeared > 0]
-        radial_average_smeared = radial_average_smeared[radial_average_smeared > 0]
-        ax6.loglog(
-            q_smeared, factor * radial_average_smeared, c + '.'
-        )
-        np.savetxt(file_maker(f"smeared_profile_{angle}", ".txt"), np.array([(q, smear_i) for q, smear_i in zip(q_smeared, radial_average_smeared)]))
-        q_smeared, radial_average_smeared = radial_average(
-            smeared_detector.simulated_intensity * smeared_detector.shadow_factor,
-            smeared_detector.qX,
-            smeared_detector.qY,
-            sector = (angle, PI / 10)
-        )
-        q_smeared = q_smeared[radial_average_smeared > 0]
-        radial_average_smeared = radial_average_smeared[radial_average_smeared > 0]
-        ax6.loglog(
-            q_smeared, factor * radial_average_smeared, c + '-'
-        )
-        
-    ax6.set_xlabel(r'Q ($\AA^{-1}$)',fontsize =  FONT_SIZE)
-    ax6.set_ylabel(r'Intensity (cm$^{-1}$)',fontsize =  FONT_SIZE)
-    ax6.text(0.05, 0.95, '(f)', color = "black", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=ax6.transAxes)
-    
-    left3, right3 = ax3.get_xlim()
-    left6, right6 = ax6.get_xlim()
-    down3, up3 = ax3.get_ylim()
-    down6, up6 = ax6.get_ylim()
-    for i, ax in enumerate([ax3, ax6]):
-        ax.set_xlim(min(left3, left6), max(right3, right6))
-        ax.set_ylim(min(down3, down6), max(up3, up6))
-        ax.text(0.025, 0.05, ["No smearing", "With smearing"][i], color = "black", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=ax.transAxes)
     
 
     for ax in (ax1, ax2, ax3, ax4, ax5, ax6):
+        ax.xaxis.set_ticklabels([])
+
+
+    for ax in (ax1, ax2, ax3, ax4, ax5, ax6, ax7, ax8, ax9):
         ax.set_box_aspect(1)
+
+    ax7.set_xlabel(r'Q$_{x}$ ($\AA^{-1}$)',fontsize =  FONT_SIZE)
+    ax8.set_xlabel(r'X (nm)',fontsize =  FONT_SIZE)
+    ax9.set_xlabel(r'Q ($\AA^{-1}$)',fontsize =  FONT_SIZE)
 
     ax3.text(0.01, 1, r'0$^{o}$', color = 'b',fontsize =  FONT_SIZE)
     ax3.text(0.01, 200, r'30$^{o}$', color = 'r',fontsize =  FONT_SIZE)
@@ -559,6 +549,11 @@ def figure_particle_maps():
     ax6.text(0.01, 200, r'30$^{o}$', color = 'r',fontsize =  FONT_SIZE)
     ax6.text(0.01, 20000, r'60$^{o}$', color = 'k',fontsize =  FONT_SIZE)
     ax6.text(0.01, 2000000, r'90$^{o}$', color = 'g',fontsize =  FONT_SIZE)
+
+    ax9.text(0.01, 5000, r'0$^{o}$', color = 'b',fontsize =  FONT_SIZE)
+    ax9.text(0.01, 500000, r'30$^{o}$', color = 'r',fontsize =  FONT_SIZE)
+    ax9.text(0.01, 50000000, r'60$^{o}$', color = 'k',fontsize =  FONT_SIZE)
+    ax9.text(0.01, 5000000000, r'90$^{o}$', color = 'g',fontsize =  FONT_SIZE)
 
     fig.tight_layout()
 
@@ -649,15 +644,7 @@ def figure_algorithm_performance():
 def sector_subfigure(ax, detector_up: SimulatedDetectorImage, detector_down: SimulatedDetectorImage):
     unpolarized_intensity = (detector_up.experimental_intensity + detector_down.experimental_intensity) /2
     fn_q, fn_intensity = radial_average(unpolarized_intensity, detector_down.qX, detector_down.qY, sector = (PI/2, PI/10))
-    '''difference_intensity = detector_up.experimental_intensity - detector_down.experimental_intensity
-    #plt.imshow(np.log(difference_intensity))
-    #plt.show()
-    cross_q, cross_intensity = radial_average(difference_intensity, detector_down.qX, detector_down.qY, sector = (0, PI/10))
-    fnfm_intensity = cross_intensity / 4
-    fm_q, fnaddfm_intensity = radial_average(unpolarized_intensity, detector_down.qX, detector_down.qY, sector=(0, PI/10))
-    q_up, i_up = radial_average(detector_up.experimental_intensity, detector_up.qX, detector_up.qY, sector=(0, PI/10))
-    fm_intensity  = fnaddfm_intensity - fn_intensity'''
-    #fm_intensity = fnfm_intensity**2 / fn_intensity
+    
     up_q, up_intensiyt = radial_average(detector_up.experimental_intensity, detector_up.qX, detector_up.qY, sector = (0, PI/10))
     down_q, down_intensiyt = radial_average(detector_down.experimental_intensity, detector_down.qX, detector_down.qY, sector = (0, PI/10))
     b_term = up_intensiyt - fn_intensity
@@ -802,20 +789,9 @@ def row_to_particle(row: pd.Series) -> Particle:
 def dataframe_to_particle_list(data_frame: pd.DataFrame) -> List[Particle]:
     return [row_to_particle(row) for _, row in data_frame.iterrows()]
 
-def box_from_detector(detector_list: DetectorImage, particle_list: List[Particle]) -> Box:
-    dimension_0 = np.max([2 * PI / detector.qx_delta for detector in detector_list])
-    dimension_1 = np.max([2 * PI / detector.qy_delta for detector in detector_list])
-    dimension_2 = dimension_0
-    return Box(
-        particles=particle_list,
-        cube = Cube(
-            dimension_0=dimension_0,
-            dimension_1=dimension_1,
-            dimension_2=dimension_2
-        )
-    )
 
-def read_simulation_output(file_path: Path) -> Tuple[List[DetectorImage], List[Box], SimulationParams]:
+
+def read_simulation_output(file_path: Path) -> Tuple[List[SimulatedDetectorImage], List[Box], SimulationParams]:
     data_dict = pd.read_excel(
         file_path,
         sheet_name=None,
@@ -827,7 +803,7 @@ def read_simulation_output(file_path: Path) -> Tuple[List[DetectorImage], List[B
         if key not in data_dict:
             break
         else:
-            detector_list.append(DetectorImage.gen_from_pandas(
+            detector_list.append(SimulatedDetectorImage.gen_from_pandas(
                 dataframe=data_dict[key]))
     box_list = []
     for j in range(100_000):

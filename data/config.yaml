@@ -1,6 +1,6 @@
 # SasRMC config file.
 
-input_config_source : CoreShell Simulation Input - Copy - Copy.xlsx # CoreShell SAXS.xlsx #CoreShell_F20_pol - Copy.xlsx # CoreShell Simulation Input - Copy.xlsx # CoreShell Simulation Input - Copy - Copy.xlsx #
+input_config_source : 001821_001221_copy.xlsx #CoreShell Simulation Input - Copy - Copy.xlsx # CoreShell SAXS.xlsx #CoreShell_F20_pol - Copy.xlsx # CoreShell Simulation Input - Copy.xlsx # CoreShell Simulation Input - Copy - Copy.xlsx #
 
 # The default file type for input_config_source is an Excel spreadsheet that contains the configuration for your simulation.
 # If you need a new, empty config file, you can generate one by specifying one of the following commands next to input_config_source (remove the quotation marks):
