@@ -166,7 +166,7 @@ class Vector:
         return unit_a, unit_b, unit_c
 
     @classmethod
-    def random_vector(cls, length = 1):
+    def random_vector(cls, length: float = 1.0):
         random_numbers = rng.uniform(-1, 1, size=3)
         return length * (cls.from_numpy(random_numbers).unit_vector)
 

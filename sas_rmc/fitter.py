@@ -80,6 +80,7 @@ def average_chi_squared_fitter(experimental_detectors: List[DetectorImage], simu
 
 @dataclass
 class Fitter2D:
+   
     intensity_calculators: List[IntensityCalculator] # I could make this a composite function but I want to make it clear that smearing is happening
     arrays_fitter: ArraysFitter
 

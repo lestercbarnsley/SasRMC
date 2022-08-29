@@ -507,6 +507,21 @@ def test_set_particle_state():
         assert box[4].orientation == orientation
         assert box[4].magnetization == magnetization
 
+def test_set_particle_magnetization():
+    for _ in range(50):
+        box = default_box()
+        box.force_inside_box()
+        get_particle = lambda i : box.particles[i]
+        particle_4_old = get_particle(4)
+        magnetization = particle_4_old.magnetization
+        new_magnetization = Vector.random_vector(470e3)
+        command_1 = commands.MagnetizeParticle(box, 4, new_magnetization)
+        command_1.execute()
+        particle_4_new = get_particle(4)
+        assert particle_4_old != particle_4_new
+        assert particle_4_new.magnetization == new_magnetization
+        assert particle_4_old.magnetization == magnetization
+
 def test_physical_acceptance_half_test():
     box = default_box()
     simulation = default_simulation(box_list=[box])

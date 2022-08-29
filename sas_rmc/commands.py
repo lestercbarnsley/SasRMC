@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import List, Callable
+from typing import List
 
 import numpy as np
 
@@ -11,8 +11,7 @@ from .particle import Particle
 from .scattering_simulation import SimulationParams
 from .vector import Vector
 
-
-# rng = np.random.default_rng() There is a strong argument that all of these functions should be pure
+# execute should be a pure function, so I get rid of the instance of rng
 
 def small_angle_change(vector: Vector, angle_change: float, reference_vector: Vector = None) -> Vector:
     ref_vec = reference_vector if reference_vector is not None else Vector.null_vector()
@@ -87,10 +86,6 @@ class ParticleCommand(Command):
     def physical_acceptance_weak(self) -> bool:
         return not self.box.wall_or_particle_collision(self.particle_index)
 
-
-'''def check_and_set(attr_getter: Callable[[], object], attr_setter: Callable[[object], None], value: object) -> None:
-    if attr_getter() != value:
-        attr_setter(value)'''
 
 
 @dataclass
@@ -170,10 +165,7 @@ class ReorientateParticle(ParticleCommand):
         particle = self.particle
         particle = self.particle
         SetParticleState(self.box, self.particle_index, particle.set_orientation(self.orientation_new)).execute()
-        '''check_and_set(
-            lambda : particle.orientation,
-            lambda orientation : particle.set_orientation(orientation),
-            self.orientation_new)'''
+        
         
 
 @dataclass
@@ -192,10 +184,7 @@ class MagnetizeParticle(ParticleCommand):
     def execute(self) -> None:
         particle = self.particle
         SetParticleState(self.box, self.particle_index, particle.set_magnetization(self.magnetization)).execute()
-        '''check_and_set(
-            lambda : particle.magnetization,
-            lambda magnetization : particle.set_magnetization(magnetization),
-            self.magnetization)'''
+        
 
 
 @dataclass

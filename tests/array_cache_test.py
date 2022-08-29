@@ -5,10 +5,11 @@ import numpy as np
 
 import sas_rmc
 from sas_rmc.array_cache import array_cache
+from sas_rmc.form_calculator import box_intensity_average
 from sas_rmc.vector import Vector, broadcast_to_numpy_array
 from sas_rmc.particle import CoreShellParticle, CylindricalParticle
 from sas_rmc.shapes import Cube
-from sas_rmc.result_calculator import NumericalProfileCalculator, ProfileCalculator
+from sas_rmc.result_calculator import AnalyticalCalculator, NumericalProfileCalculator, ProfileCalculator
 from sas_rmc.box_simulation import Box
 from sas_rmc.profile_calculator import box_profile_calculator
 
@@ -82,10 +83,18 @@ def average_sld_func_for_cylinder_test():
         plotter(r_array, sld_average)
         plt.show()
 
-
+def core_shell_test():
+    core_shell = CoreShellParticle.gen_from_parameters(
+        position=Vector.null_vector(), core_radius=50.6, core_sld=6.975, thickness=15.1, shell_sld = 0.0776, solvent_sld=5.646
+    )
+    q = np.linspace(3e-3, 0.3, num=1000)
+    intensity = box_intensity_average([Box([core_shell], cube = Cube(dimension_0=6000, dimension_1=6000, dimension_2=6000))],AnalyticalCalculator(q, 0*q))
+    file_maker = sas_rmc.simulator_factory.generate_file_path_maker(r"J:\Uni\Programming\SasRMC\data\results", "core_shell")
+    plt.loglog(q, intensity)
+    np.savetxt(file_maker("", "txt"), [(q_i, i_i) for q_i, i_i in zip(q, intensity)], delimiter='\t')
 
 if __name__ == "__main__":
-    numerical_test()
+    core_shell_test()
     #testing_average_sld_func_for_cylinder()
     
 #%%

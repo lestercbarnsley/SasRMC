@@ -374,7 +374,7 @@ class CoreShellParticle(Particle):
         q = modulus_array(qx_array, qy_array)
         core_form = form_array_sphere(
             radius = self.core_sphere.radius, 
-            sld = self.delta_sld(self.core_sld - self.shell_sld), 
+            sld = self.delta_sld(self.core_sld) - self.delta_sld(self.shell_sld), 
             q_array=q)
         shell_form = form_array_sphere(
             radius = self.shell_sphere.radius, 
