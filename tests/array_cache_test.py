@@ -92,6 +92,7 @@ def core_shell_test():
     file_maker = sas_rmc.simulator_factory.generate_file_path_maker(r"J:\Uni\Programming\SasRMC\data\results", "core_shell")
     plt.loglog(q, intensity)
     np.savetxt(file_maker("", "txt"), [(q_i, i_i) for q_i, i_i in zip(q, intensity)], delimiter='\t')
+    plt.show()
 
 if __name__ == "__main__":
     core_shell_test()
