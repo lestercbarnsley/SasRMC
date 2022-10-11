@@ -62,8 +62,26 @@ def fuzzy_unique(arr: np.ndarray, array_filterer: Callable[[np.ndarray], np.ndar
         if not all(t in closest_arr for t in test_space):
             return test_space_maker(i-1)
     raise Exception("Unable to find enough unique values in Q-space to map detector to 2-D grid")
-    
 
+
+def average_uniques(linear_arr: np.ndarray) -> np.ndarray:
+    sorted_uniques = np.sort(np.unique(linear_arr))
+    if len(sorted_uniques) < 5 * np.sqrt(len(linear_arr)):
+        return sorted_uniques
+    diffs = np.diff(sorted_uniques)
+    in_range = lambda x : -np.std(diffs) < (x - np.average(diffs)) < +np.std(diffs)
+    fuzzy_uniques = []
+    fuzzy_row = []
+    for x, dx in zip(sorted_uniques, np.append(diffs, np.inf)):
+        fuzzy_row.append(x)
+        if not in_range(dx):
+            fuzzy_uniques.append(np.average(fuzzy_row))
+            fuzzy_row.clear()
+    return np.array(fuzzy_uniques)
+
+    
+def area_to_radius(area: float): # I made this not anonymous so I can write a docstring later if needed
+    return np.sqrt(area / PI)
 
 class Polarization(Enum):
     UNPOLARIZED = "unpolarized"
@@ -87,7 +105,6 @@ class DetectorConfig:
     polarization: Polarization = Polarization.UNPOLARIZED
 
     def get_sigma_geometric(self) -> float:
-        area_to_radius = lambda area: np.sqrt(area / PI)
         k_mag = 2 * PI / self.wavelength_in_angstrom
         l1, l2 = self.collimation_distance_in_m, self.detector_distance_in_m
         r1, r2 = area_to_radius(self.collimation_aperture_area_in_m2), area_to_radius(self.sample_aperture_area_in_m2)
@@ -104,15 +121,12 @@ class DetectorConfig:
         return sigma_para
 
 
-def orthogonal_vector(vector: Vector) -> Vector: # If I find I need this function a lot, I'll make it a method in the Vector class, but for now I'm happy for it to be a helper function
-    if vector.z:
-        raise ValueError("this function was only designed for 2-D vectors")
-    v = vector.unit_vector
-    if not v.mag:
-        return v
-    orth_y = 0.0 if v.x == 0 else np.sqrt(1 / (1 + (v.y / v.x)**2)) * np.sign(v.x)
-    orth_x = -1.0 if v.x == 0 else -(v.y / v.x) * orth_y
-    return Vector(orth_x, orth_y)
+def orthogonal_xy(x: float, y: float) -> Tuple[float, float]: # If I find I need this function a lot, I'll make it a method in the Vector class, but for now I'm happy for it to be a helper function
+    if not np.sqrt(x**2 + y**2):
+        return 0, 0
+    orth_y = 0.0 if x == 0 else np.sqrt(1 / (1 + (y / x)**2)) * np.sign(x)
+    orth_x = -1.0 if x == 0 else -(y / x) * orth_y
+    return orth_x, orth_y
 
 
 @dataclass
@@ -138,7 +152,7 @@ class DetectorPixel:
         q_offset = (qx_offset, qy_offset, 0)
         q_vec = Vector(self.qX, self.qY)
         q_para = q_vec.unit_vector
-        q_perp = orthogonal_vector(q_para)
+        q_perp = Vector(*orthogonal_xy(q_para.x, q_para.y))
         q_para_arr = q_para.unit_vector * q_offset
         q_perp_arr = q_perp.unit_vector * q_offset
         gaussian = np.exp(-(1/2) * ((q_para_arr / self.sigma_para)**2 + (q_perp_arr / self.sigma_perp)**2) )
@@ -199,7 +213,7 @@ class DetectorPixel:
 
 
 @dataclass
-class DetectorImage:
+class DetectorImage: # Major refactor needed for detector image, as it shouldn't be responsible for how it's plotted
     _detector_pixels: np.ndarray
     polarization: Polarization = Polarization.UNPOLARIZED
 
@@ -274,15 +288,21 @@ class DetectorImage:
 
     @property
     def qx_delta(self) -> float:
-        return np.average(np.diff(self.qX[0,:]))
+        return np.average(np.diff(np.sort(np.unique(self.qX))))
 
     @property
     def qy_delta(self) -> float:
-        return np.average(np.diff(self.qY[:,0]))
+        return np.average(np.diff(np.sort(np.unique(self.qY))))
 
     @property
     def qxqy_delta(self) -> Tuple[float, float]:
         return self.qx_delta, self.qy_delta
+
+    def delta_qxqy_from_detector(self) -> Tuple[float, float]: # I don't think this should be here
+        qx_uniques = average_uniques(self.qX)
+        qy_uniques = average_uniques(self.qY)
+        diff_strategy = lambda arr : np.average(np.diff(arr))
+        return diff_strategy(qx_uniques), diff_strategy(qy_uniques)
 
     @staticmethod
     def plot_intensity_matrix(intensity_matrix, qx, qy , log_intensity = True, show_crosshair = True, levels = 30, cmap = 'jet', show_fig: bool = True) -> Figure:
@@ -305,8 +325,21 @@ class DetectorImage:
             plt.show()
         return fig
 
+    def intensity_2d(self, intensity: np.ndarray = None):
+        intensity = intensity if intensity is not None else self.intensity
+        if len(intensity.shape) == 2:
+            return intensity
+        qx_line, qy_line = average_uniques(self.qX), average_uniques(self.qY)
+        intensity_arr = np.zeros((len(qy_line), len(qx_line)))
+        for pixel, pixel_intensity in zip(self._detector_pixels, intensity):
+            i = np.argmin(np.abs(qx_line - pixel.qX)) # This now finds the closest value rather than an exact match, then it overwrites the pixel
+            j = np.argmin(np.abs(qy_line - pixel.qY))
+            intensity_arr[j, i] = pixel_intensity
+        return intensity_arr
+        
     def plot_intensity(self, log_intensity = True, show_crosshair = True, levels = 30, cmap = 'jet', show_fig: bool = True) -> Figure:
-        return type(self).plot_intensity_matrix(self.intensity, self.qX, self.qY, log_intensity=log_intensity, show_crosshair=show_crosshair, levels=levels, cmap = cmap, show_fig=show_fig)
+        qx, qy = np.meshgrid(average_uniques(self.qX), average_uniques(self.qY))
+        return type(self).plot_intensity_matrix(self.intensity_2d(), qx, qy, log_intensity=log_intensity, show_crosshair=show_crosshair, levels=levels, cmap = cmap, show_fig=show_fig)
     
     def get_pandas(self) -> pd.DataFrame:
         d = [pixel.to_dict() for _, pixel in np.ndenumerate(self._detector_pixels)]
@@ -340,6 +373,17 @@ class DetectorImage:
             i = np.argmin(np.abs(qX_1d - qX)) # This now finds the closest value rather than an exact match, then it overwrites the pixel
             j = np.argmin(np.abs(qY_1d - qY))
             detector_pixels[j, i] = DetectorPixel.row_to_pixel(row, detector_config=detector_config)
+        polarization = detector_config.polarization if detector_config else Polarization(data_dict.get(POLARIZATION, Polarization.UNPOLARIZED.value))
+        return cls(
+            _detector_pixels = detector_pixels,
+            polarization = polarization
+        )
+
+    @classmethod
+    def gen_from_data(cls, data_dict: dict, detector_config: DetectorConfig = None):
+        qX_data = data_dict[QX]
+        get_row = lambda i : {k : data_dict.get(k)[i] for k in [QX, QY, INTENSITY, INTENSITY_ERROR, QZ, SIGMA_PARA, SIGMA_PERP, SHADOW_FACTOR]}
+        detector_pixels = [DetectorPixel.row_to_pixel(get_row(i), detector_config=detector_config) for i, _ in enumerate(qX_data)]
         polarization = detector_config.polarization if detector_config else Polarization(data_dict.get(POLARIZATION, Polarization.UNPOLARIZED.value))
         return cls(
             _detector_pixels = detector_pixels,
@@ -435,8 +479,9 @@ class SimulatedDetectorImage(DetectorImage):
             lambda : self.experimental_intensity,
             lambda : self.simulated_intensity,
             lambda : np.where(self.qX < 0, self.experimental_intensity, self.simulated_intensity)
-        ][mode] # Always be lazy!
-        return type(self).plot_intensity_matrix(intensity_matrix_maker(), self.qX, self.qY, log_intensity=log_intensity, show_crosshair=show_crosshair, levels = levels, cmap = cmap, show_fig=show_fig)
+        ][mode]
+        qx, qy = np.meshgrid(average_uniques(self.qX), average_uniques(self.qY))
+        return type(self).plot_intensity_matrix(self.intensity_2d(intensity_matrix_maker()), qx, qy, log_intensity=log_intensity, show_crosshair=show_crosshair, levels = levels, cmap = cmap, show_fig=show_fig)
 
 
 

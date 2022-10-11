@@ -90,7 +90,7 @@ def core_shell_test():
     q = np.linspace(3e-3, 0.3, num=1000)
     intensity = box_intensity_average([Box([core_shell], cube = Cube(dimension_0=6000, dimension_1=6000, dimension_2=6000))],AnalyticalCalculator(q, 0*q))
     file_maker = sas_rmc.simulator_factory.generate_file_path_maker(r"J:\Uni\Programming\SasRMC\data\results", "core_shell")
-    plt.loglog(q, intensity)
+    plt.loglog(q, intensity + 1e-6)
     np.savetxt(file_maker("", "txt"), [(q_i, i_i) for q_i, i_i in zip(q, intensity)], delimiter='\t')
     plt.show()
 

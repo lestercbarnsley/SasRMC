@@ -5,6 +5,7 @@ from . import commands, particle, scattering_simulation, simulator, acceptance_s
 from .rmc_runner import RmcRunner, load_config
 
 # Only very import classes should be directly imported
+# This is just for putting things into the namespace
 from .particle import Particle
 from .vector import Vector, VectorSpace, VectorElement
 from .detector import DetectorImage, SimulatedDetectorImage, DetectorPixel, DetectorConfig, Polarization

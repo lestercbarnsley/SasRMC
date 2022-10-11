@@ -81,11 +81,11 @@ def default_simulation(box_list: List[Box]) -> ScatteringSimulation:
     for box in box_list:
         box.force_inside_box()
     detector = default_detector_image()
-    qx, qy = detector.qX, detector.qY
+    qx, qy = np.meshgrid(sas_rmc.detector.average_uniques(detector.qX), sas_rmc.detector.average_uniques(detector.qY))
     fitter = Fitter2D.generate_standard_fitter(
         detector_list=[detector],
         box_list = box_list,
-        result_calculator_maker=lambda detector : sas_rmc.result_calculator.AnalyticalCalculator(detector.qX, detector.qY)
+        result_calculator_maker=lambda detector : sas_rmc.result_calculator.AnalyticalCalculator(qx, qy)
     )
     return ScatteringSimulation(fitter=fitter, simulation_params=sas_rmc.simulator_factory.box_simulation_params_factory())
 

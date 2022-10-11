@@ -380,7 +380,7 @@ class CoreShellParticle(Particle):
             radius = self.shell_sphere.radius, 
             sld = self.delta_sld(self.shell_sld), 
             q_array = q)
-        return core_form + shell_form
+        return core_form  + shell_form
 
     def magnetic_form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector, magnetization: Vector) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         q = modulus_array(qx_array, qy_array)

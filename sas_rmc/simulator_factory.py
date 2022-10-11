@@ -151,9 +151,11 @@ def box_simulation_params_factory(starting_rescale: float = 1.0, starting_magnet
 
 def command_factory(nominal_step_size: float, box: Box, particle_index: int, temperature: float, simulation_params: SimulationParams, spherical_particle: bool = False, magnetic_simulation: bool = False) -> commands.AcceptableCommand:
     nominal_angle_change = PI/8
-    nominal_rescale= 0.02#0.005
+    nominal_rescale= 0.02
+    particle_was_in_plane = box[particle_index].position.z == 0
     change_by_factor = rng.normal(loc = 1.0, scale = nominal_rescale)
-    position_delta = Vector.random_vector_xy(rng.normal(loc = 0.0, scale = nominal_step_size) )
+    position_delta_size = rng.normal(loc = 0.0, scale = nominal_step_size)
+    position_delta = (Vector.random_vector_xy if particle_was_in_plane else Vector.random_vector)(position_delta_size)
     actual_angle_change = rng.normal(loc = 0.0, scale = nominal_angle_change)
     massive_angle_change = rng.uniform(low = -PI, high = PI)
     move_by = lambda : commands.MoveParticleBy(
@@ -171,9 +173,8 @@ def command_factory(nominal_step_size: float, box: Box, particle_index: int, tem
         particle_index=particle_index,
         relative_angle=actual_angle_change
     )
-    position_old = box[particle_index].position
     position_new = box.cube.random_position_inside()
-    if position_old.z == 0:
+    if particle_was_in_plane:
         position_new = Vector(position_new.x, position_new.y)
     move_to = lambda : commands.MoveParticleTo(
         box = box,
@@ -352,7 +353,7 @@ def subtract_buffer_intensity(detector: DetectorImage, buffer: Union[float, Dete
         detector.intensity_err = np.sqrt(detector.intensity_err**2 + buffer.intensity_err**2) # This is the proper way to do this, since the errors add in quadrature. If the buffer intensity error isn't present, the total error won't change
     elif isinstance(buffer, float):
         detector.intensity = detector.intensity - buffer
-    #detector.shadow_factor = detector.shadow_factor * (detector.intensity > detector.intensity_err)
+    detector.shadow_factor = detector.shadow_factor * (detector.intensity > 0)
     return detector
 
 polarization_dict = {
@@ -439,11 +440,12 @@ def box_factory(particle_number: int, particle_factory: ParticleFactory, box_tem
         )
     )
 
-def generate_box_factory(box_template: Tuple[float, float, float], detector_list: List[DetectorImage]) -> BoxFactory:
+def generate_box_factory(box_template: Tuple[float, float, float], detector_list: List[DetectorImage], delta_qxqy_strategy: Callable[[DetectorImage], Tuple[float, float]] = None) -> BoxFactory:
+    delta_qxqy_strategy = delta_qxqy_strategy if delta_qxqy_strategy is not None else (lambda d : d.delta_qxqy_from_detector())
     dimension_0, dimension_1, dimension_2 = box_template
     if dimension_0 * dimension_1 * dimension_2 == 0:
-        dimension_0 = np.max([2 * PI / detector.qx_delta for detector in detector_list])
-        dimension_1 = np.max([2 * PI / detector.qy_delta for detector in detector_list])
+        dimension_0 = np.max([2 * PI / delta_qxqy_strategy(detector)[0] for detector in detector_list])
+        dimension_1 = np.max([2 * PI / delta_qxqy_strategy(detector)[1] for detector in detector_list])
         dimension_2 = dimension_0
     return lambda particle_number, particle_factory : box_factory(particle_number, particle_factory, (dimension_0, dimension_1, dimension_2))
 
@@ -455,9 +457,10 @@ def generate_file_path_maker(output_folder: Path, description: str = "") -> Call
     datetime_string = datetime.now().strftime(datetime_format)
     return lambda comment, file_format: generate_save_file(datetime_string, output_folder, description, comment, file_format)
 
-def qxqy_from_detector(detector: DetectorImage, range_factor: float, resolution_factor: float):
+def qxqy_from_detector(detector: DetectorImage, range_factor: float, resolution_factor: float, delta_qxqy_strategy: Callable[[DetectorImage], Tuple[float, float]] = None):
     detector_qx, detector_qy = detector.qX, detector.qY
-    detector_delta_qx, detector_delta_qy = detector.qx_delta, detector.qy_delta
+    delta_qxqy_strategy = delta_qxqy_strategy if delta_qxqy_strategy is not None else (lambda d : d.delta_qxqy_from_detector())
+    detector_delta_qx, detector_delta_qy = delta_qxqy_strategy(detector)
     line_maker = lambda starting_q_min, starting_q_max, starting_q_step : np.arange(start = range_factor * starting_q_min, stop = +range_factor * starting_q_max, step = starting_q_step / resolution_factor)
     qx_linear = line_maker(np.min(detector_qx), np.max(detector_qx), detector_delta_qx)
     qy_linear = line_maker(np.min(detector_qy), np.max(detector_qy), detector_delta_qy)
@@ -550,7 +553,9 @@ class SimulationConfig:
             result_calculator_maker=self.result_calculator_maker,
             smearing=self.detector_smearing
         )
-        return ScatteringSimulation(fitter = fitter, simulation_params=box_simulation_params_factory())
+        box_concentration = np.sum([p.volume for p in box_list[0]]) / box_list[0].volume
+        starting_factor = self.nominal_concentration / box_concentration if self.nominal_concentration else 1.0
+        return ScatteringSimulation(fitter = fitter, simulation_params=box_simulation_params_factory(starting_rescale=starting_factor, starting_magnetic_rescale=starting_factor))
 
     def generate_controller(self, simulation: ScatteringSimulation, box_list: List[Box]) -> Controller:
         temperature_function = self.annealing_config.generate_temperature_function()
@@ -558,8 +563,10 @@ class SimulationConfig:
             commands.SetSimulationParams(simulation.simulation_params, change_to_factors = simulation.simulation_params.values),
             ]
         for box in box_list:
-            box.force_inside_box(in_plane=self.in_plane)
-            for particle_index, _ in enumerate(box.particles):
+            box.force_inside_box(in_plane=True)
+            for particle_index, particle in enumerate(box.particles):
+                if not self.in_plane:
+                    box.particles[particle_index] = particle.set_position(particle.position + Vector(0,0,1e-3))
                 ledger.append(
                     commands.SetParticleState.gen_from_particle(box, particle_index)
                 )
@@ -627,6 +634,7 @@ class SimulationConfig:
             detector_smearing=config_dict.get("detector_smearing", True),
             field_direction=config_dict.get("field_direction", "Y"),
             force_log = config_dict.get("force_log_file", True),
+            in_plane = config_dict.get("in_plane", False),
             output_plot_format = config_dict.get("output_plot_format", "PDF").lower(),
             box_template = (
                 config_dict.get("box_dimension_1", 0),
@@ -635,9 +643,10 @@ class SimulationConfig:
             )
         )
 
-def box_from_detector(detector_list: DetectorImage, particle_list: List[Particle]) -> Box:
-    dimension_0 = np.max([2 * PI / detector.qx_delta for detector in detector_list])
-    dimension_1 = np.max([2 * PI / detector.qy_delta for detector in detector_list])
+def box_from_detector(detector_list: DetectorImage, particle_list: List[Particle], delta_qxqy_strategy: Callable[[DetectorImage], Tuple[float, float]] = None) -> Box:
+    delta_qxqy_strategy = delta_qxqy_strategy if delta_qxqy_strategy is not None else (lambda d : d.delta_qxqy_from_detector())
+    dimension_0 = np.max([2 * PI / delta_qxqy_strategy(detector)[0] for detector in detector_list])
+    dimension_1 = np.max([2 * PI / delta_qxqy_strategy(detector)[1] for detector in detector_list])
     dimension_2 = dimension_0
     return Box(
         particles=particle_list,
