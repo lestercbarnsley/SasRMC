@@ -1,7 +1,7 @@
 data/results/
 sas_rmc/__pycache__/
 *.xlsx
-!data/config.yaml
+data/config.yaml
 !data/CoreShell_Simulation_Input.xlsx
 !data/CoreShell_F20_pol.xlsx
 sas_rmc.egg-info/
@@ -15,4 +15,3 @@ tests/__pycache__/
 tests/array_testing.py
 tests/galaxi.py
 tests/dumbbell_test.py
-data/config.yaml
