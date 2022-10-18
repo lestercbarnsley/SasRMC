@@ -3,10 +3,9 @@ from dataclasses import field, dataclass
 from abc import ABC, abstractmethod
 
 import numpy as np
-#from matplotlib import pyplot as plt
 from matplotlib import patches
 
-from .vector import Vector, Interface
+from ..vector import Vector, Interface
 
 PI = np.pi
 
@@ -158,7 +157,7 @@ class Sphere(Shape):
         )
 
     def change_position(self, position: Vector):
-        return Sphere(central_position=position,radius = self.radius)
+        return type(self)(central_position=position,radius = self.radius)
 
     def change_orientation(self, orientation: Vector):
         return self

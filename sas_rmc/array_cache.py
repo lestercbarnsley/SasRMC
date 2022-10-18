@@ -38,8 +38,7 @@ def pass_arg(arg):
     return id(arg)
 
 def array_cache(func = None, max_size: int = None):
-    if max_size is None:
-        max_size = MAX_SIZE
+    max_size = max_size if max_size is not None else MAX_SIZE
     def _array_cache(func):
         cache = {}
 

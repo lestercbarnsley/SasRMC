@@ -5,7 +5,7 @@ from typing import List, Tuple
 
 import pandas as pd
 
-from .particle import CoreShellParticle, Dumbbell
+from .particles import CoreShellParticle, Dumbbell
 
 ALWAYS_PRESENT_DATA = [
     [None,None,None,None],

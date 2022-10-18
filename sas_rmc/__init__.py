@@ -1,12 +1,14 @@
 #%%
 
-from . import commands, particle, scattering_simulation, simulator, acceptance_scheme, viewer, shapes, array_cache, simulator_factory, result_calculator, form_calculator
+from .shapes import shapes
+from .particles import particle
+from . import commands, scattering_simulation, simulator, acceptance_scheme, viewer, array_cache, simulator_factory, result_calculator, form_calculator
 
 from .rmc_runner import RmcRunner, load_config
 
 # Only very import classes should be directly imported
 # This is just for putting things into the namespace
-from .particle import Particle
+from .particles.particle import Particle
 from .vector import Vector, VectorSpace, VectorElement
 from .detector import DetectorImage, SimulatedDetectorImage, DetectorPixel, DetectorConfig, Polarization
 from .controller import Controller

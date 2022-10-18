@@ -41,15 +41,6 @@ def set_unsmeared_intensity(unsmeared_intensity: np.ndarray, simulated_qx: np.nd
     simulated_detector.simulated_intensity = unsmeared_intensity
     return unsmeared_intensity
 
-def intensity_calculator(box_list: List[Box], result_calculator: ResultCalculator, simulation_params: SimulationParams, polarization: Polarization) -> np.ndarray:
-    rescale_factor = simulation_params.get_value(NUCLEAR_RESCALE, default=1.0)
-    magnetic_rescale = simulation_params.get_value(MAGNETIC_RESCALE, default=1.0)
-    intensity = box_intensity_average(box_list, result_calculator, rescale_factor=rescale_factor, magnetic_rescale=magnetic_rescale, polarization=polarization)
-    return intensity
-
-def create_intensity_calculator(box_list: List[Box], result_calculator: ResultCalculator, polarization: Polarization) -> IntensityCalculator:
-    return lambda simulation_params : intensity_calculator(box_list, result_calculator, simulation_params, polarization)
-
 def intensity_calculator_and_smearer_from_detector(detector: SimulatedDetectorImage, box_list: List[Box], result_calculator_maker: Callable[[DetectorImage], ResultCalculator]):
     result_calculator = result_calculator_maker(detector)
     intensity_calculator_fn = create_intensity_calculator(box_list, result_calculator, detector.polarization)

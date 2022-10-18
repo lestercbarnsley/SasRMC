@@ -7,7 +7,7 @@ import numpy as np
 from .acceptance_scheme import AcceptanceScheme
 from .scattering_simulation import MAGNETIC_RESCALE, NUCLEAR_RESCALE, ScatteringSimulation
 from .box_simulation import Box
-from .particle import Particle
+from .particles.particle import Particle
 from .scattering_simulation import SimulationParams
 from .vector import Vector
 

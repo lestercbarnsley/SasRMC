@@ -7,8 +7,8 @@ import sas_rmc
 from sas_rmc.array_cache import array_cache
 from sas_rmc.form_calculator import box_intensity_average
 from sas_rmc.vector import Vector, broadcast_to_numpy_array
-from sas_rmc.particle import CoreShellParticle, CylindricalParticle
-from sas_rmc.shapes import Cube
+from sas_rmc.particles import CoreShellParticle, CylindricalParticle
+from sas_rmc.shapes.shapes import Cube
 from sas_rmc.result_calculator import AnalyticalCalculator, NumericalProfileCalculator, ProfileCalculator
 from sas_rmc.box_simulation import Box
 from sas_rmc.profile_calculator import box_profile_calculator

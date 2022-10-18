@@ -9,7 +9,7 @@ from matplotlib import pyplot as plt
 
 from .converters import particle_to_axes
 from .box_simulation import Box
-from .particle import Particle
+from .particles.particle import Particle
 
 PI = np.pi
 

@@ -15,10 +15,10 @@ from sas_rmc import result_calculator
 from sas_rmc.box_simulation import Box
 from sas_rmc.command_writer import BoxWriter
 from sas_rmc.form_calculator import box_intensity_average
-from sas_rmc.particle import CoreShellParticle, Dumbbell, Particle
+from sas_rmc.particles.particle import CoreShellParticle, Dumbbell, Particle
 from sas_rmc.result_calculator import AnalyticalCalculator, NumericalCalculator, ParticleNumerical
 from sas_rmc.scattering_simulation import SimulationParam, SimulationParams
-from sas_rmc.shapes import Cube
+from sas_rmc.shapes.shapes import Cube
 from sas_rmc.simulator_factory import is_float,  subtract_buffer_intensity
 from sas_rmc.fitter import smear_simulated_intensity
 

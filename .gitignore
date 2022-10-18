@@ -15,3 +15,5 @@ tests/__pycache__/
 tests/array_testing.py
 tests/galaxi.py
 tests/dumbbell_test.py
+sas_rmc/particles/__pycache__/
+sas_rmc/shapes/__pycache__/

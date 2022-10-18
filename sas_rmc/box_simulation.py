@@ -6,9 +6,9 @@ from typing import List
 import numpy as np
 from matplotlib import pyplot as plt
 
-from .particle import Particle
+from .particles.particle import Particle
 from .vector import Vector
-from .shapes import Cube
+from .shapes.shapes import Cube
 
 
 PI = np.pi

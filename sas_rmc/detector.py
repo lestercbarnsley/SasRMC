@@ -10,7 +10,7 @@ import pandas as pd
 
 from .array_cache import method_array_cache
 from .vector import Vector, broadcast_array_function#, dot
-from .particle import modulus_array 
+from .particles.particle import modulus_array 
 
 
 PI = np.pi

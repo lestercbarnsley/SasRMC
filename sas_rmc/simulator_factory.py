@@ -14,10 +14,10 @@ from .viewer import CLIViewer
 from .scattering_simulation import MAGNETIC_RESCALE, NUCLEAR_RESCALE, ScatteringSimulation, SimulationParam, SimulationParams
 from .simulator import MemorizedSimulator, MonteCarloEvaluator, Simulator
 from .vector import Vector, VectorSpace
-from .particle import CoreShellParticle, Dumbbell, Particle
+from .particles import CoreShellParticle, Dumbbell, Particle
 from .box_simulation import Box
 from .detector import DetectorImage, Polarization, DetectorConfig, SimulatedDetectorImage
-from .shapes import Cube
+from .shapes.shapes import Cube
 from .controller import Controller
 from .result_calculator import AnalyticalCalculator, NumericalCalculator, ResultCalculator
 from .fitter import Fitter2D
@@ -31,14 +31,6 @@ NUMERICAL_RANGE_FACTOR = 1.05
 
 ParticleFactory = Callable[[], Particle]
 BoxFactory = Callable[[int,ParticleFactory], Box]
-
-DEFAULT_VAL_TYPES =  {
-    str: "",
-    int: 0,
-    float: 0.0,
-    bool: False,
-    Polarization: Polarization.UNPOLARIZED
-} # Mark for deletion
   
 truth_dict = {
     'ON' : True,
@@ -173,9 +165,13 @@ def command_factory(nominal_step_size: float, box: Box, particle_index: int, tem
         particle_index=particle_index,
         relative_angle=actual_angle_change
     )
-    position_new = box.cube.random_position_inside()
+    put_in_plane = lambda vector : Vector(vector.x, vector.y, z = 0 if particle_was_in_plane else box[particle_index].position.z)
+    position_new = put_in_plane(box.cube.random_position_inside())
+    '''
     if particle_was_in_plane:
         position_new = Vector(position_new.x, position_new.y)
+    else:
+        position_new = Vector(position_new.x, position_new.y, box[particle_index].position.z)'''
     move_to = lambda : commands.MoveParticleTo(
         box = box,
         particle_index=particle_index,

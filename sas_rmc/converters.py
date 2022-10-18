@@ -4,7 +4,7 @@ from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 
 from .vector import Vector
-from . particle import Dumbbell, Particle, CoreShellParticle
+from .particles import Dumbbell, Particle, CoreShellParticle
 
 
 

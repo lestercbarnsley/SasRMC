@@ -12,7 +12,7 @@ from .vector import cross
 
 PI = np.pi
 
-mod = lambda arr: np.real(arr * np.conj(arr))
+mod = lambda arr: np.real(arr * np.conj(arr)) # this function is NOT a good candidate for caching
 
 
 @array_cache(max_size=5_000)
@@ -29,6 +29,11 @@ def nuclear_amplitude(form_results: List[FormResult], rescale_factor: float = 1)
     form_nuclear_getter =  lambda form_result: form_result.form_nuclear
     return form_result_adder(form_results, form_nuclear_getter, rescale=rescale_factor)
 
+@array_cache(max_size=5_000)
+def q_squared(qx: np.ndarray, qy: np.ndarray, offset: float = 1e-16) -> np.ndarray:
+    qq = qx**2 + qy**2
+    return np.where(qq !=0 , qq, offset)
+
 def magnetic_amplitude(form_results: List[FormResult], qx: np.ndarray, qy: np.ndarray, magnetic_rescale:float = 1) -> List[np.ndarray]:
     getters = [
         lambda form_result: form_result.form_magnetic_x, 
@@ -37,9 +42,9 @@ def magnetic_amplitude(form_results: List[FormResult], qx: np.ndarray, qy: np.nd
         ]
     fm_x, fm_y, fm_z = [form_result_adder(form_results, getter_fn, magnetic_rescale) for getter_fn in getters]
     q = [qx, qy, 0]
-    q_squared = qx**2 + qy**2+ 1e-16 # Avoid a divide by zero warning
+    q_square = q_squared(qx, qy)
     mqm = cross(q, cross([fm_x, fm_y, fm_z], q))
-    return [mq_comp / q_squared for mq_comp in mqm]
+    return [mq_comp / q_square for mq_comp in mqm]
 
 def intensity_polarization(fn: np.ndarray, fmx: np.ndarray, fmy: np.ndarray, fmz: np.ndarray, polarization: Polarization) -> np.ndarray:
     minus_minus_fn = lambda : fn + fmy
