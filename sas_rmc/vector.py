@@ -5,9 +5,10 @@ from dataclasses import dataclass
 import math
 
 import numpy as np
+from . import constants
 
-PI = np.pi
-rng = np.random.default_rng()
+PI = constants.PI
+rng = constants.RNG
 
 def cross(a: Tuple, b: Tuple) -> Tuple:
     ax, ay, az = a[0], a[1], a[2]

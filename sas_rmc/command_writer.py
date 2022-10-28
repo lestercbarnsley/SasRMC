@@ -10,8 +10,9 @@ from matplotlib import pyplot as plt
 from .converters import particle_to_axes
 from .box_simulation import Box
 from .particles.particle import Particle
+from . import constants
 
-PI = np.pi
+PI = constants.PI
 
 
 class Loggable(Protocol):

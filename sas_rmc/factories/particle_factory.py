@@ -11,9 +11,9 @@ from ..box_simulation import Box
 from ..particles import Particle
 from ..commands import Command
 from ..scattering_simulation import SimulationParams
+from .. import constants
 
-
-rng = np.random.default_rng()
+rng = constants.RNG
 
 
 def polydisperse_parameter(loc: float, polyd: float, dispersity_fn: Callable[[float, float], float] = None) -> float:

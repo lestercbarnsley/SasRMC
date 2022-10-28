@@ -4,10 +4,12 @@ from typing import List
 
 import numpy as np
 
+from sas_rmc.shapes.shapes import Sphere
+
 from .acceptance_scheme import AcceptanceScheme
 from .scattering_simulation import MAGNETIC_RESCALE, NUCLEAR_RESCALE, ScatteringSimulation
 from .box_simulation import Box
-from .particles.particle import Particle
+from .particles import Particle, CoreShellParticle
 from .scattering_simulation import SimulationParams
 from .vector import Vector
 
@@ -202,6 +204,31 @@ class FlipMagnetization(ParticleCommand):
         magnetization_old = self.particle.magnetization
         magnetization_new = -1 * magnetization_old
         MagnetizeParticle(self.box, self.particle_index, magnetization_new).execute()
+
+@dataclass
+class CompressShell(ParticleCommand):
+    change_by_factor: float
+    reference_particle_index: int
+
+    def execute(self) -> None:
+        particle = self.particle
+        if not isinstance(particle, CoreShellParticle):
+            raise TypeError("This command can only be used with CoreShellParticle")
+        core_radius = particle.core_sphere.radius
+        new_thickness = self.change_by_factor * particle.shell_thickness
+        old_scattering_length = particle.shell_sld * (particle.shell_sphere.volume - particle.core_sphere.volume)
+        new_sld = old_scattering_length / (Sphere(radius = (core_radius + new_thickness)).volume - particle.core_sphere.volume)
+        new_particle = CoreShellParticle.gen_from_parameters(
+            position = particle.position,
+            magnetization=particle.magnetization,
+            core_radius=particle.core_sphere.radius,
+            thickness=new_thickness,
+            core_sld=particle.core_sld,
+            shell_sld = new_sld,
+            solvent_sld=particle.solvent_sld
+        )
+        SetParticleState(self.box, self.particle_index, new_particle).execute()
+        JumpParticleTo(self.box, self.particle_index, self.reference_particle_index).execute()
 
 
 

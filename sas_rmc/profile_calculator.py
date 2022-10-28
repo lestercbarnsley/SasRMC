@@ -2,9 +2,12 @@
 
 import numpy as np
 
-from .box_simulation import PI, Box
+from .box_simulation import Box
 from .result_calculator import NumericalProfileCalculator
 from .form_calculator import mod
+from . import constants
+
+PI = constants.PI
 
 def box_profile_calculator(box: Box, profile_calculator: NumericalProfileCalculator):
     total_form = 0

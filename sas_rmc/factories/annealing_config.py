@@ -46,6 +46,7 @@ class VeryFastAnneal(AnnealingConfig):
 
 TYPE_DICT = {
     "Very Fast" : lambda annealing_stop_cycle_number, anneal_start_temp, anneal_fall_rate: VeryFastAnneal(annealing_stop_cycle_number, anneal_start_temp, anneal_fall_rate),
+    "Very fast" : lambda annealing_stop_cycle_number, anneal_start_temp, anneal_fall_rate: VeryFastAnneal(annealing_stop_cycle_number, anneal_start_temp, anneal_fall_rate),
     "Fast" : lambda annealing_stop_cycle_number, anneal_start_temp, anneal_fall_rate: FastAnneal(annealing_stop_cycle_number, anneal_start_temp),
     "Greedy" : lambda annealing_stop_cycle_number, anneal_start_temp, anneal_fall_rate: GreedyAnneal(),
 }

@@ -3,9 +3,15 @@ from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from typing import List
 
+import numpy as np
+
 from ..shapes.shapes import Cube
 from ..box_simulation import Box
+from ..detector import DetectorImage
 from .particle_factory import ParticleFactory
+from .. import constants
+
+PI = constants.PI
 
 @dataclass
 class BoxFactory(ABC):
@@ -29,6 +35,18 @@ class BoxDFactory(BoxFactory):
             )
         box.force_inside_box(in_plane = self.in_plane)
         return box
+
+
+@dataclass
+class BoxFromDetectorListFactory(BoxFactory):
+    detector_list: List[DetectorImage]
+    in_plane: bool = True
+
+    def create_box(self, particle_factory: ParticleFactory, total_particles: int) -> Box:
+        dimension_0 = np.max([2 * PI / detector.qx_delta for detector in self.detector_list])
+        dimension_1 = np.max([2 * PI / detector.qy_delta for detector in self.detector_list])
+        dimension_2 = dimension_0
+        return BoxDFactory(dimension_0, dimension_1, dimension_2, in_plane=self.in_plane).create_box(particle_factory=particle_factory, total_particles=total_particles)
 
 
 @dataclass
@@ -76,12 +94,14 @@ class BoxListParticleNumberBoxNumber(BoxListFactory):
         return [box_factory.create_box(particle_factory, particle_number_per_box) for _ in range(self.box_number)]
 
 
-def gen_from_dict(d: dict, dimension_0: float = 0, dimension_1: float = 0, dimension_2: float = 0) -> BoxFactory:
-    box_dimension_0 = d.get("box_dimension_1", dimension_0)
-    box_dimension_1 = d.get("box_dimension_2", dimension_1)
-    box_dimension_2 = d.get("box_dimension_3", dimension_2)
+def gen_from_dict(d: dict, detector_list: List[DetectorImage]) -> BoxFactory:
+    box_dimension_0 = d.get("box_dimension_1", 0.0)
+    box_dimension_1 = d.get("box_dimension_2", 0.0)
+    box_dimension_2 = d.get("box_dimension_3", 0.0)
     in_plane = d.get("in_plane", True)
-    return BoxDFactory(box_dimension_0, box_dimension_1, box_dimension_2, in_plane=in_plane)
+    if constants.NON_ZERO_LIST([box_dimension_0, box_dimension_1, box_dimension_2]):
+        return BoxDFactory(box_dimension_0, box_dimension_1, box_dimension_2, in_plane=in_plane)
+    return BoxFromDetectorListFactory(detector_list, in_plane=in_plane)
 
 def gen_list_factory_from_dict(d: dict) -> BoxListFactory:
     nominal_concentration = d.get("nominal_concentration", 0.0)

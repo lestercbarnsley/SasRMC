@@ -2,14 +2,14 @@
 from dataclasses import dataclass
 from typing import List
 
-import numpy as np
-
 from ..vector import Vector
 from ..particles import CoreShellParticle, SphericalParticle
-from .particle_factory import ParticleFactory, polydisperse_parameter, rng
+from .particle_factory import ParticleFactory, polydisperse_parameter
 from . import command_factory
+from .. import constants
 
-PI = np.pi
+PI = constants.PI
+rng = constants.RNG
 
 @dataclass
 class SphericalCommandFactory(command_factory.CommandFactoryList):
@@ -77,6 +77,16 @@ class SphericalParticleFactory(ParticleFactory):
 
 
 @dataclass
+class CoreShellSphericalCommandFactory(SphericalCommandFactory):
+
+    def create_command_list(self) -> List[command_factory.CommandFactory]:
+        change_by_factor = rng.normal(loc = 1.0, scale = self.nominal_rescale_change)
+        spherical_commands = super().create_command_list()
+        compress_shell = command_factory.CompressShellFactory(change_by_factor)
+        return spherical_commands + compress_shell
+
+
+@dataclass
 class CoreShellParticleFactory(ParticleFactory):
     command_factory: SphericalCommandFactory
     core_radius: float
@@ -100,15 +110,20 @@ class CoreShellParticleFactory(ParticleFactory):
 
     @classmethod
     def gen_from_dict(cls, d: dict):
-        return cls(
-            command_factory=SphericalCommandFactory(
-                in_plane=d.get("in_plane", True),
-                nominal_step_size=d.get("core_radius") / 2,
-                add_magnetic_commands=bool(d.get("core_magnetization", 0))
-                ),
+        command_factory_type = CoreShellSphericalCommandFactory if d.get("enable_compress_shell", False) else SphericalCommandFactory
+        command_factory = command_factory_type(
+            in_plane=d.get("in_plane", True),
+            nominal_step_size=d.get("core_radius") / 2,
+            add_magnetic_commands=bool(d.get("core_magnetization", 0))
+            )
+        return CoreShellParticleFactory(
+            command_factory=command_factory,
             core_radius=d.get("core_radius"),
-            sphere_polydispersity=d.get("core_polydispersity",0.0),
-            sphere_sld=d.get("core_sld", 0.0),
+            core_polydispersity = d.get("core_polydispersity",0.0),
+            core_sld=d.get("core_sld", 0.0),
+            shell_thickness = d.get("shell_thickness", 0.0),
+            shell_polydispersity=d.get("shell_polydispersity", 0.0),
+            shell_sld = d.get("shell_sld", 0.0),
             solvent_sld=d.get("solvent_sld", 0.0),
             core_magnetization=d.get("core_magnetization", 0.0)
             )

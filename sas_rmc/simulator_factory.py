@@ -7,7 +7,7 @@ from typing import Callable, List, Tuple, Type, Union
 import numpy as np
 import pandas as pd
 
-from . import commands
+from . import commands, constants
 from .converters import dict_to_particle
 from .acceptance_scheme import MetropolisAcceptance
 from .viewer import CLIViewer
@@ -23,7 +23,7 @@ from .result_calculator import AnalyticalCalculator, NumericalCalculator, Result
 from .fitter import Fitter2D
 
 rng = np.random.default_rng()
-PI = np.pi
+PI = constants.PI
 RANGE_FACTOR = 1.2
 RESOLUTION_FACTOR = 1.0
 NUMERICAL_RANGE_FACTOR = 1.05

@@ -9,16 +9,14 @@ from scipy import constants
 from ..array_cache import round_vector
 from ..vector import Vector
 from ..shapes.shapes import Shape, Sphere, collision_detected
+from .. import constants
 
 
-get_physical_constant = lambda constant_str: constants.physical_constants[constant_str][0]
-
-PI = np.pi
-
-GAMMA_N = np.abs(get_physical_constant('neutron mag. mom. to nuclear magneton ratio')) # This value is unitless
-R_0 = get_physical_constant('classical electron radius')
-BOHR_MAG = get_physical_constant('Bohr magneton')
-B_H_IN_INVERSE_AMP_METRES = (GAMMA_N * R_0 / 2) / BOHR_MAG
+PI = constants.PI
+GAMMA_N = constants.GAMMA_N#np.abs(get_physical_constant('neutron mag. mom. to nuclear magneton ratio')) # This value is unitless
+R_0 = constants.R_0# get_physical_constant('classical electron radius')
+BOHR_MAG = constants.BOHR_MAG #get_physical_constant('Bohr magneton')
+B_H_IN_INVERSE_AMP_METRES = constants.B_H_IN_INVERSE_AMP_METRES# (GAMMA_N * R_0 / 2) / BOHR_MAG
 
 
 def magnetic_sld_in_angstrom_minus_2(magnetization_vector_in_amp_per_metre: Vector) -> Tuple[float, float, float]:

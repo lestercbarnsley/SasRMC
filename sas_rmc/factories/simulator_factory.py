@@ -14,22 +14,25 @@ from ..box_simulation import Box
 class SimulatorFactory(ABC):
 
     @abstractmethod
-    def create_simulator(self, controller: Controller, simulation: ScatteringSimulation, box_list: List[Box]) -> Simulator:
+    def create_simulator(self) -> Simulator:
         pass
 
 
 @dataclass
 class MemorizedSimulatorFactory(SimulatorFactory):
-
-    def create_simulator(self, controller: Controller, simulation: ScatteringSimulation, box_list: List[Box]) -> Simulator:
+    controller: Controller
+    simulation: ScatteringSimulation
+    box_list: List[Box]
+    
+    def create_simulator(self) -> Simulator:
          return MemorizedSimulator(
-            controller=controller,
+            controller=self.controller,
             evaluator=MonteCarloEvaluator(
-                simulation=simulation,
+                simulation=self.simulation,
                 viewer=CLIViewer()
             ),
-            simulation=simulation,
-            box_list=box_list
+            simulation=self.simulation,
+            box_list=self.box_list
         )
 
 

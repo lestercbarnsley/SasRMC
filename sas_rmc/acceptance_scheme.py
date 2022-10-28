@@ -6,8 +6,9 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 from .scattering_simulation import ScatteringSimulation
+from . import constants
 
-rng = np.random.default_rng()
+rng = constants.RNG
 
 
 class AcceptanceState(Enum):

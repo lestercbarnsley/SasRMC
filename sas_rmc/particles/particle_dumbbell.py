@@ -3,7 +3,6 @@
 from dataclasses import dataclass, field
 from typing import List
 
-
 from .particle import Particle
 from .particle_composite import ParticleComposite
 from .particle_core_shell_spherical import CoreShellParticle

@@ -9,8 +9,9 @@ from .box_simulation import Box
 from .result_calculator import FormResult, ResultCalculator
 from .detector import Polarization
 from .vector import cross
+from . import constants
 
-PI = np.pi
+PI = constants.PI
 
 mod = lambda arr: np.real(arr * np.conj(arr)) # this function is NOT a good candidate for caching
 

@@ -9,8 +9,9 @@ from .particles import Particle, ParticleComposite
 from .particles.particle import magnetic_sld_in_angstrom_minus_2
 from .vector import Vector, VectorSpace, broadcast_to_numpy_array, composite_function
 from .array_cache import method_array_cache
+from . import constants
 
-PI = np.pi
+PI = constants.PI
 
 @dataclass
 class FormResult:

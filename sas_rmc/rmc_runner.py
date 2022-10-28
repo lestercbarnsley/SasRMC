@@ -1,21 +1,21 @@
 #%%
-
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, List, Protocol
+from typing import Callable, List
 
 import yaml
 import pandas as pd
 
 from .simulator import Simulator, timeit
-from .box_simulation import Box
-from .detector import DetectorImage
-from .logger import Logger
+#from .box_simulation import Box
+#from .detector import DetectorImage
+from .logger import LogCallback, Logger
 from .simulator_factory import gen_config_from_dataframes, generate_file_path_maker
 from .template_generator import generate_core_shell, generate_dumbbell, generate_reload
 
 
-@dataclass
+'''@dataclass
 class RmcRunner:
     detector_list: List[DetectorImage]
     box_list: List[Box]
@@ -39,7 +39,45 @@ class RmcRunner:
                 self.simulator.simulate()
         else:
             logger = self.generate_logger()
-            logger.watch_simulation(self.simulator)
+            logger.watch_simulation(self.simulator)'''
+
+
+@dataclass
+class Runner(ABC):
+
+    @abstractmethod
+    def run(self) -> None:
+        pass
+
+
+@dataclass
+class RmcRunner(Runner):
+    logger: Logger
+    #callback_list: List[LogCallback]
+    simulator: Simulator
+    force_log: bool = True
+
+    '''def generate_logger(self) -> Logger:
+        return Logger(callback_list=self.callback_list)'''
+
+    def run_force_log(self) -> None:
+        with self.logger:#generate_logger() as l:
+            #why doesnb't the context manager work?'
+            #print(len(l.callback_list))
+            self.simulator.simulate()
+
+    def run_not_forced_log(self) -> None:
+        #logger = Logger(self.callback_list)
+        self.logger.before_event()
+        self.simulator.simulate()
+        self.logger.after_event()
+
+    def run(self) -> None:
+        if self.force_log:
+            self.run_force_log()
+        else:
+            self.run_not_forced_log()
+
 
 @dataclass
 class TemplateGenerator:
@@ -57,10 +95,7 @@ class TemplateGenerator:
         print(f"If you're having difficulty reading parameters in Excel, select top row and try Home -> Format -> Autofit Column Width")
 
 
-@dataclass
-class Runner(Protocol):
-    def run(self) -> None:
-        pass
+
 
 @timeit
 def rmc_runner_factory(input_config_source: Path, output_path: Path) -> RmcRunner:

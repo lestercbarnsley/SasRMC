@@ -9,10 +9,11 @@ from matplotlib import pyplot as plt
 from .particles.particle import Particle
 from .vector import Vector
 from .shapes.shapes import Cube
+from . import constants
 
 
-PI = np.pi
-rng = np.random.default_rng()
+PI = constants.PI
+rng = constants.RNG
 
 
 @dataclass

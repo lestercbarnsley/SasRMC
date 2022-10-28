@@ -11,9 +11,10 @@ import pandas as pd
 from .array_cache import method_array_cache
 from .vector import Vector, broadcast_array_function#, dot
 from .particles.particle import modulus_array 
+from . import constants
 
 
-PI = np.pi
+PI = constants.PI
 DEFAULT_SLICING_FRACTION_DENOM = 4 # This considers 6.25% of the detector (i.e, 1/4^2) per pixel, which is more than sufficient
 
 # name string constants, this is the source of truth for the names of these quantities
@@ -286,19 +287,33 @@ class DetectorImage: # Major refactor needed for detector image, as it shouldn't
         set_intensity_err_matrix = np.frompyfunc(set_shadow_factor, 2, 0)
         set_intensity_err_matrix(self._detector_pixels, new_shadow_factor)
 
+    def _q_delta(self, pixel_para_fn: Callable[[DetectorPixel], float], pixel_perp_fn: Callable[[DetectorPixel], float]) -> float:
+        smallest_q_s = sorted(self._detector_pixels, key = lambda pixel : Vector(pixel_perp_fn(pixel), pixel_para_fn(pixel)).mag)[:9]
+        next_qx = sorted(smallest_q_s[1:], key = lambda pixel : np.abs(pixel_perp_fn(pixel) - pixel_perp_fn(smallest_q_s[0])))[0]
+        return np.abs(pixel_para_fn(next_qx) - pixel_para_fn(smallest_q_s[0]))
+
     @property
     def qx_delta(self) -> float:
-        return np.average(np.diff(np.sort(np.unique(self.qX))))
+        return self._q_delta(lambda pixel : pixel.qX, lambda pixel : pixel.qY)
+        '''smallest_q_s = sorted(self._detector_pixels, key = lambda pixel : Vector(pixel.qX, pixel.qY).mag)[:9]
+        next_qx = sorted(smallest_q_s[1:], key = lambda pixel : np.abs(pixel.qY - smallest_q_s[0].qY))[0]
+        return np.abs(next_qx.qX - smallest_q_s[0].qX)'''
+        #return np.average(np.diff(np.sort(np.unique(self.qX))))
 
     @property
     def qy_delta(self) -> float:
-        return np.average(np.diff(np.sort(np.unique(self.qY))))
+        return self._q_delta(lambda pixel : pixel.qY, lambda pixel : pixel.qX)
+        '''smallest_q_s = sorted(self._detector_pixels, key = lambda pixel : Vector(pixel.qX, pixel.qY).mag)[:9]
+        next_qx = sorted(smallest_q_s[1:], key = lambda pixel : np.abs(pixel.qX - smallest_q_s[0].qX))[0]
+        return np.abs(next_qx.qY - smallest_q_s[0].qY)'''
+        #return np.average(np.diff(np.sort(np.unique(self.qY))))
 
     @property
     def qxqy_delta(self) -> Tuple[float, float]:
         return self.qx_delta, self.qy_delta
 
     def delta_qxqy_from_detector(self) -> Tuple[float, float]: # I don't think this should be here
+        # Mark for deletion
         qx_uniques = average_uniques(self.qX)
         qy_uniques = average_uniques(self.qY)
         diff_strategy = lambda arr : np.average(np.diff(arr))
@@ -325,7 +340,7 @@ class DetectorImage: # Major refactor needed for detector image, as it shouldn't
             plt.show()
         return fig
 
-    def intensity_2d(self, intensity: np.ndarray = None):
+    '''def intensity_2d(self, intensity: np.ndarray = None):
         intensity = intensity if intensity is not None else self.intensity
         if len(intensity.shape) == 2:
             return intensity
@@ -335,11 +350,28 @@ class DetectorImage: # Major refactor needed for detector image, as it shouldn't
             i = np.argmin(np.abs(qx_line - pixel.qX)) # This now finds the closest value rather than an exact match, then it overwrites the pixel
             j = np.argmin(np.abs(qy_line - pixel.qY))
             intensity_arr[j, i] = pixel_intensity
-        return intensity_arr
-        
+        return intensity_arr'''
+
+    def intensity_2d(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        qx_delta, qy_delta = self.qxqy_delta
+        line_maker = lambda arr, step: np.arange(start = np.min(arr), stop = np.max(arr), step = step)
+        qx_line = line_maker(self.qX, qx_delta / 2)
+        qy_line = line_maker(self.qY, qy_delta / 2)
+        qx, qy = np.meshgrid(qx_line, qy_line)
+        tensities = qx * 0
+        shadow = tensities * 0
+        this_qX, this_qY, this_intensity, this_shadow = self.qX, self.qY, self.intensity, self.shadow_factor
+        for idx, qx_i in np.ndenumerate(qx):
+            qy_i = qy[idx]
+            distances = np.sqrt((this_qX - qx_i)**2 + (this_qY - qy_i)**2)
+            amin = np.argmin(distances)
+            tensities[idx] = this_intensity[amin]
+            shadow[idx] = this_shadow[amin]
+        return qx, qy, tensities, shadow.astype(bool)
+
     def plot_intensity(self, log_intensity = True, show_crosshair = True, levels = 30, cmap = 'jet', show_fig: bool = True) -> Figure:
-        qx, qy = np.meshgrid(average_uniques(self.qX), average_uniques(self.qY))
-        return type(self).plot_intensity_matrix(self.intensity_2d(), qx, qy, log_intensity=log_intensity, show_crosshair=show_crosshair, levels=levels, cmap = cmap, show_fig=show_fig)
+        qx, qy, tensities, shadow = self.intensity_2d()
+        return type(self).plot_intensity_matrix(shadow * tensities, qx, qy, log_intensity=log_intensity, show_crosshair=show_crosshair, levels=levels, cmap = cmap, show_fig=show_fig)
     
     def get_pandas(self) -> pd.DataFrame:
         d = [pixel.to_dict() for _, pixel in np.ndenumerate(self._detector_pixels)]
@@ -474,14 +506,37 @@ class SimulatedDetectorImage(DetectorImage):
             return pixel.simulated_intensity
         return self.array_from_pixels(smear_pixel)
 
+    def simulated_intensity_2d(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        qx, qy, _, shadow = self.intensity_2d()
+        simulated_tensities = qx * 0
+        this_qX, this_qY, this_simulated_intensity = self.qX, self.qY, self.simulated_intensity
+        for idx, qx_i in np.ndenumerate(qx):
+            qy_i = qy[idx]
+            distances = np.sqrt((this_qX - qx_i)**2 + (this_qY - qy_i)**2)
+            simulated_tensities[idx] = this_simulated_intensity[np.argmin(distances)]
+        return qx, qy, simulated_tensities, shadow
+
+    def experimental_simulated_2d(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        qx, qy, experimental_intensity, shadow = self.intensity_2d()
+        simulated_tensities = qx * 0
+        this_qX, this_qY, this_simulated_intensity = self.qX, self.qY, self.simulated_intensity
+        for idx, qx_i in np.ndenumerate(qx):
+            qy_i = qy[idx]
+            if qx_i < 0:
+                simulated_tensities[idx] = experimental_intensity[idx]
+            else:
+                distances = np.sqrt((this_qX - qx_i)**2 + (this_qY - qy_i)**2)
+                simulated_tensities[idx] = this_simulated_intensity[np.argmin(distances)]
+        return qx, qy, simulated_tensities, shadow
+
     def plot_intensity(self, mode: int = 2, log_intensity: bool = True, show_crosshair: bool = True, levels: int = 30, cmap: str = 'jet', show_fig: bool = True) -> Figure:
         intensity_matrix_maker = [
-            lambda : self.experimental_intensity,
-            lambda : self.simulated_intensity,
-            lambda : np.where(self.qX < 0, self.experimental_intensity, self.simulated_intensity)
+            self.intensity_2d,
+            self.simulated_intensity_2d, #self.simulated_intensity,
+            self.experimental_simulated_2d,
         ][mode]
-        qx, qy = np.meshgrid(average_uniques(self.qX), average_uniques(self.qY))
-        return type(self).plot_intensity_matrix(self.intensity_2d(intensity_matrix_maker()), qx, qy, log_intensity=log_intensity, show_crosshair=show_crosshair, levels = levels, cmap = cmap, show_fig=show_fig)
+        qx, qy, intensity, shadow = intensity_matrix_maker()
+        return type(self).plot_intensity_matrix(shadow * intensity, qx, qy, log_intensity=log_intensity, show_crosshair=show_crosshair, levels = levels, cmap = cmap, show_fig=show_fig)
 
 
 

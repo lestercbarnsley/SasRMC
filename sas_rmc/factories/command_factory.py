@@ -6,7 +6,9 @@ from ..vector import Vector
 from .. import commands
 from ..box_simulation import Box
 from ..scattering_simulation import SimulationParams
-from .particle_factory import rng
+from .. import constants
+
+rng = constants.RNG
 
 
 def different_random_int(n: int, number_to_avoid: int) -> int:
@@ -123,4 +125,17 @@ class NuclearMagneticRescaleFactory(CommandFactory):
             simulation_params=simulation_params,
             change_by_factor=self.change_by_factor
             )
+
+
+@dataclass
+class CompressShellFactory(CommandFactory):
+    change_by_factor: float
+
+    def create_command(self, box: Box, particle_index: int, simulation_params: SimulationParams = None) -> commands.CompressShell:
+        return commands.CompressShell(
+            box=box,
+            particle_index=particle_index,
+            change_by_factor=self.change_by_factor,
+            reference_particle_index=different_random_int(len(box), particle_index),
+        )
 
