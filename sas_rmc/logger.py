@@ -142,27 +142,6 @@ class DetectorPlotter(LogCallback):
         comment_maker = lambda detector_number : f"_detector_{detector_number}_final"
         self.plot_detectors(comment_maker)
 
-
-def linear_function(xy: Tuple[float, float], mx: float,  my: float, c: float) -> float:
-    x, y = xy
-    return (mx * x) + (my * y) + c
-
-'''def interpolate_qxqy(qx: np.ndarray, qy: np.ndarray, intensity: np.ndarray, qx_target: float, qy_target: float) -> float:
-    q_target = Vector(qx_target, qy_target)
-    biggest_q = np.max(np.sqrt(qx**2 + qy**2))
-    distance_from_target_fn = lambda pixel : (Vector(pixel.qX, pixel.qY) - q_target).mag
-    filter_fn = lambda pixel : (distance_from_target_fn(pixel) < 0.1 * biggest_q)
-    pixels = [DetectorPixel(qx_i, qy_i, intensity_i, 0) for qx_i, qy_i, intensity_i in zip(qx, qy, intensity)]
-    pixels_filtered = [pixel for pixel in pixels if filter_fn(pixel)]
-    nearest_pixels = sorted(pixels_filtered, key=distance_from_target_fn)[:9] # filter to make this go faster
-    extract_from_nearest_pixels = lambda pixel_fn : np.array([pixel_fn(nearest_pixel) for nearest_pixel in nearest_pixels])
-    nearest_qx = extract_from_nearest_pixels(lambda pixel : pixel.qX)
-    nearest_qy = extract_from_nearest_pixels(lambda pixel : pixel.qY)
-    nearest_intensities = extract_from_nearest_pixels(lambda pixel : pixel.intensity)
-    starting_params = [0, 0, np.average(nearest_intensities)]
-    popt, _ = optimize.curve_fit(linear_function, (nearest_qx, nearest_qy), nearest_intensities, p0=starting_params)
-    return linear_function((qx_target, qy_target), *popt)'''
-
 def interpolate_qxqy(qx: np.ndarray, qy: np.ndarray, intensity: np.ndarray, shadow: np.ndarray, qx_target: float, qy_target: float) -> Optional[float]:
     distances = np.sqrt((qx - qx_target)**2 + (qy - qy_target)**2)
     arg_of_min = np.where(distances == np.amin(distances))
@@ -230,6 +209,27 @@ class ProfilePlotter(LogCallback): # This is bad code, a better solution is comp
     def after_event(self, d: dict = None) -> None:
         comment_maker = lambda detector_number : f"_profiles_{detector_number}_final"
         self.plot_detectors(comment_maker)
+
+
+@dataclass
+class BoxPlotter(LogCallback):
+    save_path_maker: Callable[[str, str],Path]
+    box_list: List[Box]
+    format: str = "pdf"
+    make_initial: bool = True
+
+    def plot_box_list(self) -> None:
+        box_writer = BoxWriter.standard_box_writer()
+        for box_number, box in enumerate(self.box_list):
+            fig = box_writer.to_plot(box)
+            fig_path = self.save_path_maker(f"_box_{box_number}_particle_positions", self.format)
+            fig.savefig(fig_path)
+
+    def before_event(self, d: dict = None) -> None:
+        pass
+
+    def after_event(self, d: dict = None) -> None:
+        self.plot_box_list()
 
 
 @dataclass

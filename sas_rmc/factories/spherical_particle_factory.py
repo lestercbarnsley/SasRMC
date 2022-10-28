@@ -8,6 +8,8 @@ from .particle_factory import ParticleFactory, polydisperse_parameter
 from . import command_factory
 from .. import constants
 
+import numpy as np
+
 PI = constants.PI
 rng = constants.RNG
 
@@ -80,10 +82,10 @@ class SphericalParticleFactory(ParticleFactory):
 class CoreShellSphericalCommandFactory(SphericalCommandFactory):
 
     def create_command_list(self) -> List[command_factory.CommandFactory]:
-        change_by_factor = rng.normal(loc = 1.0, scale = self.nominal_rescale_change)
+        change_by_factor = np.abs(rng.normal(loc = 1.0, scale = 0.3))
         spherical_commands = super().create_command_list()
         compress_shell = command_factory.CompressShellFactory(change_by_factor)
-        return spherical_commands + compress_shell
+        return spherical_commands + [compress_shell]
 
 
 @dataclass

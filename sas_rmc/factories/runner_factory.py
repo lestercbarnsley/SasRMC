@@ -11,7 +11,7 @@ import yaml
 from .acceptable_command_factory import MetropolisAcceptanceFactory
 from . import box_factory, particle_factory, spherical_particle_factory, simulation_factory, controller_factory, simulator_factory, detector_builder, parse_data
 from ..rmc_runner import Runner, RmcRunner
-from ..logger import Logger, ExcelCallback, DetectorPlotter, ProfilePlotter
+from ..logger import BoxPlotter, Logger, ExcelCallback, DetectorPlotter, ProfilePlotter
 
 
 @dataclass
@@ -85,8 +85,9 @@ class RMCRunnerFactory(RunnerFactory):
         excel_callback = ExcelCallback(save_path_maker, box_list, detector_list, controller )
         detector_plotter = DetectorPlotter(save_path_maker, detector_list, format=file_format, make_initial=False)
         profile_plotter= ProfilePlotter(save_path_maker, detector_list, format=file_format, make_initial=False)
+        box_plotter = BoxPlotter(save_path_maker, box_list, format = file_format, make_initial=False)
         return RmcRunner(
-            logger=Logger(callback_list=[excel_callback, detector_plotter, profile_plotter]),
+            logger=Logger(callback_list=[excel_callback, detector_plotter, profile_plotter, box_plotter]),
             simulator=simulator,
             force_log=config_dict.get("force_log_file", True)
         )
