@@ -209,6 +209,7 @@ class FlipMagnetization(ParticleCommand):
 class CompressShell(ParticleCommand):
     change_by_factor: float
     reference_particle_index: int
+    jump_to_particle: bool = True
 
     def execute(self) -> None:
         particle = self.particle
@@ -228,8 +229,23 @@ class CompressShell(ParticleCommand):
             solvent_sld=particle.solvent_sld
         )
         SetParticleState(self.box, self.particle_index, new_particle).execute()
-        JumpParticleTo(self.box, self.particle_index, self.reference_particle_index).execute()
+        if self.jump_to_particle:
+            JumpParticleTo(self.box, self.particle_index, self.reference_particle_index).execute()
 
+
+@dataclass
+class CompressAllShells(ParticleCommand):
+    change_by_factor: float
+
+    def execute(self) -> None:
+        for particle_index, _ in enumerate(self.box.particles):
+            compress_particle_shell = CompressShell(
+                box = self.box, 
+                particle_index=particle_index, 
+                change_by_factor=self.change_by_factor,
+                reference_particle_index=-1,
+                jump_to_particle=False)
+            compress_particle_shell.execute()
 
 
 @dataclass

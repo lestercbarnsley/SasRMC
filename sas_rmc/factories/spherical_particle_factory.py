@@ -22,18 +22,24 @@ class SphericalCommandFactory(command_factory.CommandFactoryList):
     add_magnetic_commands: bool = True
 
     def create_command_list(self) -> List[command_factory.CommandFactory]:
-        change_by_factor = rng.normal(loc = 1.0, scale = self.nominal_rescale_change)
+        change_by_factor = np.abs(rng.normal(loc = 1.0, scale = self.nominal_rescale_change))
+        massive_change_factor = change_by_factor**10
         position_delta_size = rng.normal(loc = 0.0, scale = self.nominal_step_size)
+        position_delta_massive = rng.normal(loc = 0.0, scale = 10 * self.nominal_angle_change)
         position_delta = (Vector.random_vector_xy if self.in_plane else Vector.random_vector)(position_delta_size)
+        position_big_massive = (Vector.random_vector_xy if self.in_plane else Vector.random_vector)(position_delta_massive)
         actual_angle_change = rng.normal(loc = 0.0, scale = self.nominal_angle_change)
         massive_angle_change = rng.uniform(low = -PI, high = PI)
 
         command_list = [
             command_factory.MoveParticleByFactory(position_delta=position_delta),
+            command_factory.MoveParticleByFactory(position_delta=position_big_massive),
             command_factory.JumpToParticleFactory(),
             command_factory.OrbitParticleFactory(actual_angle_change=actual_angle_change),
+            command_factory.OrbitParticleFactory(actual_angle_change=massive_angle_change),
             command_factory.MoveParticleToFactory(in_plane = self.in_plane),
-            command_factory.NuclearMagneticRescaleFactory(change_by_factor=change_by_factor)
+            command_factory.NuclearMagneticRescaleFactory(change_by_factor=change_by_factor),
+            command_factory.NuclearMagneticRescaleFactory(change_by_factor=massive_change_factor)
             ]
         magnetic_commands = [
             command_factory.RotateMagnetizationFactory(actual_angle_change=actual_angle_change),
@@ -82,10 +88,12 @@ class SphericalParticleFactory(ParticleFactory):
 class CoreShellSphericalCommandFactory(SphericalCommandFactory):
 
     def create_command_list(self) -> List[command_factory.CommandFactory]:
-        change_by_factor = np.abs(rng.normal(loc = 1.0, scale = 0.3))
+        change_by_factor = np.abs(rng.normal(loc = 1.0, scale = self.nominal_rescale_change))
+        massive_change_factor = change_by_factor**10
         spherical_commands = super().create_command_list()
         compress_shell = command_factory.CompressShellFactory(change_by_factor)
-        return spherical_commands + [compress_shell]
+        compress_shell_massive = command_factory.CompressShellFactory(massive_change_factor)
+        return spherical_commands + [compress_shell, compress_shell_massive]
 
 
 @dataclass
@@ -115,7 +123,7 @@ class CoreShellParticleFactory(ParticleFactory):
         command_factory_type = CoreShellSphericalCommandFactory if d.get("enable_compress_shell", False) else SphericalCommandFactory
         command_factory = command_factory_type(
             in_plane=d.get("in_plane", True),
-            nominal_step_size=d.get("core_radius") / 2,
+            nominal_step_size=d.get("core_radius") /2,
             add_magnetic_commands=bool(d.get("core_magnetization", 0))
             )
         return CoreShellParticleFactory(

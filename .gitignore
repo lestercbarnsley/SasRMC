@@ -18,3 +18,4 @@ tests/dumbbell_test.py
 sas_rmc/particles/__pycache__/
 sas_rmc/shapes/__pycache__/
 sas_rmc/factories/__pycache__/
+*.yaml

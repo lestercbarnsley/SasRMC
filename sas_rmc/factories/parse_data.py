@@ -58,3 +58,10 @@ def dataframe_to_config_dict(dataframe: pd.DataFrame) -> dict:
         param_value = row.iloc[1]
         add_row_to_dict(config_dict, param_name, param_value)
     return config_dict
+
+def dataseries_to_config_dict(dataseries: pd.Series) -> dict:
+    config_dict = dict()
+    for h, v in dataseries.items():
+        add_row_to_dict(config_dict, h, v)
+    return config_dict
+

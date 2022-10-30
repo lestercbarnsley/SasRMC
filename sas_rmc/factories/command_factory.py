@@ -131,11 +131,22 @@ class NuclearMagneticRescaleFactory(CommandFactory):
 class CompressShellFactory(CommandFactory):
     change_by_factor: float
 
-    def create_command(self, box: Box, particle_index: int, simulation_params: SimulationParams = None) -> commands.CompressShell:
+    def create_all_command(self, box: Box, particle_index: int, simulation_params: SimulationParams = None) -> commands.CompressAllShells:
+        return commands.CompressAllShells(
+            box = box,
+            particle_index=particle_index,
+            change_by_factor=self.change_by_factor
+        )
+
+    def create_single_command(self, box: Box, particle_index: int, simulation_params: SimulationParams = None) -> commands.CompressShell:
         return commands.CompressShell(
             box=box,
             particle_index=particle_index,
             change_by_factor=self.change_by_factor,
             reference_particle_index=different_random_int(len(box), particle_index),
         )
+
+    def create_command(self, box: Box, particle_index: int, simulation_params: SimulationParams = None) -> commands.Command:
+        cmd = rng.choice([self.create_all_command, self.create_single_command])
+        return cmd(box, particle_index, simulation_params)
 

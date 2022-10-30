@@ -260,6 +260,6 @@ class MultipleDetectorBuilder:
             buffer_source = self.config_dict.get("Buffer Source", 0.0)
             return [DetectorFromDataFrame(self.dataframes, data_source, buffer_source=buffer_source, config_dataframe=self.config_dict).create_detector_image()]
        
-        return [DetectorFromDataFrame(self.dataframes, row.get("Data Source", ""), row.get("Buffer Source", ""), config_dataframe=row).create_detector_image() for _, row in datasources.iterrows()]
+        return [DetectorFromDataFrame(self.dataframes, row.get("Data Source", ""), row.get("Buffer Source", ""), config_dataframe=parse_data.dataseries_to_config_dict(row)).create_detector_image() for _, row in datasources.iterrows()]
 
 
