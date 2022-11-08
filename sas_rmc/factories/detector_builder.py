@@ -240,6 +240,8 @@ class DetectorFromDataFrame(DetectorImageFactory):
         builder.add_config_factory(DetectorConfigFromDict(dataframe=self.config_dataframe))
         if parse_data.is_float(self.buffer_source):
             builder.add_buffer_strategy(BufferSubtraction(buffer_intensity = float(self.buffer_source)))
+        elif self.buffer_source == "":
+            builder.add_buffer_strategy(BufferSubtraction(buffer_intensity = 0.0))
         elif Path(self.buffer_source).exists():
             builder.add_buffer_strategy(BufferStrategyFromFile(self.buffer_source))
         else:

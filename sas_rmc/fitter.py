@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from .box_simulation import Box
-from .form_calculator import box_intensity_average
+from .form_calculator import box_intensity_average, FieldDirection
 from .scattering_simulation import SimulationParams, MAGNETIC_RESCALE, NUCLEAR_RESCALE
 from .result_calculator import ResultCalculator
 from .detector import DetectorImage, SimulatedDetectorImage, Polarization
@@ -13,14 +13,14 @@ from .detector import DetectorImage, SimulatedDetectorImage, Polarization
 IntensityCalculator = Callable[[SimulationParams], np.ndarray]
 ArraysFitter = Callable[[List[np.ndarray]], float]
 
-def intensity_calculator(box_list: List[Box], result_calculator: ResultCalculator, simulation_params: SimulationParams, polarization: Polarization) -> np.ndarray:
+def intensity_calculator(box_list: List[Box], result_calculator: ResultCalculator, simulation_params: SimulationParams, polarization: Polarization, field_direction: FieldDirection = FieldDirection.Y) -> np.ndarray:
     rescale_factor = simulation_params.get_value(NUCLEAR_RESCALE, default=1.0)
     magnetic_rescale = simulation_params.get_value(MAGNETIC_RESCALE, default=1.0)
-    intensity = box_intensity_average(box_list, result_calculator, rescale_factor=rescale_factor, magnetic_rescale=magnetic_rescale, polarization=polarization)
+    intensity = box_intensity_average(box_list, result_calculator, rescale_factor=rescale_factor, magnetic_rescale=magnetic_rescale, polarization=polarization, field_direction=field_direction)
     return intensity
 
-def create_intensity_calculator(box_list: List[Box], result_calculator: ResultCalculator, polarization: Polarization) -> IntensityCalculator:
-    return lambda simulation_params : intensity_calculator(box_list, result_calculator, simulation_params, polarization)
+def create_intensity_calculator(box_list: List[Box], result_calculator: ResultCalculator, polarization: Polarization, field_direction: FieldDirection = FieldDirection.Y) -> IntensityCalculator:
+    return lambda simulation_params : intensity_calculator(box_list, result_calculator, simulation_params, polarization, field_direction)
 
 def default_detector_to_weighting_function(detector: DetectorImage) -> np.ndarray:
     intensity_err = detector.intensity_err
@@ -41,18 +41,18 @@ def set_unsmeared_intensity(unsmeared_intensity: np.ndarray, simulated_qx: np.nd
     simulated_detector.simulated_intensity = unsmeared_intensity
     return unsmeared_intensity
 
-def intensity_calculator_and_smearer_from_detector(detector: SimulatedDetectorImage, box_list: List[Box], result_calculator_maker: Callable[[DetectorImage], ResultCalculator]):
+def intensity_calculator_and_smearer_from_detector(detector: SimulatedDetectorImage, box_list: List[Box], result_calculator_maker: Callable[[DetectorImage], ResultCalculator], field_direction: FieldDirection = FieldDirection.Y):
     result_calculator = result_calculator_maker(detector)
-    intensity_calculator_fn = create_intensity_calculator(box_list, result_calculator, detector.polarization)
+    intensity_calculator_fn = create_intensity_calculator(box_list, result_calculator, detector.polarization, field_direction=field_direction)
     smearer = lambda simulated_intensity: smear_simulated_intensity(simulated_intensity, result_calculator.qx_array, result_calculator.qy_array, detector)
     return lambda simulation_params : smearer(intensity_calculator_fn(simulation_params))
 
-def intensity_calculator_no_smearer(detector: SimulatedDetectorImage, box_list: List[Box], result_calculator_maker: Callable[[DetectorImage], ResultCalculator]):
+def intensity_calculator_no_smearer(detector: SimulatedDetectorImage, box_list: List[Box], result_calculator_maker: Callable[[DetectorImage], ResultCalculator], field_direction: FieldDirection = FieldDirection.Y):
     result_calculator = result_calculator_maker(detector)
     qX, qY, shadow_factor = detector.qX, detector.qY, detector.shadow_factor
     result_calculator.qx_array = qX
     result_calculator.qy_array = qY
-    intensity_calculator_fn = create_intensity_calculator(box_list, result_calculator, detector.polarization)
+    intensity_calculator_fn = create_intensity_calculator(box_list, result_calculator, detector.polarization, field_direction=field_direction)
     intensity_setter = lambda simulated_intensity: set_unsmeared_intensity(simulated_intensity * shadow_factor, qX, qY, detector)
     return lambda simulated_params : intensity_setter(intensity_calculator_fn(simulated_params))
 
@@ -81,13 +81,13 @@ class Fitter2D:
             )
     
     @classmethod
-    def generate_standard_fitter(cls, detector_list: List[SimulatedDetectorImage], box_list: List[Box], result_calculator_maker: Callable[[DetectorImage], ResultCalculator], weighting_function: Callable[[DetectorImage], np.ndarray] = None, masking_function: Callable[[DetectorImage], np.ndarray] = None, smearing: bool = True):
+    def generate_standard_fitter(cls, detector_list: List[SimulatedDetectorImage], box_list: List[Box], result_calculator_maker: Callable[[DetectorImage], ResultCalculator], weighting_function: Callable[[DetectorImage], np.ndarray] = None, masking_function: Callable[[DetectorImage], np.ndarray] = None, smearing: bool = True, field_direction: FieldDirection = FieldDirection.Y):
         if weighting_function is None:
             weighting_function = default_detector_to_weighting_function
         if masking_function is None:
             masking_function = lambda detector : detector.shadow_factor
         calculating_function = intensity_calculator_and_smearer_from_detector if smearing else intensity_calculator_no_smearer
-        intensity_calculators = [calculating_function(detector, box_list, result_calculator_maker) for detector in detector_list]
+        intensity_calculators = [calculating_function(detector, box_list, result_calculator_maker, field_direction=field_direction) for detector in detector_list]
         arrays_fitter = lambda simulated_intensities : average_chi_squared_fitter(detector_list, simulated_intensities, weighting_function, masking_function)
         return cls(
             intensity_calculators=intensity_calculators,
