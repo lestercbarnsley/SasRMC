@@ -53,6 +53,7 @@ class MetropolisAcceptance(AcceptanceScheme):
     rng_val: float = field(default_factory= rng.uniform)
     delta_chi: float = field(default_factory= lambda : 0, init = False)
     _after_chi: float = field(default_factory= lambda : 0, init = False)
+    _accepted_chi_squared: float = field(default_factory= lambda : np.inf, init = False)
 
     def set_delta_chi(self, delta_chi: float, after_chi: float) -> None:
         self.delta_chi = delta_chi
@@ -77,10 +78,12 @@ class MetropolisAcceptance(AcceptanceScheme):
         
         if self.is_acceptable():
             simulation.update_goodness_of_fit(new_chi_squared)#.update_chi_squared(new_chi_squared)
+        self._accepted_chi_squared = simulation.current_goodness_of_fit
         
     def get_loggable_data(self) -> dict:
         return {
-            "Current Chi": self._after_chi,
+            "Current Chi^2": self._accepted_chi_squared,
+            "Test Chi^2": self._after_chi,
             "RNG": self.rng_val,
             "Temperature": self.temperature,
             "Acceptable Move": self.is_acceptable(),

@@ -178,11 +178,12 @@ def plot_profile(detector: SimulatedDetectorImage, file_name: Path, angle_list: 
     for factor, colour, angle in zip(factors, colours, angle_list):
         q, exp_int = sector_average(detector, lambda d: d.intensity_2d(), sector_tuple=[angle, PI/10])
         q_sim, sim_int = sector_average(detector, lambda d: d.simulated_intensity_2d(), sector_tuple=[angle, PI/10])
-        ax.loglog(q, (10**factor) * exp_int, colour + '.' )
+        ax.loglog(q, (10**factor) * exp_int, colour + '.' , label = f"{(180/PI)*angle:.2f} deg")
         ax.loglog(q_sim, (10**factor) * sim_int, colour + '-')
     fig.set_size_inches(5,5)
     ax.set_xlabel(r'Q ($\AA^{-1}$)',fontsize =  16)#'x-large')
     ax.set_ylabel(r'Intensity (cm $^{-1}$)',fontsize =  16)#'x-large')
+    ax.legend()
     fig.savefig(file_name)
     
 
