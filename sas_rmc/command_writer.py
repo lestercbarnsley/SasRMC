@@ -2,7 +2,6 @@
 from dataclasses import dataclass
 from typing import Callable, List, Optional, Protocol
 
-import numpy as np
 from matplotlib.figure import Figure
 from matplotlib.axes import Axes
 from matplotlib import pyplot as plt

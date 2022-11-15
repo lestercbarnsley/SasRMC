@@ -7,16 +7,14 @@ from pathlib import Path
 
 import pandas as pd
 import numpy as np
-#from scipy.optimize import curve_fit
 from matplotlib import pyplot as plt
 from matplotlib import colors as mcolors
 
 from .simulator import Simulator
 from .controller import Controller, CommandProtocol
-from .detector import DetectorImage, DetectorPixel, SimulatedDetectorImage
+from .detector import DetectorImage, SimulatedDetectorImage
 from .box_simulation import Box
 from .command_writer import BoxWriter, CommandWriter, Loggable
-from .vector import Vector
 from . import constants
 
 PI = constants.PI

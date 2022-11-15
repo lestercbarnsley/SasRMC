@@ -4,8 +4,6 @@ from functools import wraps
 from typing import List, Optional, Protocol, Union
 import time
 
-#import numpy as np
-
 from .controller import Controller
 from . import commands
 from .acceptance_scheme import AcceptanceScheme, UnconditionalAcceptance
@@ -99,7 +97,6 @@ class MemorizedSimulator(Simulator):
         acceptable = self.evaluator.evaluate(command)
         if acceptable:
             self.state_command = commands.SetSimulationState.gen_from_simulation(self.simulation.simulation_params, self.box_list)
-            #self.state_controller.add_command(state_command)
 
     @timeit
     def simulate(self) -> None:

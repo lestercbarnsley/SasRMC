@@ -109,49 +109,6 @@ def load_config(config_file: str) -> Runner:
     return runner_factory.create_runner(input_config_source = input_config_path, output_path=output_path)
 
 
-'''
-@dataclass
-class RMCRunnerFactory(RunnerFactory):
+if __name__ == "__main__":
+    pass
 
-    def create_runner(input_config_source: Path, output_path: Path) -> Runner:
-        print(f"Loading configuration from {input_config_source}, please wait a moment...")
-        dataframes = pd.read_excel(
-            input_config_source,
-            dtype = str,
-            sheet_name = None,
-            keep_default_na=False,
-            )
-        dataframe, dataframe_2 = list(dataframes.values())[:2]
-        config_dict = dataframe_to_config_dict(dataframe)
-        particle_factory = dict_to_particle_factory(config_dict)
-        box_factory_ = box_factory.gen_from_dict(config_dict)
-        box_list_factory = box_factory.gen_list_factory_from_dict(config_dict)
-        simulation_factory_ = simulation_factory.gen_from_dict(config_dict, )
-        controller_factory_ = controller_factory.gen_from_dict(config_dict, particle_factory, acceptable_command_factory=MetropolisAcceptanceFactory())
-        simulator_factory_ = simulator_factory.MemorizedSimulatorFactory()
-        box_list = box_list_factory.create_box_list(box_factory_, particle_factory)
-
-        detector_list = simulator_config.generate_detector_list(dataframes)
-        box_list = simulator_config.generate_box_list(detector_list)
-        save_file_maker = simulator_config.generate_save_file_maker(output_path)
-        scattering_sim = simulator_config.generate_scattering_simulation(detector_list, box_list)
-        controller = simulator_config.generate_controller(scattering_sim, box_list)
-        simulator = simulator_config.generate_simulator(
-            controller=controller,
-            simulation=scattering_sim,
-            box_list=box_list
-        )
-        force_log = simulator_config.force_log
-        output_format = None if simulator_config.output_plot_format == "none" else simulator_config.output_plot_format
-        print("Configuration loaded. Simulation starting.")
-        return RmcRunner(
-            detector_list=detector_list,
-            box_list=box_list,
-            save_file_maker=save_file_maker,
-            simulator=simulator,
-            force_log=force_log,
-            output_format=output_format
-        )
-
-
-def rmc_runner_factory(input_config_source: Path, output_path: Path) -> RmcRunner:'''

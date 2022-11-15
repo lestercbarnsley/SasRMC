@@ -1,6 +1,6 @@
 #%%
 from functools import reduce
-from typing import Any, Callable, Generator, List, Tuple, Type#, Union
+from typing import Any, Callable, Generator, List, Tuple, Type
 from dataclasses import dataclass
 import math
 
