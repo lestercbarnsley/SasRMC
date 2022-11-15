@@ -55,7 +55,10 @@ def gen_from_dict(d: dict, result_calculator_maker: Callable[[DetectorImage], Re
     field_direction = {
         "X": FieldDirection.X,
         "Y": FieldDirection.Y,
-        "Z": FieldDirection.Z
+        "Z": FieldDirection.Z,
+        "x": FieldDirection.X,
+        "y": FieldDirection.Y,
+        "z": FieldDirection.Z
     }[d.get("field_direction", "Y")]
     return Fitter2DSimulationFactory(detector_smearing, result_calculator_maker, nominal_concentration, field_direction)
 

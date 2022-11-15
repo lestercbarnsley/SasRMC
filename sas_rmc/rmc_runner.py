@@ -2,44 +2,17 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, List
+from typing import Callable
 
 import yaml
 import pandas as pd
 
 from .simulator import Simulator, timeit
-#from .box_simulation import Box
-#from .detector import DetectorImage
-from .logger import LogCallback, Logger
+from .logger import Logger
 from .simulator_factory import gen_config_from_dataframes, generate_file_path_maker
 from .template_generator import generate_core_shell, generate_dumbbell, generate_reload
 
 
-'''@dataclass
-class RmcRunner:
-    detector_list: List[DetectorImage]
-    box_list: List[Box]
-    save_file_maker: Callable[[str, str], Path]
-    simulator: Simulator
-    force_log: bool = True
-    output_format: str = None
-
-    def generate_logger(self) -> Logger:
-        return Logger(
-            box_list=self.box_list,
-            controller=self.simulator.controller,
-            save_path_maker=self.save_file_maker,
-            detector_list=self.detector_list,
-            output_format=self.output_format
-        )
-
-    def run(self) -> None:
-        if self.force_log:      
-            with self.generate_logger():
-                self.simulator.simulate()
-        else:
-            logger = self.generate_logger()
-            logger.watch_simulation(self.simulator)'''
 
 
 @dataclass
@@ -53,21 +26,15 @@ class Runner(ABC):
 @dataclass
 class RmcRunner(Runner):
     logger: Logger
-    #callback_list: List[LogCallback]
     simulator: Simulator
     force_log: bool = True
 
-    '''def generate_logger(self) -> Logger:
-        return Logger(callback_list=self.callback_list)'''
 
     def run_force_log(self) -> None:
-        with self.logger:#generate_logger() as l:
-            #why doesnb't the context manager work?'
-            #print(len(l.callback_list))
+        with self.logger:
             self.simulator.simulate()
 
     def run_not_forced_log(self) -> None:
-        #logger = Logger(self.callback_list)
         self.logger.before_event()
         self.simulator.simulate()
         self.logger.after_event()

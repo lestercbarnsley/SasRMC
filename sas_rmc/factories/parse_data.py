@@ -45,8 +45,8 @@ def add_row_to_dict(d: dict, param_name: str, param_value: str) -> None:
     for is_f, t in [
             (is_int, int),
             (is_float, float),
-            (is_bool_in_truth_dict, lambda v : truth_dict[v]),
-            (lambda v : True, lambda v : v)]:
+            (is_bool_in_truth_dict, lambda v_ : truth_dict[v_]),
+            (lambda _ : True, lambda v_ : v_)]:
         if is_f(v):
             d[param_name] = t(v)
             return

@@ -4,8 +4,7 @@ from typing import List
 
 import numpy as np
 
-from sas_rmc.shapes.shapes import Sphere
-
+from .shapes.shapes import Sphere
 from .acceptance_scheme import AcceptanceScheme
 from .scattering_simulation import MAGNETIC_RESCALE, NUCLEAR_RESCALE, ScatteringSimulation
 from .box_simulation import Box

@@ -1,7 +1,7 @@
 #%%
 
 from enum import Enum
-from typing import Callable, List, Tuple
+from typing import Callable, List
 
 import numpy as np
 
