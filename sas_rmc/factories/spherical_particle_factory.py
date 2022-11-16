@@ -13,6 +13,8 @@ import numpy as np
 PI = constants.PI
 rng = constants.RNG
 
+DEFAULT_IN_PLANE_SETTING = False
+
 @dataclass
 class SphericalCommandFactory(command_factory.CommandFactoryList):
     in_plane: bool = True
@@ -72,7 +74,7 @@ class SphericalParticleFactory(ParticleFactory):
     def gen_from_dict(cls, d: dict):
         return cls(
             command_factory=SphericalCommandFactory(
-                in_plane=d.get("in_plane", True),
+                in_plane=d.get("in_plane", DEFAULT_IN_PLANE_SETTING),
                 nominal_step_size=d.get("core_radius") / 2,
                 add_magnetic_commands=bool(d.get("core_magnetization", 0))
                 ),
@@ -122,7 +124,7 @@ class CoreShellParticleFactory(ParticleFactory):
     def gen_from_dict(cls, d: dict):
         command_factory_type = CoreShellSphericalCommandFactory if d.get("enable_compress_shell", False) else SphericalCommandFactory
         command_factory = command_factory_type(
-            in_plane=d.get("in_plane", True),
+            in_plane=d.get("in_plane", DEFAULT_IN_PLANE_SETTING),
             nominal_step_size=d.get("core_radius") /2,
             add_magnetic_commands=bool(d.get("core_magnetization", 0))
             )

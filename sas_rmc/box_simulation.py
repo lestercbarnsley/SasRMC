@@ -1,7 +1,7 @@
 #%%
 
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Callable
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -14,6 +14,15 @@ from . import constants
 
 PI = constants.PI
 rng = constants.RNG
+
+
+def collision_detected_3d(particle_1: Particle, particle_2: Particle) -> bool:
+    if particle_1.collision_detected(particle_2):
+        return True
+    '''if particle_1.position.z == particle_2.position.z:
+        return False'''
+    test_position = Vector(particle_2.position.x, particle_2.position.y, particle_1.position.z) # The central position of the second particle can't be under the shadow of the first, but this doesn't mean that the two shadows can't overlap
+    return particle_1.is_inside(test_position)
 
 
 @dataclass
@@ -50,12 +59,13 @@ class Box:
     def is_magnetic(self) -> bool:
         return any(particle.is_magnetic() for particle in self.particles)
     
-    def wall_or_particle_collision(self, i: int, half_test = False) -> bool:
+    def wall_or_particle_collision(self, i: int, half_test = False, collision_detected_fn: Callable[[Particle, Particle], bool] = None) -> bool:
         particle = self.particles[i]
         if not self.is_inside(particle.position):
             return True
         compare_to_i = (lambda j: i < j) if half_test else (lambda j: i != j) #There's no way to get around this step, it will be done one way or another
-        return any(compare_to_i(j) and particle.collision_detected(particle2) for j, particle2 in enumerate(self.particles))
+        collision_detected_fn = collision_detected_fn if collision_detected_fn is not None else collision_detected_3d
+        return any(compare_to_i(j) and collision_detected_fn(particle, particle2) for j, particle2 in enumerate(self.particles))
         
 
     def move_inside_box(self, i: int, in_plane: bool = False) -> None:
@@ -68,7 +78,6 @@ class Box:
     def _force_particle_inside_box(self, i, half_test = False, in_plane = False) -> None:
         for _ in range(1000):
             if not self.wall_or_particle_collision(i, half_test=half_test):
-                #print(j)
                 return
             self.move_inside_box(i, in_plane=in_plane)
         raise ValueError("Failed to find unexcluded particle configuration. Try lowering number of particles in box")

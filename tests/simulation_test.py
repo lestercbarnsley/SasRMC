@@ -436,7 +436,7 @@ def test_controller_acceptance_independence():
     box = box_list[0]
     structure_box(box)
     positions = [
-        Vector(0, 50, 500),
+        Vector(-500, 50, 500),
         Vector(15,15,15),
         Vector(-400, -400, 0),
         Vector(1e7, 1e7, 1e7),

@@ -60,10 +60,7 @@ class Vector:
         return np.array(self.to_list())
 
     def to_tuple(self) -> Tuple[float, float, float]:
-        return tuple(self.itercomps())#self.x, self.y, self.z
-
-    """ def __getitem__(self, i: int) -> float:
-        return self.to_list()[i] """
+        return tuple(self.itercomps())
 
     def __len__(self) -> int:
         return 3
@@ -83,7 +80,7 @@ class Vector:
         return dot(self.to_tuple(), vector_as_tuple)
 
     def __mul__(self, vector_or_scalar):
-        if isinstance(vector_or_scalar, Vector) or type(vector_or_scalar) in [list, tuple]:# type(vector_or_scalar) == type(self): This should be hardcodes as the base class because a sub class should be multipliable by any Vector
+        if isinstance(vector_or_scalar, Vector) or type(vector_or_scalar) in [list, tuple]:#This should be hardcodes as the base class because a sub class should be multipliable by any Vector
             return self.dot(vector_or_scalar)
         return type(self)(
             x = self.x * vector_or_scalar,
@@ -301,21 +298,9 @@ class Interface:
         position_ref = position - self.position_marker
         return position_ref - (self.normal.unit_vector * position_ref) * self.normal.unit_vector + self.position_marker
 
-# Mark for deletion        
-'''def dot(a: Union[Tuple, Vector], b: Union[Tuple, Vector]) -> Tuple[float, float, float]:
-    return _dot(a.to_tuple() if isinstance(a, Vector) else a, b.to_tuple() if isinstance(b, Vector) else b)'''
-
 
 if __name__ == "__main__":
-    from matplotlib import pyplot as plt
-
-    fig = plt.figure()
-    ax = fig.add_subplot(projection = '3d')
-
-    vectors = [Vector.random_vector(1) for _ in range(100)]
-    for vector in vectors:
-        ax.scatter(vector.x, vector.y, vector.z, color = 'b', marker = 'o')
-    plt.show()    
+    pass
 
 
 

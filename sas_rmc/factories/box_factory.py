@@ -8,6 +8,7 @@ import numpy as np
 from ..shapes.shapes import Cube
 from ..box_simulation import Box
 from ..detector import DetectorImage
+from ..vector import Vector
 from .particle_factory import ParticleFactory
 from .. import constants
 
@@ -33,7 +34,11 @@ class BoxDFactory(BoxFactory):
             particles=[particle_factory.create_particle() for _ in range(total_particles)],
             cube = Cube(dimension_0=self.dimension_0, dimension_1=self.dimension_1, dimension_2=self.dimension_2)
             )
-        box.force_inside_box(in_plane = self.in_plane)
+        box.force_inside_box(in_plane = True)
+        if not self.in_plane:
+            for i, particle in enumerate(box.particles):
+                new_position = particle.position + Vector(0,0,1e-4)
+                box.particles[i] = particle.set_position(new_position)
         return box
 
 

@@ -340,18 +340,6 @@ class DetectorImage: # Major refactor needed for detector image, as it shouldn't
             plt.show()
         return fig
 
-    '''def intensity_2d(self, intensity: np.ndarray = None):
-        intensity = intensity if intensity is not None else self.intensity
-        if len(intensity.shape) == 2:
-            return intensity
-        qx_line, qy_line = average_uniques(self.qX), average_uniques(self.qY)
-        intensity_arr = np.zeros((len(qy_line), len(qx_line)))
-        for pixel, pixel_intensity in zip(self._detector_pixels, intensity):
-            i = np.argmin(np.abs(qx_line - pixel.qX)) # This now finds the closest value rather than an exact match, then it overwrites the pixel
-            j = np.argmin(np.abs(qy_line - pixel.qY))
-            intensity_arr[j, i] = pixel_intensity
-        return intensity_arr'''
-
     def intensity_2d(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         qx_delta, qy_delta = self.qxqy_delta
         line_maker = lambda arr, step: np.arange(start = np.min(arr), stop = np.max(arr), step = step)
