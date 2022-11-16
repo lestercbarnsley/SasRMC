@@ -6,16 +6,17 @@ import numpy as np
 
 from .box_simulation import Box
 from .form_calculator import box_intensity_average, FieldDirection
-from .scattering_simulation import SimulationParams, MAGNETIC_RESCALE, NUCLEAR_RESCALE
+from .scattering_simulation import SimulationParams
 from .result_calculator import ResultCalculator
 from .detector import DetectorImage, SimulatedDetectorImage, Polarization
+from . import constants
 
 IntensityCalculator = Callable[[SimulationParams], np.ndarray]
 ArraysFitter = Callable[[List[np.ndarray]], float]
 
 def intensity_calculator(box_list: List[Box], result_calculator: ResultCalculator, simulation_params: SimulationParams, polarization: Polarization, field_direction: FieldDirection = FieldDirection.Y) -> np.ndarray:
-    rescale_factor = simulation_params.get_value(NUCLEAR_RESCALE, default=1.0)
-    magnetic_rescale = simulation_params.get_value(MAGNETIC_RESCALE, default=1.0)
+    rescale_factor = simulation_params.get_value(constants.NUCLEAR_RESCALE, default=1.0)
+    magnetic_rescale = simulation_params.get_value(constants.MAGNETIC_RESCALE, default=1.0)
     intensity = box_intensity_average(box_list, result_calculator, rescale_factor=rescale_factor, magnetic_rescale=magnetic_rescale, polarization=polarization, field_direction=field_direction)
     return intensity
 

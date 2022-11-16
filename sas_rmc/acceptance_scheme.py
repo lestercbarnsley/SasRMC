@@ -70,14 +70,14 @@ class MetropolisAcceptance(AcceptanceScheme):
 
     def handle_simulation(self, simulation: ScatteringSimulation) -> None:
         currently_acceptable = self.is_acceptable()
-        old_chi_squared = simulation.current_goodness_of_fit# simulation.chi_squared_current
-        new_chi_squared = simulation.get_goodness_of_fit() if currently_acceptable else old_chi_squared#simulation.test_chi_squared() if not_unacceptable else old_chi_squared
+        old_chi_squared = simulation.current_goodness_of_fit
+        new_chi_squared = simulation.get_goodness_of_fit() if currently_acceptable else old_chi_squared
         delta_chi = new_chi_squared - old_chi_squared
         self.set_delta_chi(delta_chi=delta_chi, after_chi = new_chi_squared)
         self._calculate_success()
         
         if self.is_acceptable():
-            simulation.update_goodness_of_fit(new_chi_squared)#.update_chi_squared(new_chi_squared)
+            simulation.update_goodness_of_fit(new_chi_squared)
         self._accepted_chi_squared = simulation.current_goodness_of_fit
         
     def get_loggable_data(self) -> dict:

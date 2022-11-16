@@ -9,8 +9,9 @@ from ..form_calculator import FieldDirection
 from ..result_calculator import ResultCalculator
 from ..detector import DetectorImage
 from ..box_simulation import Box
-from ..scattering_simulation import ScatteringSimulation, SimulationParam, SimulationParams, NUCLEAR_RESCALE, MAGNETIC_RESCALE
+from ..scattering_simulation import ScatteringSimulation, SimulationParam, SimulationParams
 from ..fitter import Fitter2D
+from .. import constants
 
 
 @dataclass
@@ -23,8 +24,8 @@ class SimulationFactory(ABC):
 
 def box_simulation_params_factory(starting_rescale: float = 1.0, starting_magnetic_rescale: float = 1.0) -> SimulationParams:
     params = [
-        SimulationParam(value = starting_rescale, name = NUCLEAR_RESCALE, bounds=(0, np.inf)), 
-        SimulationParam(value = starting_magnetic_rescale, name = MAGNETIC_RESCALE, bounds=(0, np.inf))
+        SimulationParam(value = starting_rescale, name = constants.NUCLEAR_RESCALE, bounds=(0, np.inf)), 
+        SimulationParam(value = starting_magnetic_rescale, name = constants.MAGNETIC_RESCALE, bounds=(0, np.inf))
         ]
     return SimulationParams(params = params)
 

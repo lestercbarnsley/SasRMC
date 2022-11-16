@@ -6,11 +6,12 @@ import numpy as np
 
 from .shapes.shapes import Sphere
 from .acceptance_scheme import AcceptanceScheme
-from .scattering_simulation import MAGNETIC_RESCALE, NUCLEAR_RESCALE, ScatteringSimulation
+from .scattering_simulation import ScatteringSimulation
 from .box_simulation import Box
 from .particles import Particle, CoreShellParticle
 from .scattering_simulation import SimulationParams
 from .vector import Vector
+from . import constants
 
 # execute should be a pure function, so I get rid of the instance of rng
 
@@ -282,7 +283,7 @@ class NuclearScale(ScaleCommand):
     change_to_factor: float
 
     def execute(self) -> None:
-        self.simulation_params.set_value(key = NUCLEAR_RESCALE, value = self.change_to_factor)
+        self.simulation_params.set_value(key = constants.NUCLEAR_RESCALE, value = self.change_to_factor)
 
 
 @dataclass
@@ -290,7 +291,7 @@ class MagneticScale(ScaleCommand):
     change_to_factor: float
 
     def execute(self) -> None:
-        self.simulation_params.set_value(key = MAGNETIC_RESCALE, value = self.change_to_factor)
+        self.simulation_params.set_value(key = constants.MAGNETIC_RESCALE, value = self.change_to_factor)
 
 
 @dataclass
@@ -298,7 +299,7 @@ class NuclearRescale(ScaleCommand):
     change_by_factor: float = 1
 
     def execute(self) -> None:
-        nuclear_rescale = self.simulation_params.get_value(key = NUCLEAR_RESCALE)
+        nuclear_rescale = self.simulation_params.get_value(key = constants.NUCLEAR_RESCALE)
         new_scale = nuclear_rescale * self.change_by_factor
         NuclearScale(self.simulation_params, change_to_factor=new_scale).execute()
         
@@ -308,7 +309,7 @@ class MagneticRescale(ScaleCommand):
     change_by_factor: float = 1
 
     def execute(self) -> None:
-        magnetic_rescale = self.simulation_params.get_value(key = MAGNETIC_RESCALE)
+        magnetic_rescale = self.simulation_params.get_value(key = constants.MAGNETIC_RESCALE)
         new_scale = magnetic_rescale * self.change_by_factor
         MagneticScale(self.simulation_params, change_to_factor=new_scale).execute()
 
@@ -327,7 +328,7 @@ class NuclearMagneticRescale(ScaleCommand):
     change_by_factor: float = 1
 
     def execute(self) -> None:
-        rescale_value = self.simulation_params.get_value(key = NUCLEAR_RESCALE)
+        rescale_value = self.simulation_params.get_value(key = constants.NUCLEAR_RESCALE)
         new_scale_factor = rescale_value * self.change_by_factor
         NuclearMagneticScale(self.simulation_params, change_to_factor=new_scale_factor).execute()
 
@@ -363,7 +364,6 @@ class SetSimulationState(Command):
     @classmethod
     def gen_from_simulation(cls, simulation_params: SimulationParams, box_list: List[Box]):
         command_ledger = [SetSimulationParams.gen_from_simulation_params(simulation_params)]
-        #command_ledger.append(SetSimulationParams(simulation_params, change_to_factors=simulation_params.values))
         for box in box_list: # Google Python style guide says to write it this way rather than a 2-iterator list comprehension
             for particle_index, _ in enumerate(box.particles):
                 command_ledger.append(

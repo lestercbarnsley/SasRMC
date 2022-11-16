@@ -5,8 +5,6 @@ from typing import List, Optional, Protocol, Tuple
 
 import numpy as np
 
-NUCLEAR_RESCALE = "Nuclear rescale"
-MAGNETIC_RESCALE = "Magnetic rescale"
 
 
 @dataclass

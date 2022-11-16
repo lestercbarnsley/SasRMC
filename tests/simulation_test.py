@@ -5,15 +5,15 @@ from pathlib import Path
 from typing import List
 
 import numpy as np
-import sas_rmc
 
+import sas_rmc
 from sas_rmc.box_simulation import Box
 from sas_rmc.controller import Controller
 from sas_rmc.particles import CoreShellParticle, Dumbbell, Particle
-from sas_rmc.scattering_simulation import MAGNETIC_RESCALE, NUCLEAR_RESCALE, ScatteringSimulation
+from sas_rmc.scattering_simulation import ScatteringSimulation
 from sas_rmc import Vector, SimulatedDetectorImage, Polarization, DetectorConfig, commands
 from sas_rmc.fitter import Fitter2D
-from sas_rmc import shapes
+from sas_rmc import shapes, constants
 
 
 PI = np.pi
@@ -88,7 +88,7 @@ def default_simulation(box_list: List[Box]) -> ScatteringSimulation:
         box_list = box_list,
         result_calculator_maker=lambda detector : sas_rmc.result_calculator.AnalyticalCalculator(qx, qy)
     )
-    return ScatteringSimulation(fitter=fitter, simulation_params=sas_rmc.simulator_factory.box_simulation_params_factory())
+    return ScatteringSimulation(fitter=fitter, simulation_params=sas_rmc.box_simulation_params_factory())
 
 def test_particle_move():
     box = default_box()
@@ -235,7 +235,6 @@ def test_modulated_form_cache_polish():
     d3 = get_modulated_form()
     f3 = box[14].form_array(qx_array, qy_array, orientation=box[14].orientation)
     assert np.average(d3 - d1) == 0
-    #assert id(d3) == id(d1) # This worked when particles were mutable, so I might delete this!
     assert np.average(d3 - d2) != 0
     assert id(d3) != id(d2)
     assert np.average(f2 - f1) == 0
@@ -256,28 +255,26 @@ def test_dumbbell_modulated_and_form_array():
         position_d2 = box[14].seed_particle.position
         command = commands.MoveParticleTo(box, 14, position)
         command2 = commands.MoveParticleTo(box, 14, position_2)
-        d1 = get_current_modulated_form_array(box[14])#.modulated_form_array(qx_array, qy_array, position=box[14].position, orientation=box[14].orientation)
-        f1 = get_current_form_array(box[14])#.form_array(qx_array, qy_array, orientation=box[14].orientation)
-        dcore_01 = get_current_modulated_form_array(box[14].core_particle)#.modulated_form_array(qx_array, qy_array, position=box[14].particle_1.position, orientation=box[14].particle_1.orientation)
-        dcore_02 = get_current_modulated_form_array(box[14].seed_particle)#.modulated_form_array(qx_array, qy_array,position=box[14].particle_2.position, orientation=box[14].particle_2.orientation)
+        d1 = get_current_modulated_form_array(box[14])
+        f1 = get_current_form_array(box[14])
+        dcore_01 = get_current_modulated_form_array(box[14].core_particle)
+        dcore_02 = get_current_modulated_form_array(box[14].seed_particle)
         command.execute()
-        d2 = get_current_modulated_form_array(box[14])#box[14].modulated_form_array(qx_array, qy_array, position=box[14].position, orientation=box[14].orientation)
-        f2 = get_current_form_array(box[14])#box[14].form_array(qx_array, qy_array, orientation=box[14].orientation)
-        dcore_11 = get_current_modulated_form_array(box[14].core_particle)#box[14].particle_1.modulated_form_array(qx_array, qy_array, position=box[14].particle_1.position, orientation=box[14].particle_1.orientation)
-        dcore_12 = get_current_modulated_form_array(box[14].seed_particle)#box[14].particle_2.modulated_form_array(qx_array, qy_array,position=box[14].particle_2.position, orientation=box[14].particle_2.orientation)
+        d2 = get_current_modulated_form_array(box[14])
+        f2 = get_current_form_array(box[14])
+        dcore_11 = get_current_modulated_form_array(box[14].core_particle)
+        dcore_12 = get_current_modulated_form_array(box[14].seed_particle)
         command2.execute()
-        d3 = get_current_modulated_form_array(box[14])#box[14].modulated_form_array(qx_array, qy_array, position=box[14].position, orientation=box[14].orientation)
-        f3 = get_current_form_array(box[14])#box[14].form_array(qx_array, qy_array, orientation=box[14].orientation)
+        d3 = get_current_modulated_form_array(box[14])
+        f3 = get_current_form_array(box[14])
         position_d22 = box[14].seed_particle.position
-        dcore_21 = get_current_modulated_form_array(box[14].core_particle)#box[14].particle_1.modulated_form_array(qx_array, qy_array, position=box[14].particle_1.position, orientation=box[14].particle_1.orientation)
-        dcore_22 = get_current_modulated_form_array(box[14].seed_particle)#box[14].particle_2.modulated_form_array(qx_array, qy_array,position=box[14].particle_2.position, orientation=box[14].particle_2.orientation)
+        dcore_21 = get_current_modulated_form_array(box[14].core_particle)
+        dcore_22 = get_current_modulated_form_array(box[14].seed_particle)
         assert box[14].position == position_2
         assert (position_d2 - position_d22).mag == pytest.approx(0)
         assert np.average(d3 - d1) == pytest.approx(0)
         assert np.average(dcore_01 - dcore_21) == pytest.approx(0)
         assert np.average(dcore_02 - dcore_22) == pytest.approx(0)
-        #assert id(dcore_01) == id(dcore_21)
-        #assert id(dcore_02) == id(dcore_22) This probably only passes if the particle is mutable
         assert np.average(d3 - d2) != pytest.approx(0)
         assert np.average(dcore_11 - dcore_21) != pytest.approx(0)
         assert np.average(dcore_12 - dcore_22) != pytest.approx(0)
@@ -390,16 +387,16 @@ def test_metropolis_handle_simulation():
 def test_simulation_get_acceptance():
     box_list = [default_box()]
     simulation = default_simulation(box_list=box_list)
-    simulation.simulation_params.set_value(NUCLEAR_RESCALE, 1.0)
-    simulation.simulation_params.set_value(MAGNETIC_RESCALE, 1.0)
+    simulation.simulation_params.set_value(constants.NUCLEAR_RESCALE, 1.0)
+    simulation.simulation_params.set_value(constants.MAGNETIC_RESCALE, 1.0)
     assert simulation.get_physical_acceptance()
-    simulation.simulation_params.set_value(NUCLEAR_RESCALE, -0.0000001)
+    simulation.simulation_params.set_value(constants.NUCLEAR_RESCALE, -0.0000001)
     assert simulation.get_physical_acceptance() == False
-    simulation.simulation_params.set_value(NUCLEAR_RESCALE, 1.0)
-    simulation.simulation_params.set_value(MAGNETIC_RESCALE, -0.0000001)
+    simulation.simulation_params.set_value(constants.NUCLEAR_RESCALE, 1.0)
+    simulation.simulation_params.set_value(constants.MAGNETIC_RESCALE, -0.0000001)
     assert simulation.get_physical_acceptance() == False
-    simulation.simulation_params.set_value(NUCLEAR_RESCALE, 1.0)
-    simulation.simulation_params.set_value(MAGNETIC_RESCALE, 1.0)
+    simulation.simulation_params.set_value(constants.NUCLEAR_RESCALE, 1.0)
+    simulation.simulation_params.set_value(constants.MAGNETIC_RESCALE, 1.0)
     command = commands.MoveParticleTo(box_list[0], 13, Vector(1e10, 1e10, 1e10))
     command.execute()
     assert box_list[0].collision_test() != False
@@ -436,7 +433,6 @@ def test_acceptable_command():
 
 def test_controller_acceptance_independence():
     box_list = [default_box()]
-    #simulation = default_simulation(box_list=box_list)
     box = box_list[0]
     structure_box(box)
     positions = [
@@ -533,7 +529,7 @@ def test_physical_acceptance_half_test():
             particle_index=particle_index,
             position_delta=Vector.random_vector_xy(100)
         )
-        undo_command = commands.SetParticleState.gen_from_particle(box, particle_index)#.gen_from_particle_command(command)
+        undo_command = commands.SetParticleState.gen_from_particle(box, particle_index)
         command.execute()
         weak_physical_acceptance = command.physical_acceptance_weak()
         assert weak_physical_acceptance != box.collision_test()

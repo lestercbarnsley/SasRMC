@@ -9,7 +9,7 @@ import pandas as pd
 
 from .simulator import Simulator, timeit
 from .logger import Logger
-from .simulator_factory import gen_config_from_dataframes, generate_file_path_maker
+#from .simulator_factory import gen_config_from_dataframes, generate_file_path_maker
 from .template_generator import generate_core_shell, generate_dumbbell, generate_reload
 
 
@@ -45,7 +45,7 @@ class RmcRunner(Runner):
         else:
             self.run_not_forced_log()
 
-
+'''
 @dataclass
 class TemplateGenerator:
     config_folder: Path
@@ -130,7 +130,7 @@ def load_config(config_file: str) -> Runner:
     if r'./' in output_path:
         output_path = config_file_path.parent / Path(output_path.replace(r'./', ''))
     return rmc_runner_factory(input_config_path, output_path)
-
+'''
 
 if __name__ == "__main__":
     pass

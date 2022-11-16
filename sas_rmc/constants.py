@@ -15,3 +15,7 @@ RNG = np.random.default_rng()
 
 NON_ZERO_LIST = lambda ls: np.sum((np.array(ls)**2))
 
+# string names
+NUCLEAR_RESCALE = "Nuclear rescale"
+MAGNETIC_RESCALE = "Magnetic rescale"
+
