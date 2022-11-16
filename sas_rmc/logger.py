@@ -215,20 +215,21 @@ class BoxPlotter(LogCallback):
     save_path_maker: Callable[[str, str],Path]
     box_list: List[Box]
     format: str = "pdf"
-    make_initial: bool = True
+    make_initial: bool = False
 
-    def plot_box_list(self) -> None:
+    def plot_box_list(self, timing_string: str = "initial") -> None:
         box_writer = BoxWriter.standard_box_writer()
         for box_number, box in enumerate(self.box_list):
             fig = box_writer.to_plot(box)
-            fig_path = self.save_path_maker(f"_box_{box_number}_particle_positions", self.format)
+            fig_path = self.save_path_maker(f"_box_{box_number}_{timing_string}_particle_positions", self.format)
             fig.savefig(fig_path)
 
     def before_event(self, d: dict = None) -> None:
-        pass
+        if self.make_initial:
+            self.plot_box_list(timing_string="initial")
 
     def after_event(self, d: dict = None) -> None:
-        self.plot_box_list()
+        self.plot_box_list(timing_string="final")
 
 
 @dataclass
@@ -257,7 +258,7 @@ class Logger:
 
 
 @dataclass
-class Logger_:
+class Logger_: # mark for deletion
     box_list: List[Box]
     controller: Controller
     save_path_maker: Callable[[str, str],Path]
