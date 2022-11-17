@@ -44,8 +44,10 @@ The `/data` folder contains a file `CoreShell_F20_pol.xlsx` which contains data 
 
 ## Terms of Use
 SasRMC is released for free under the MIT license. An associated publication is available here:
+
 Barnsley, L.C., Nandakumaran, N., Feoktystov, A., Dulle, M., Fruhner, L. & Feygenson, M. (2022). J. Appl. Cryst. 55,
 https://doi.org/10.1107/S1600576722009219.
+
 If you find that using SasRMC has added value to your scientific research, the authors would like to ask you to consider including a reference to the above work in your publication.
 
 ## Advanced Usage
