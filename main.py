@@ -7,16 +7,16 @@ import sas_rmc
 
 CONFIG_FILE = "./data/config.yaml"
 
-def run_rmc(config_file: str):
+def run_rmc(config_file: str) -> None:
     rmc = sas_rmc.load_config(config_file)
     rmc.run()
 
-def run_dev_rmc():
+def run_dev_rmc() -> None:
     with open("dev_config.txt",'r') as dev_config:
         secret_dev_config = dev_config.read()
     run_rmc(secret_dev_config)
 
-def generate_template(args: List[str]):
+def generate_template(args: List[str]) -> None:
     command = ' '.join(args)
     sas_rmc.generate_template(command, Path(CONFIG_FILE).parent)
 

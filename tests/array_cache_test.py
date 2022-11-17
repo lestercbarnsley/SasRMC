@@ -95,7 +95,8 @@ def core_shell_test():
     plt.show()
 
 if __name__ == "__main__":
-    core_shell_test()
+    numerical_test()
+    #core_shell_test()
     #testing_average_sld_func_for_cylinder()
     
 #%%

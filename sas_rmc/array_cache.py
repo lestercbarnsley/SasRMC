@@ -27,8 +27,10 @@ def round_vector(vector: Vector, precision: int = DEFAULT_PRECISION) -> Tuple[fl
 def pass_arg(arg):
     if type(arg) in immutable_types:
         return arg
-    if isinstance(arg, np.ndarray) and arg.flags.writeable:
-        arg.flags.writeable = False
+    if isinstance(arg, np.ndarray):
+        if arg.flags.writeable:
+            arg.flags.writeable = False
+        return id(arg)
     if isinstance(arg, Vector):
         return round_vector(arg)
     if isinstance(arg, list) or isinstance(arg, tuple):

@@ -6,7 +6,7 @@ from typing import List, Tuple
 import numpy as np
 from scipy import constants
 
-from ..array_cache import round_vector
+from ..array_cache import round_vector, array_cache
 from ..vector import Vector
 from ..shapes.shapes import Shape, Sphere, collision_detected
 from .. import constants
@@ -28,9 +28,11 @@ def magnetic_sld_in_angstrom_minus_2(magnetization_vector_in_amp_per_metre: Vect
 
 sphere_volume = lambda radius: (4 * PI / 3) * radius**3
 theta = lambda qR: np.where(qR == 0, 1, 3 * (np.sin(qR) - qR* np.cos(qR)) / (qR**3))
-modulus_array = lambda x_arr, y_arr: np.sqrt(x_arr**2 + y_arr**2)
+#modulus_array = lambda x_arr, y_arr: np.sqrt(x_arr**2 + y_arr**2)
 
-
+@array_cache(max_size=5_000)
+def modulus_array(x_arr: np.ndarray, y_arr: np.ndarray) -> np.ndarray:
+    return np.sqrt(x_arr**2 + y_arr**2)
 
 
 @dataclass
@@ -193,7 +195,7 @@ class Particle(ABC):
         'Total scattering length' : self.scattering_length,
     }
 
-
+@array_cache(max_size=500)
 def form_array_sphere(radius: float, sld: float, q_array: np.ndarray) -> np.ndarray:
     volume = sphere_volume(radius)
     theta_arr = theta(q_array * radius)
