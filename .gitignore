@@ -1,7 +1,6 @@
 data/results/
 sas_rmc/__pycache__/
 *.xlsx
-data/config.yaml
 !data/CoreShell_Simulation_Input.xlsx
 !data/CoreShell_F20_pol.xlsx
 sas_rmc.egg-info/
@@ -19,3 +18,4 @@ sas_rmc/particles/__pycache__/
 sas_rmc/shapes/__pycache__/
 sas_rmc/factories/__pycache__/
 *.yaml
+dev_config.txt

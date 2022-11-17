@@ -13,7 +13,7 @@ import numpy as np
 PI = constants.PI
 rng = constants.RNG
 
-DEFAULT_IN_PLANE_SETTING = False
+DEFAULT_IN_PLANE_SETTING = True
 
 @dataclass
 class SphericalCommandFactory(command_factory.CommandFactoryList):

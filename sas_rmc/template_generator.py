@@ -41,24 +41,6 @@ DUMBBELL_PARTICLE_DATA = [
     ["seed_magnetization",0.0,r"# Amperes/metre",None],
 ]
 
-'''NUMERICAL_DUMBBELL_PARTICLE = [
-    ["particle_type",NumericalDumbell.__name__,None,None],
-    ["core_radius",None,r"# Angstroms",None],
-    ["core_polydispersity",None,r"# Fraction",None],
-    ["core_sld",None,r"# 10E-6 / Angstrom^2",None],
-    ["seed_radius",None,r"# Angstroms",None],
-    ["seed_polydispersity",None,r"# Fraction",None],
-    ["seed_sld",None,r"# 10E-6 / Angstrom^2",None],
-    ["centre_to_centre_separation",None,r"# Angstroms",None],
-    ["centre_to_centre_polydispersity",None,r"# Fraction",None],
-    ["shell_thickness",None,r"# Angstroms",None],
-    ["shell_polydispersity",None,r"# Fraction",None],
-    ["shell_sld",None,r"# 10E-6 / Angstrom^2",None],
-    ["solvent_sld",None,r"# 10E-6 / Angstrom^2",None],
-    ["core_magnetization",None,r"# Amperes/metre",None],
-    ["seed_magnetization",0.0,r"# Amperes/metre",None],
-]'''
-
 RELOAD_PARTICLE_DATA = [
     ["particle_type","Reload old simulation",r"# This line should stay unchanged.",None],
     ["log_file_source",None,r"# File path", r"# Point to a previously saved log file (.xlsx). Particle configurations and detector data will be loaded directly from the log file. Simulation configurations are loaded from below parameters"],
@@ -181,6 +163,24 @@ def generate_reload(output_path: Path) -> None:
     simulation_data = SIMULATION_DATA
     dfs, sheet_names = generate_normal_template(particle_data=particle_data, simulation_data=simulation_data)
     df_list_to_excel(output_path, dfs, sheet_names)
+
+def generate_template(command: str, output_path: Path) -> None:
+    TEMPLATE_PARAMS = {
+    "generate core shell template":{
+        "template_name" : "CoreShell_Simulation_Input",
+        "template_generating_method" : generate_core_shell
+        },
+    "generate dumbbell template":{
+        "template_name" : "Dumbell_Simulation_Input",
+        "template_generating_method" : generate_dumbbell
+        },
+    "generate reload template":{
+        "template_name" : "Reload_Simulation_Input",
+        "template_generating_method" : generate_reload
+        }
+    }
+    template_generating_method = TEMPLATE_PARAMS[command]["template_generating_method"]
+    template_generating_method(output_path)
 
 if __name__ == "__main__":
     dfs, sheet_names = generate_normal_template(particle_data=CORE_SHELL_PARTICLE_DATA)

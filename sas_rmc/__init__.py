@@ -7,6 +7,7 @@ from . import commands, scattering_simulation, simulator, acceptance_scheme, vie
 #from .rmc_runner import RmcRunner, load_config
 from .factories.runner_factory import load_config
 from .factories.simulation_factory import box_simulation_params_factory
+from .template_generator import generate_template
 
 # Only very import classes should be directly imported
 # This is just for putting things into the namespace

@@ -4,13 +4,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-import yaml
-import pandas as pd
-
-from .simulator import Simulator, timeit
+from .simulator import Simulator
 from .logger import Logger
 #from .simulator_factory import gen_config_from_dataframes, generate_file_path_maker
-from .template_generator import generate_core_shell, generate_dumbbell, generate_reload
+#from .template_generator import generate_core_shell, generate_dumbbell, generate_reload
 
 
 
@@ -44,8 +41,8 @@ class RmcRunner(Runner):
             self.run_force_log()
         else:
             self.run_not_forced_log()
-
 '''
+
 @dataclass
 class TemplateGenerator:
     config_folder: Path
@@ -60,8 +57,8 @@ class TemplateGenerator:
         print(f"Find your config.yaml and change the 'input_config_source' field to {file.name}")
         print(f"Edit and save {file.name} to configure your simulation.")
         print(f"If you're having difficulty reading parameters in Excel, select top row and try Home -> Format -> Autofit Column Width")
-
-
+'''
+'''
 
 
 @timeit

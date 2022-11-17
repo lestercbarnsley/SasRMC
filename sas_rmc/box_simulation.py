@@ -19,8 +19,8 @@ rng = constants.RNG
 def collision_detected_3d(particle_1: Particle, particle_2: Particle) -> bool:
     if particle_1.collision_detected(particle_2):
         return True
-    '''if particle_1.position.z == particle_2.position.z:
-        return False'''
+    if particle_1.position.z == particle_2.position.z:
+        return False
     test_position = Vector(particle_2.position.x, particle_2.position.y, particle_1.position.z) # The central position of the second particle can't be under the shadow of the first, but this doesn't mean that the two shadows can't overlap
     return particle_1.is_inside(test_position)
 
@@ -95,9 +95,7 @@ class Box:
         def get_distance_from_particle(particle2: Particle):
             return np.inf if particle is particle2 else (particle.position - particle2.position).mag
         return min(self.particles, key = get_distance_from_particle)
-        #distances = [distance(particle2) for particle2 in self.particles]
-        #return self.particles[np.argmin(distances)]
-
+        
     def plot_particle_positions(self, symbol: str = 'b.') -> None: # Mark for deletion
         plt.plot([p.position.x for p in self.particles], [p.position.y for p in self.particles], symbol)
         plt.show()
