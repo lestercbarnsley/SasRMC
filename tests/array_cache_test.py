@@ -27,7 +27,7 @@ add_to_threes = functional_cache(np.array([3,3,3,3]))
 for _ in range(10):
     add_to_threes(np.random.rand(4))
 
-def numerical_test():
+def numerical_test(show_plot: bool = True):
     profile_calculator = ProfileCalculator(q_array=np.linspace(1e-3, .5, num = 1000), r_array=np.linspace(0,130000, num = 10000))
     particle_number = 100
     particles = [CoreShellParticle.gen_from_parameters(
@@ -43,13 +43,15 @@ def numerical_test():
         cylinder_sld=6
     ) for _ in range(particle_number)]
     box = Box(particles=particles, cube = Cube(dimension_0=100000, dimension_1=3000, dimension_2=10000))
-    box.force_inside_box(in_plane=True)
+    for i, particle in enumerate(box.particles):
+        box.particles[i] = particle.set_position(Vector(2 *i* 103, 0, 0)).set_orientation(Vector(0,1,0))
 
     intensity = box_profile_calculator(box, profile_calculator)
-    plt.loglog(profile_calculator.q_array, intensity)
-    plt.show()
+    if show_plot:
+        plt.loglog(profile_calculator.q_array, intensity)
+        plt.show()
 
-    box.plot_particle_positions('b.')
+        box.plot_particle_positions('b.')
 
 def average_sld_func_for_cylinder_test():
     r_array=np.linspace(0,1300, num = 200)
