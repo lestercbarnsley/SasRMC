@@ -9,7 +9,7 @@ import pandas as pd
 import yaml
 
 from .acceptable_command_factory import MetropolisAcceptanceFactory
-from . import box_factory, particle_factory, spherical_particle_factory, simulation_factory, controller_factory, simulator_factory, detector_builder, parse_data
+from . import box_factory, particle_factory, particle_factory_spherical, simulation_factory, controller_factory, simulator_factory, detector_builder, parse_data
 from ..rmc_runner import Runner, RmcRunner
 from ..logger import BoxPlotter, Logger, ExcelCallback, DetectorPlotter, ProfilePlotter
 
@@ -35,7 +35,7 @@ def generate_file_path_maker(output_folder: Path, description: str = "") -> Call
 
 
 PARTICLE_TYPE_DICT = {
-    "CoreShellParticle" : spherical_particle_factory.CoreShellParticleFactory
+    "CoreShellParticle" : particle_factory_spherical.CoreShellParticleFactory
 }
 
 def dict_to_particle_factory(d: dict) -> particle_factory.ParticleFactory:

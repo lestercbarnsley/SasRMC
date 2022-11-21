@@ -22,8 +22,9 @@ class EnlargeCylinder(commands.ParticleCommand):
     def execute(self) -> None:
         old_particle: CylindricalParticle = self.particle
         cylinder_shape = old_particle.shapes[0]
+        new_radius = self.change_by_factor * (cylinder_shape.radius)
         new_particle = CylindricalParticle.gen_from_parameters(
-            radius = self.change_by_factor * (cylinder_shape.radius),
+            radius = new_radius,
             height=cylinder_shape.height,
             cylinder_sld=old_particle.cylinder_sld,
             solvent_sld=old_particle.solvent_sld,
@@ -34,11 +35,31 @@ class EnlargeCylinder(commands.ParticleCommand):
 
 
 @dataclass
+class EnlargeAllCylinders(commands.ParticleCommand):
+    change_by_factor: float
+
+    def execute(self) -> None:
+        enlarge_cylinder_commands = [EnlargeCylinder(
+            self.box, 
+            particle_index, 
+            self.change_by_factor) for particle_index, _ in enumerate(self.box.particles)]
+        for enlarge_cylinder_command in enlarge_cylinder_commands:
+            enlarge_cylinder_command.execute()
+
+
+@dataclass
 class EnlargeCylinderCommandFactory(command_factory.CommandFactory):
     change_by_factor: float
 
-    def create_command(self, box: Box, particle_index: int, simulation_params: SimulationParams = None) -> commands.Command:
+    def create_single_command(self, box: Box, particle_index: int, simulation_params: SimulationParams = None) -> EnlargeCylinder:
         return EnlargeCylinder(box, particle_index=particle_index, change_by_factor=self.change_by_factor)
+
+    def create_all_command(self, box: Box, particle_index: int, simulation_params: SimulationParams = None) -> commands.Command:
+        return EnlargeAllCylinders(box, particle_index, change_by_factor=self.change_by_factor)
+
+    def create_command(self, box: Box, particle_index: int, simulation_params: SimulationParams = None) -> commands.Command:
+        create = np.random.choice([self.create_single_command, self.create_all_command])
+        return create(box, particle_index, simulation_params)
 
 
 @dataclass
@@ -81,7 +102,7 @@ class CylindricalParticleFactory(ParticleFactory):
             cylinder_sld=self.cylinder_sld,
             solvent_sld=self.solvent_sld,
             position=Vector(0,0,0),
-            orientation=Vector(0,1,0),
+            orientation=Vector(0,0,1),
         )
 
 

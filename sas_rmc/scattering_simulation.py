@@ -136,7 +136,7 @@ class Fitter(Protocol):
 @dataclass
 class ScatteringSimulation:
     fitter: Fitter # The fitter is a strategy class
-    simulation_params: SimulationParams# = field(default_factory=box_simulation_params_factory)
+    simulation_params: SimulationParams
     current_goodness_of_fit: float = np.inf
 
     def get_goodness_of_fit(self) -> float:
