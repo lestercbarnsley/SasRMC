@@ -8,6 +8,8 @@ from .particle import Particle
 from ..vector import Vector
 from ..shapes.shapes import Shape, Cylinder
 
+#def long_cylinder_average_fraction(cylinder_radius: float, radius: float) -> float:
+
 
 
 @dataclass

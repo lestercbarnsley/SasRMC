@@ -172,29 +172,6 @@ class ProfileCalculator:
         sin_q_fn = lambda q : np.sum(average_sld * np.sinc(q * self.r_array / PI) * dr * (self.r_array ** 2)) # Using np.sinc here guarantees sin(qr)/qr = 1 if qr = 0
         return broadcast_to_numpy_array(self.q_array, sin_q_fn)
 
-'''GOLDEN_RATIO = (1 + 5**0.5) / 2
-
-@array_cache(max_size=5_000)
-def q_vectors(q_i: float, sphere_points: int) -> List[Vector]:
-    n = sphere_points
-    i = np.arange(0, n) + 0.5
-    phi = np.arccos(1 - 2 * i / n)
-    theta = 2 * PI * i / GOLDEN_RATIO
-    x, y, z = np.cos(theta) * np.sin(phi), np.sin(theta) * np.sin(phi), np.cos(phi)
-    return [q_i * Vector(x_i, y_i, z_i) for x_i, y_i, z_i in zip(x, y, z)]'''
-
-
-'''@dataclass
-class NumericalProfileCalculator:
-    q_array: np.ndarray
-    vector_space: VectorSpace
-    average_sphere_points: int = 100
-    
-    @method_array_cache(cache_holder_index=1)
-    def form_profile(self, particle: ParticleNumerical):
-        for q in self.q_array:
-            q_vecs = q_vectors(q, self.average_sphere_points)
-'''
 
 
 

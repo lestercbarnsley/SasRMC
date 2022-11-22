@@ -74,13 +74,17 @@ class CylindricalCommandFactory(command_factory.CommandFactoryList):
         position_delta = (Vector.random_vector_xy if self.in_plane else Vector.random_vector)(position_delta_size)
         change_by_factor = np.abs(rng.normal(loc = 1.0, scale = self.nominal_rescale_change))
         massive_change_factor = change_by_factor**10
+        actual_angle_change = rng.normal(loc = 0.0, scale = self.nominal_angle_change)
+        massive_angle_change = rng.uniform(low = -PI, high = PI)
         command_list = [
             command_factory.MoveParticleToFactory(self.in_plane),
             command_factory.MoveParticleByFactory(position_delta),
+            command_factory.OrbitParticleFactory(actual_angle_change=actual_angle_change),
+            command_factory.OrbitParticleFactory(actual_angle_change=massive_angle_change),
             command_factory.NuclearMagneticRescaleFactory(change_by_factor=change_by_factor),
             command_factory.NuclearMagneticRescaleFactory(change_by_factor=massive_change_factor),
             EnlargeCylinderCommandFactory(change_by_factor),
-            EnlargeCylinder(massive_change_factor)
+            EnlargeCylinderCommandFactory(massive_change_factor)
             ]
         return command_list
 
@@ -104,6 +108,10 @@ class CylindricalParticleFactory(ParticleFactory):
             position=Vector(0,0,0),
             orientation=Vector(0,0,1),
         )
+
+    @classmethod
+    def gen_from_dict(cls, d: dict):
+        pass
 
 
 

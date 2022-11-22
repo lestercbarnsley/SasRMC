@@ -35,7 +35,7 @@ class ProfileFitter:
     box_list: List[Box]
     single_profile_calculator: NumericalProfileCalculator
     experimental_intensity: np.ndarray
-    intensity_uncertainty: np.ndarray = field(default_factory=lambda : np.zeros(0))
+    intensity_uncertainty: np.ndarray = field(default_factory=lambda : np.zeros(1000))
 
     @method_array_cache
     def experimental_uncertainty(self) -> np.ndarray:
@@ -46,7 +46,7 @@ class ProfileFitter:
     def fit(self, simulation_params: SimulationParams) -> float:
         rescale = simulation_params.get_value(key = constants.NUCLEAR_RESCALE)
         simulated_intensity = rescale * np.sum([box_profile_calculator(box, self.single_profile_calculator) for box in self.box_list], axis = 0)
-        intensity_uncertainty = self.experimental_intensity()
+        intensity_uncertainty = self.experimental_uncertainty()
         return np.average((simulated_intensity - self.experimental_intensity)**2 / (intensity_uncertainty**2))
         
         
