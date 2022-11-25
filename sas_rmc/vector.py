@@ -110,7 +110,7 @@ class Vector:
         else:
             return self / self.mag
 
-    def distance_from_vector(self, vector):
+    def distance_from_vector(self, vector) -> float:
         return (self - vector).mag
 
     def copy(self):

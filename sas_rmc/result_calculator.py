@@ -8,7 +8,7 @@ import numpy as np
 from .particles import Particle, ParticleComposite
 from .particles.particle import magnetic_sld_in_angstrom_minus_2
 from .vector import Vector, VectorSpace, broadcast_to_numpy_array, composite_function
-from .array_cache import method_array_cache, array_cache
+from .array_cache import method_array_cache#, array_cache
 from . import constants
 
 PI = constants.PI
@@ -160,6 +160,7 @@ class ParticleAverageNumerical(Protocol):
     def get_average_sld(self, radius: float) -> float:
         pass
 
+
 @dataclass
 class ProfileCalculator:
     q_array: np.ndarray
@@ -174,7 +175,13 @@ class ProfileCalculator:
 
 
 
+@dataclass
+class ProfileCalculatorAnalytical:
+    q_array: np.ndarray
 
+    @method_array_cache(cache_holder_index=1)
+    def form_profile(self, particle: Particle):
+        return particle.form_array(self.q_array, 0, orientation=particle.orientation)
 
 
 

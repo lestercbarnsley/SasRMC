@@ -1,6 +1,6 @@
 #%%
-from dataclasses import dataclass
-from typing import List
+# from dataclasses import dataclass
+# from typing import List
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -14,42 +14,12 @@ from sas_rmc.factories.particle_factory_cylindrical import CylindricalParticleFa
 from sas_rmc.factories.simulator_factory import MemorizedSimulatorFactory   
 from sas_rmc.box_simulation import Box, Cube
 from sas_rmc.profile_calculator import ProfileFitter
-from sas_rmc.result_calculator import ProfileCalculator
+from sas_rmc.result_calculator import ProfileCalculator, ProfileCalculatorAnalytical
 from sas_rmc.scattering_simulation import ScatteringSimulation
 from sas_rmc.rmc_runner import RmcRunner
 from sas_rmc.logger import Logger, LogCallback
 
 rng = constants.RNG
-'''
-def create_runner():
-    detector_list = detector_builder.MultipleDetectorBuilder(dataframes, config_dict).build_detector_images()
-    p_factory = dict_to_particle_factory(config_dict)
-    cont_factory = controller_factory.gen_from_dict(config_dict, p_factory=p_factory, acceptable_command_factory=MetropolisAcceptanceFactory())
-    boxfactory = box_factory.gen_from_dict(config_dict, detector_list)
-    box_list_factory = box_factory.gen_list_factory_from_dict(config_dict)
-    box_list = box_list_factory.create_box_list(boxfactory, p_factory)
-    result_calculator_maker_factory = dict_to_result_maker_factory(config_dict, p_factory)
-    sim_factory = simulation_factory.gen_from_dict(config_dict, result_calculator_maker_factory.create_result_maker())
-    simulation = sim_factory.create_simulation(detector_list, box_list)
-    controller = cont_factory.create_controller(simulation.simulation_params, box_list)
-    simulator = simulator_factory.MemorizedSimulatorFactory(controller, simulation, box_list).create_simulator()
-    # This should be a builder, not a factory
-    save_path_maker = generate_file_path_maker(output_path, config_dict.get("simulation_title", ""))
-    file_format = config_dict.get("output_plot_format", "PDF").lower()
-    excel_callback = ExcelCallback(save_path_maker, box_list, detector_list, controller )
-    detector_plotter = DetectorPlotter(save_path_maker, detector_list, format=file_format, make_initial=False)
-    profile_plotter= ProfilePlotter(save_path_maker, detector_list, format=file_format, make_initial=False)
-    box_plotter = BoxPlotter(save_path_maker, box_list, format = file_format, make_initial=False)
-    return RmcRunner(
-        logger=Logger(callback_list=[excel_callback, detector_plotter, profile_plotter, box_plotter]),
-        simulator=simulator,
-        force_log=config_dict.get("force_log_file", True)
-    )
-
-'''
-'''@dataclass
-class 
-    '''
 
 
 RADIUS = 68.0 # ANGSTROM
@@ -58,7 +28,7 @@ LATTICE_PARAM = 92.0
 HEIGHT = 3000.0
 SOLVENT_SLD = 8.29179504046
 PARTICLE_NUMBER = 100
-CYCLES = 10
+CYCLES = 200
 
 def create_box(particle_number: int, particle_factory: ParticleFactory ) -> Box:
     particles = [particle_factory.create_particle() for _ in range(particle_number)]
@@ -94,7 +64,7 @@ def create_runner() -> RmcRunner:
     intensity = data[:,1]
     intensity_err = data[:,2]
     r_array = np.linspace(0, HEIGHT, num = 100)
-    single_profile_calculator = ProfileCalculator(q_array=q, r_array=r_array)
+    single_profile_calculator = ProfileCalculatorAnalytical(q)#ProfileCalculator(q_array=q, r_array=r_array)
     profile_fitter = ProfileFitter(box_list=box_list, single_profile_calculator=single_profile_calculator, experimental_intensity=intensity, intensity_uncertainty=intensity_err)
     simulation = ScatteringSimulation(profile_fitter, simulation_params=sas_rmc.box_simulation_params_factory())
     controller_factory = ControllerFactory(
@@ -108,6 +78,8 @@ def create_runner() -> RmcRunner:
     simulator = simulator_factory.create_simulator()
     plt.plot([p.position.x for p in box.particles],[p.position.y for p in box.particles], 'b.')
     plt.show()
+    plt.loglog(q, intensity, 'b-')
+    plt.show()
     return RmcRunner(
         logger = Logger(callback_list=[]),
         simulator=simulator,
@@ -117,11 +89,20 @@ def create_runner() -> RmcRunner:
 
 if __name__ == "__main__":
     runner = create_runner()
-    runner.run()
+    try:
+        runner.run()
+    except KeyboardInterrupt:
+        print("Ended early")
     simulation = runner.simulator.evaluator.simulation
-    box_list = simulation.fitter.box_list
-    box = box_list[0]
+    fitter = simulation.fitter
+    box = fitter.box_list[0]
     plt.plot([p.position.x for p in box.particles],[p.position.y for p in box.particles], 'b.')
     plt.show()
+    q = fitter.single_profile_calculator.q_array
+    plt.loglog(q, fitter.experimental_intensity, 'b.')
+    rescale = simulation.simulation_params.get_value(key = constants.NUCLEAR_RESCALE)
+    plt.loglog(q, fitter.simulated_intensity(rescale = rescale), 'r-')
+    plt.show()
+
 
 #%%

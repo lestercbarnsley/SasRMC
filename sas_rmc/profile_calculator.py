@@ -9,20 +9,32 @@ from .box_simulation import Box
 from .result_calculator import NumericalProfileCalculator
 from .form_calculator import mod
 from .scattering_simulation import SimulationParams
-from .array_cache import method_array_cache
+from .array_cache import method_array_cache, array_cache
 from . import constants, Vector
 
 PI = constants.PI
 
+@array_cache(max_size=5_000)
+def array_list_sum(arr_list: List[np.ndarray], bottom_level = False):
+    if bottom_level:
+        return np.sum(arr_list, axis = 0)
+    divs = int(np.sqrt(len(arr_list)))
+    return np.sum([array_list_sum(arr_list[i::divs], bottom_level = True)  for i in range(divs) ], axis = 0)
+
+@array_cache(max_size = 5_000)
+def structure_factor_func(q_array: np.ndarray, position_1: Vector, position_2: Vector):
+    distance = (position_2 - position_1).mag
+    return np.sinc(q_array * distance / PI)
+
+@array_cache(max_size=5_000)
 def structure_factor(q_array: np.ndarray, particle_position: Vector, box_position_list: List[Vector]) -> np.ndarray:
-    structure_factor_func = lambda pos_2 : np.sinc(q_array * (particle_position - pos_2).mag / PI)
-    return np.sum([structure_factor_func(position) for position in box_position_list], axis = 0)
+    return array_list_sum([structure_factor_func(q_array, particle_position, position) for position in box_position_list])
 
 def form_array(box: Box, profile_calculator: NumericalProfileCalculator)-> np.ndarray:
     box_position_list = [particle.position for particle in box.particles]
     q_array = profile_calculator.q_array
     form = lambda particle, position : profile_calculator.form_profile(particle) * structure_factor(q_array, position, box_position_list)
-    return np.sum([form(particle, particle.position) for particle in box.particles], axis = 0)
+    return array_list_sum([form(particle, particle.position) for particle in box.particles])
 
 def box_profile_calculator(box: Box, profile_calculator: NumericalProfileCalculator) -> np.ndarray:
     total_form = form_array(box, profile_calculator)
@@ -43,9 +55,12 @@ class ProfileFitter:
             return self.intensity_uncertainty
         return np.sqrt(self.experimental_intensity)
 
+    def simulated_intensity(self, rescale: float = 1.0) -> np.ndarray:
+        return rescale * np.sum([box_profile_calculator(box, self.single_profile_calculator) for box in self.box_list], axis = 0)
+
     def fit(self, simulation_params: SimulationParams) -> float:
         rescale = simulation_params.get_value(key = constants.NUCLEAR_RESCALE)
-        simulated_intensity = rescale * np.sum([box_profile_calculator(box, self.single_profile_calculator) for box in self.box_list], axis = 0)
+        simulated_intensity = self.simulated_intensity(rescale)
         intensity_uncertainty = self.experimental_uncertainty()
         return np.average((simulated_intensity - self.experimental_intensity)**2 / (intensity_uncertainty**2))
         
