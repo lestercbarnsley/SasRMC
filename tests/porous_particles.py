@@ -25,9 +25,9 @@ rng = constants.RNG
 RADIUS = 68.0 # ANGSTROM
 RADIUS_POLYD = 0.1 # 10%
 LATTICE_PARAM = 92.0
-HEIGHT = 3000.0
+HEIGHT = 100e7#300000.0 ### Make this extremely long?
 SOLVENT_SLD = 8.29179504046
-PARTICLE_NUMBER = 100
+PARTICLE_NUMBER = 1#00
 CYCLES = 200
 
 def create_box(particle_number: int, particle_factory: ParticleFactory ) -> Box:

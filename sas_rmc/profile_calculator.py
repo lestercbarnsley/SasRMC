@@ -22,13 +22,13 @@ def array_list_sum(arr_list: List[np.ndarray], bottom_level = False):
     return np.sum([array_list_sum(arr_list[i::divs], bottom_level = True)  for i in range(divs) ], axis = 0)
 
 @array_cache(max_size = 5_000)
-def structure_factor_func(q_array: np.ndarray, position_1: Vector, position_2: Vector):
-    distance = (position_2 - position_1).mag
+def structure_factor_func(q_array: np.ndarray, distance: float) -> np.ndarray:# position_1: Vector, position_2: Vector):
+    #distance = (position_2 - position_1).mag
     return np.sinc(q_array * distance / PI)
 
 @array_cache(max_size=5_000)
 def structure_factor(q_array: np.ndarray, particle_position: Vector, box_position_list: List[Vector]) -> np.ndarray:
-    return array_list_sum([structure_factor_func(q_array, particle_position, position) for position in box_position_list])
+    return array_list_sum([structure_factor_func(q_array, particle_position.distance_from_vector(position)) for position in box_position_list])
 
 def form_array(box: Box, profile_calculator: NumericalProfileCalculator)-> np.ndarray:
     box_position_list = [particle.position for particle in box.particles]

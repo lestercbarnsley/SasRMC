@@ -4,6 +4,7 @@ from abc import abstractmethod
 from dataclasses import dataclass, field
 from typing import Callable, List, Optional, Protocol, Tuple
 from pathlib import Path
+from datetime import datetime
 
 import pandas as pd
 import numpy as np
@@ -11,6 +12,7 @@ from matplotlib import pyplot as plt
 from matplotlib import colors as mcolors
 
 from .simulator import Simulator
+from .commands import AcceptableCommand, ScaleCommand
 from .controller import Controller, CommandProtocol
 from .detector import DetectorImage, SimulatedDetectorImage
 from .box_simulation import Box
@@ -56,6 +58,22 @@ def get_loggable_commmand(command: LoggableCommandProtocol) -> dict:
 def controller_writer(controller: Controller) -> pd.DataFrame:
     return pd.DataFrame([get_loggable_commmand(command) for command in controller.completed_commands])
 
+def make_global_params(box_list: List[Box], before_time: datetime, commands: List[AcceptableCommand]) -> pd.DataFrame:
+    final_rescale = 1
+    test_command = lambda acc : isinstance(acc, AcceptableCommand) and acc.acceptance_scheme.is_acceptable() and isinstance(acc.base_command, ScaleCommand)
+    test_commands = [acceptable_command for acceptable_command in commands if test_command(acceptable_command)]
+    for acceptable_command in test_commands:
+        final_rescale = acceptable_command.base_command.simulation_params.get_value(key = constants.NUCLEAR_RESCALE)
+    estimated_concentration = final_rescale * np.average([np.sum([particle.volume for particle in box.particles ]) / box.volume for box in box_list])
+    d = {
+        "Final scale": [final_rescale],
+        "Estimated concentration (v/v)": [estimated_concentration],
+        "Simulation time (s)": [(datetime.now() - before_time).total_seconds()],
+        "Effective magnetization" : ["Coming soon"]
+    }
+    return pd.DataFrame(d)
+
+
 
 @dataclass
 class ExcelCallback(LogCallback):
@@ -64,10 +82,12 @@ class ExcelCallback(LogCallback):
     detector_list: List[DetectorImage]
     controller: Controller
     before_event_log: List[Tuple[str,pd.DataFrame]] = field(default_factory = list, repr = False, init = False)
+    before_time: datetime = field(default_factory= datetime.now, repr= False, init= False)
 
     def before_event(self, d: dict = None) -> None:
         sheet_name_writer = lambda box_number : f"Box {box_number} Initial Particle States"
         self.before_event_log.extend([(sheet_name_writer(box_number), box_writer(box)) for box_number, box in enumerate(self.box_list)])
+        self.before_time = datetime.now()
 
     def after_event(self, d: dict = None) -> None:
         excel_file = self.save_path_maker("", "xlsx")
@@ -82,6 +102,8 @@ class ExcelCallback(LogCallback):
             for detector_number, detector in enumerate(self.detector_list):
                 detector_log = detector_writer(detector)
                 detector_log.to_excel(writer, sheet_name= f"Final detector image {detector_number}")
+            global_params = make_global_params(self.box_list, self.before_time, self.controller.completed_commands)
+            global_params.to_excel(writer, sheet_name="Global parameters Final")
 
 
 def plot_box(box: Box, file_name: Path) -> None:
