@@ -22,7 +22,9 @@ def generate_template(args: List[str]) -> None:
 
 def main():
     argv = sys.argv
-    if "dev" in argv[1]:
+    if len(argv) <= 1 or not argv[1]:
+        run_rmc(CONFIG_FILE)
+    elif "dev" in argv[1]:
         run_dev_rmc()
     elif "create" in argv[1]:
         generate_template(argv[1:])
