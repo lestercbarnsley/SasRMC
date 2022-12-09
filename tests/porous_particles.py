@@ -25,9 +25,9 @@ rng = constants.RNG
 RADIUS = 68.0 # ANGSTROM
 RADIUS_POLYD = 0.1 # 10%
 LATTICE_PARAM = 92.0
-HEIGHT = 100e7#300000.0 ### Make this extremely long?
+HEIGHT = 100e3#300000.0 ### Make this extremely long?
 SOLVENT_SLD = 8.29179504046
-PARTICLE_NUMBER = 1#00
+PARTICLE_NUMBER = 100
 CYCLES = 200
 
 def create_box(particle_number: int, particle_factory: ParticleFactory ) -> Box:
@@ -39,7 +39,7 @@ def create_box(particle_number: int, particle_factory: ParticleFactory ) -> Box:
             ij = i * i_total+j
             if ij < len(particles):
                 particle = particles[ij]
-                particles[ij] = particle.set_position(Vector(2 * i * LATTICE_PARAM, 2 * j * LATTICE_PARAM))
+                particles[ij] = particle.set_position(Vector(1 * i * LATTICE_PARAM, 1 * j * LATTICE_PARAM))
 
     return Box(particles=particles, cube = cube)
 
@@ -89,10 +89,7 @@ def create_runner() -> RmcRunner:
 
 if __name__ == "__main__":
     runner = create_runner()
-    try:
-        runner.run()
-    except KeyboardInterrupt:
-        print("Ended early")
+    runner.run()
     simulation = runner.simulator.evaluator.simulation
     fitter = simulation.fitter
     box = fitter.box_list[0]

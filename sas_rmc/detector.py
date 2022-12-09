@@ -161,19 +161,19 @@ class DetectorPixel:
         return gaussian / np.sum(gaussian)
 
     @method_array_cache
-    def precompute_pixel_smearer(self, qx_array: np.ndarray, qy_array: np.ndarray, slicing_range: int = 0) -> Callable[[np.ndarray], float]:
+    def precompute_pixel_smearer(self, qx_array: np.ndarray, qy_array: np.ndarray, slicing_range: int = 0) -> Callable[[np.ndarray], np.ndarray]:
         resolution_function = self._resolution_function_calculator(qx_array, qy_array)
         slicing_func = get_slicing_func_from_gaussian(resolution_function, slicing_range=slicing_range)
         resolution_subset = slicing_func(resolution_function)# Leave this in the scope
         normalized_resolution_subset = resolution_subset / np.sum(resolution_subset)
-        return lambda simulated_intensity : np.sum(normalized_resolution_subset * slicing_func(simulated_intensity))
+        return lambda simulated_intensity : normalized_resolution_subset * slicing_func(simulated_intensity)
 
     def smear_pixel(self, simulated_intensity_array: np.ndarray, qx_array: np.ndarray, qy_array: np.ndarray, shadow_is_zero: bool = True, slicing_range: int = 0) -> None:
         if shadow_is_zero and not self.shadow_factor:
             self.simulated_intensity = 0
         else:
             pixel_smearer = self.precompute_pixel_smearer(qx_array, qy_array, slicing_range=slicing_range)
-            self.simulated_intensity = pixel_smearer(simulated_intensity_array)
+            self.simulated_intensity = np.sum(pixel_smearer(simulated_intensity_array))
 
     def to_dict(self):
         return {
@@ -311,13 +311,6 @@ class DetectorImage: # Major refactor needed for detector image, as it shouldn't
     @property
     def qxqy_delta(self) -> Tuple[float, float]:
         return self.qx_delta, self.qy_delta
-
-    def delta_qxqy_from_detector(self) -> Tuple[float, float]: # I don't think this should be here
-        # Mark for deletion
-        qx_uniques = average_uniques(self.qX)
-        qy_uniques = average_uniques(self.qY)
-        diff_strategy = lambda arr : np.average(np.diff(arr))
-        return diff_strategy(qx_uniques), diff_strategy(qy_uniques)
 
     @staticmethod
     def plot_intensity_matrix(intensity_matrix, qx, qy , log_intensity = True, show_crosshair = True, levels = 30, cmap = 'jet', show_fig: bool = True) -> Figure:
@@ -493,6 +486,23 @@ class SimulatedDetectorImage(DetectorImage):
             pixel.smear_pixel(intensity, qx_array, qy_array, shadow_is_zero)
             return pixel.simulated_intensity
         return self.array_from_pixels(smear_pixel)
+
+    def _smear(self, intensity: np.ndarray, qx_array: np.ndarray, qy_array: np.ndarray, shadow_is_zero: bool = True) -> np.ndarray:
+        [pixel for pixel in self._detector_pixels]
+        def smear_pixel(pixel: DetectorPixel) -> float:
+            pixel_smearer = pixel.precompute_pixel_smearer(qx_array, qy_array)
+            if shadow_is_zero and pixel.shadow_factor == 0:
+                return pixel_smearer(np.zeros(intensity.shape))
+            return pixel_smearer(intensity)
+        '''big_arr = np.frompyfunc(smear_pixel, 1, 1)(self._detector_pixels)'''
+        big_arr = [smear_pixel(pixel) for pixel in self._detector_pixels]
+        return np.sum(big_arr, axis = (1,2)) # The dimensions are a problem
+        #I don't think this produces a big enough speed boost to add this to production
+        #It results in a ~10% speed improvement... I really don't think it's worth pushing
+        # There's definitely a way to make this faster, but the approach is probably to assemble the arrays
+        #firstt and multiply them
+        
+
 
     def simulated_intensity_2d(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         qx, qy, _, shadow = self.intensity_2d()
