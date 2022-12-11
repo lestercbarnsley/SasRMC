@@ -295,18 +295,12 @@ class DetectorImage: # Major refactor needed for detector image, as it shouldn't
     @property
     def qx_delta(self) -> float:
         return self._q_delta(lambda pixel : pixel.qX, lambda pixel : pixel.qY)
-        '''smallest_q_s = sorted(self._detector_pixels, key = lambda pixel : Vector(pixel.qX, pixel.qY).mag)[:9]
-        next_qx = sorted(smallest_q_s[1:], key = lambda pixel : np.abs(pixel.qY - smallest_q_s[0].qY))[0]
-        return np.abs(next_qx.qX - smallest_q_s[0].qX)'''
-        #return np.average(np.diff(np.sort(np.unique(self.qX))))
+        
 
     @property
     def qy_delta(self) -> float:
         return self._q_delta(lambda pixel : pixel.qY, lambda pixel : pixel.qX)
-        '''smallest_q_s = sorted(self._detector_pixels, key = lambda pixel : Vector(pixel.qX, pixel.qY).mag)[:9]
-        next_qx = sorted(smallest_q_s[1:], key = lambda pixel : np.abs(pixel.qX - smallest_q_s[0].qX))[0]
-        return np.abs(next_qx.qY - smallest_q_s[0].qY)'''
-        #return np.average(np.diff(np.sort(np.unique(self.qY))))
+        
 
     @property
     def qxqy_delta(self) -> Tuple[float, float]:
@@ -396,7 +390,7 @@ class DetectorImage: # Major refactor needed for detector image, as it shouldn't
     def gen_from_data(cls, data_dict: dict, detector_config: DetectorConfig = None):
         qX_data = data_dict[QX]
         get_row = lambda i : {k : data_dict.get(k)[i] for k in [QX, QY, INTENSITY, INTENSITY_ERROR, QZ, SIGMA_PARA, SIGMA_PERP, SHADOW_FACTOR]}
-        detector_pixels = [DetectorPixel.row_to_pixel(get_row(i), detector_config=detector_config) for i, _ in enumerate(qX_data)]
+        detector_pixels = np.array([DetectorPixel.row_to_pixel(get_row(i), detector_config=detector_config) for i, _ in enumerate(qX_data)])
         polarization = detector_config.polarization if detector_config else Polarization(data_dict.get(POLARIZATION, Polarization.UNPOLARIZED.value))
         return cls(
             _detector_pixels = detector_pixels,
@@ -488,15 +482,28 @@ class SimulatedDetectorImage(DetectorImage):
         return self.array_from_pixels(smear_pixel)
 
     def _smear(self, intensity: np.ndarray, qx_array: np.ndarray, qy_array: np.ndarray, shadow_is_zero: bool = True) -> np.ndarray:
-        [pixel for pixel in self._detector_pixels]
-        def smear_pixel(pixel: DetectorPixel) -> float:
+        #### I'm really struggling to make this an efficient function, so it's probably not worth the time to make this go faster
+        zero_intensity = 0 * intensity
+        dimension_getter = lambda arr: len(arr.shape)
+        def pixel_smear_and_intensity(pixel: DetectorPixel) -> Tuple[np.ndarray, np.ndarray]:
+            resolution = pixel._resolution_function_calculator(qx_array, qy_array)
+            slicing_func = get_slicing_func_from_gaussian(resolution)
+            sliced_resolution = slicing_func(resolution)
+            sliced_intensity = slicing_func(intensity if (pixel.shadow_factor or not shadow_is_zero) else zero_intensity)
+            return sliced_resolution, sliced_intensity
+        pixel_res_and_intensity_sliced = [pixel_smear_and_intensity(pixel) for pixel in self._detector_pixels]
+        big_resolution_arr = np.array([pixel_res for pixel_res, _ in pixel_res_and_intensity_sliced])
+        big_intensity_arr = np.array([pixel_int for _, pixel_int in pixel_res_and_intensity_sliced])
+        adding_axes = tuple(range(dimension_getter(self._detector_pixels), dimension_getter(big_resolution_arr)))
+        return np.sum(big_resolution_arr * big_intensity_arr, axis = adding_axes)
+        '''def smear_pixel(pixel: DetectorPixel) -> float:
             pixel_smearer = pixel.precompute_pixel_smearer(qx_array, qy_array)
             if shadow_is_zero and pixel.shadow_factor == 0:
                 return pixel_smearer(np.zeros(intensity.shape))
-            return pixel_smearer(intensity)
+            return pixel_smearer(intensity)'''
         '''big_arr = np.frompyfunc(smear_pixel, 1, 1)(self._detector_pixels)'''
-        big_arr = [smear_pixel(pixel) for pixel in self._detector_pixels]
-        return np.sum(big_arr, axis = (1,2)) # The dimensions are a problem
+        '''big_arr = [smear_pixel(pixel) for pixel in self._detector_pixels]
+        return np.sum(big_arr, axis = (1,2)) # The dimensions are a problem'''
         #I don't think this produces a big enough speed boost to add this to production
         #It results in a ~10% speed improvement... I really don't think it's worth pushing
         # There's definitely a way to make this faster, but the approach is probably to assemble the arrays
