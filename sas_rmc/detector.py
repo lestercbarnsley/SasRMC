@@ -8,7 +8,7 @@ from matplotlib import pyplot as plt
 from matplotlib.figure import Figure
 import pandas as pd
 
-from .array_cache import method_array_cache
+from .array_cache import array_cache, method_array_cache
 from .vector import Vector, broadcast_array_function#, dot
 from .particles.particle import modulus_array 
 from . import constants
@@ -29,7 +29,6 @@ SHADOW_FACTOR = 'shadow_factor'#: int(self.shadow_factor),
 SIMULATED_INTENSITY = 'simulated_intensity'#: self.simulated_intensity,
 SIMUATED_INTENSITY_ERR = 'simulated_intensity_err'#: self.simulated_intensity_err,
 POLARIZATION = "Polarization"
-
 
 def get_slicing_func_from_gaussian(gaussian: np.ndarray, slicing_range: int = 0) -> Callable[[np.ndarray], np.ndarray]:
     arg_of_max = np.where(gaussian == np.amax(gaussian)) 
@@ -481,36 +480,26 @@ class SimulatedDetectorImage(DetectorImage):
             return pixel.simulated_intensity
         return self.array_from_pixels(smear_pixel)
 
-    def _smear(self, intensity: np.ndarray, qx_array: np.ndarray, qy_array: np.ndarray, shadow_is_zero: bool = True) -> np.ndarray:
-        #### I'm really struggling to make this an efficient function, so it's probably not worth the time to make this go faster
+    def smear(self, intensity: np.ndarray, qx_array: np.ndarray, qy_array: np.ndarray, shadow_is_zero: bool = True) -> np.ndarray:
         zero_intensity = 0 * intensity
         dimension_getter = lambda arr: len(arr.shape)
         def pixel_smear_and_intensity(pixel: DetectorPixel) -> Tuple[np.ndarray, np.ndarray]:
-            resolution = pixel._resolution_function_calculator(qx_array, qy_array)
-            slicing_func = get_slicing_func_from_gaussian(resolution)
-            sliced_resolution = slicing_func(resolution)
-            sliced_intensity = slicing_func(intensity if (pixel.shadow_factor or not shadow_is_zero) else zero_intensity)
-            return sliced_resolution, sliced_intensity
-        pixel_res_and_intensity_sliced = [pixel_smear_and_intensity(pixel) for pixel in self._detector_pixels]
-        big_resolution_arr = np.array([pixel_res for pixel_res, _ in pixel_res_and_intensity_sliced])
-        big_intensity_arr = np.array([pixel_int for _, pixel_int in pixel_res_and_intensity_sliced])
-        adding_axes = tuple(range(dimension_getter(self._detector_pixels), dimension_getter(big_resolution_arr)))
+            sliced_resolution_name = f"_sliced_resolution_do_not_touch_{id(qx_array)}_{id(qy_array)}"
+            slicing_func_name = f"_slicing_func_do_not_touch_{id(qx_array)}_{id(qy_array)}"
+            if not all(hasattr(pixel, att) for att in (sliced_resolution_name, slicing_func_name)):
+                resolution = pixel._resolution_function_calculator(qx_array, qy_array)
+                res_slicing_func = get_slicing_func_from_gaussian(resolution)
+                setattr(pixel, sliced_resolution_name, res_slicing_func(resolution))
+                setattr(pixel, slicing_func_name, res_slicing_func)
+            sliced_resolution = getattr(pixel, sliced_resolution_name)
+            slicing_func = getattr(pixel, slicing_func_name)
+            return sliced_resolution, slicing_func(intensity if (pixel.shadow_factor or not shadow_is_zero) else zero_intensity)
+        pixel_smear_and_intensity_pyfunc = np.frompyfunc(pixel_smear_and_intensity, nin = 1, nout = 2)
+        pixel_smear, pixel_intensity = pixel_smear_and_intensity_pyfunc(self._detector_pixels)
+        big_resolution_arr, big_intensity_arr = np.array([p for p in pixel_smear]), np.array([b for b in pixel_intensity])
+        adding_axes = tuple(range(dimension_getter(self._detector_pixels), dimension_getter(big_intensity_arr)))
         return np.sum(big_resolution_arr * big_intensity_arr, axis = adding_axes)
-        '''def smear_pixel(pixel: DetectorPixel) -> float:
-            pixel_smearer = pixel.precompute_pixel_smearer(qx_array, qy_array)
-            if shadow_is_zero and pixel.shadow_factor == 0:
-                return pixel_smearer(np.zeros(intensity.shape))
-            return pixel_smearer(intensity)'''
-        '''big_arr = np.frompyfunc(smear_pixel, 1, 1)(self._detector_pixels)'''
-        '''big_arr = [smear_pixel(pixel) for pixel in self._detector_pixels]
-        return np.sum(big_arr, axis = (1,2)) # The dimensions are a problem'''
-        #I don't think this produces a big enough speed boost to add this to production
-        #It results in a ~10% speed improvement... I really don't think it's worth pushing
-        # There's definitely a way to make this faster, but the approach is probably to assemble the arrays
-        #firstt and multiply them
         
-
-
     def simulated_intensity_2d(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         qx, qy, _, shadow = self.intensity_2d()
         simulated_tensities = qx * 0
