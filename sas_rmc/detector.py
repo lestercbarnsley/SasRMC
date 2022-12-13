@@ -481,26 +481,25 @@ class SimulatedDetectorImage(DetectorImage):
         # Want a challenge? Make it work for N dimensions of detector pixels. I gave up
         dimension_getter = lambda arr: len(arr.shape)
         pixel_signature_key, pixel_signature_value = f"_pixel_signature_messing_with_this_is_unsafe_{self.private_attr_suffix}_" , ''.join(str(id(pixel)) for pixel in self._detector_pixels) 
-        qxqy_name = f"qxqy_name_{id(qx_array)}_{id(qy_array)}"
-        resolution_name_attr = f"_big_resolution_array_{qxqy_name}_{self.private_attr_suffix}"
+        qxqy_name = f"qxqy_name_{id(qx_array)}_{id(qy_array)}_{shadow_is_zero}"
+        #resolution_name_attr = f"_big_resolution_array_{qxqy_name}_{self.private_attr_suffix}"
         slicing_func_name = f"_slicing_func_{qxqy_name}_{self.private_attr_suffix}"
-        shadow_factor_array_name = f"_shadow_factor_array_{qxqy_name}_{self.private_attr_suffix}"
-        if getattr(self, pixel_signature_key, "") != pixel_signature_value or not hasattr(self, resolution_name_attr):
+        #shadow_factor_array_name = f"_shadow_factor_array_{qxqy_name}_{self.private_attr_suffix}"
+        if getattr(self, pixel_signature_key, "") != pixel_signature_value or not hasattr(self, slicing_func_name):
             setattr(self, pixel_signature_key, pixel_signature_value)
             big_resolution_list = [pixel._resolution_function_calculator(qx_array, qy_array) for pixel in self._detector_pixels]
             slicing_func_list = [get_slicing_func_from_gaussian(big_resolution) for big_resolution in big_resolution_list]
-            def slicing_func(arr: np.ndarray) -> np.ndarray:
-                return np.array([slicing_func_p(arr) for slicing_func_p in slicing_func_list])
-            setattr(self, resolution_name_attr, np.array([slicing_func_p(big_res_p) for slicing_func_p, big_res_p in zip(slicing_func_list, big_resolution_list)]))
-            setattr(self, slicing_func_name, slicing_func)
-            setattr(self, shadow_factor_array_name, np.array([pixel.shadow_factor for pixel in self._detector_pixels]))
-        big_resolution_arr = getattr(self, resolution_name_attr)
-        big_slicing_func = getattr(self, slicing_func_name)
-        big_intensity = big_slicing_func(intensity)
-        adding_axes = tuple(range(dimension_getter(self._detector_pixels), dimension_getter(big_intensity)))
-        simulate_intensity = lambda : np.sum(big_intensity * big_resolution_arr, axis = adding_axes) # call later
-        simulate_and_shadow = lambda : simulate_intensity() * getattr(self, shadow_factor_array_name) # call later
-        simulated_intensity = (simulate_intensity if shadow_is_zero else simulate_and_shadow)() # call now
+            big_resolution_arr = np.array([slicing_func_p(big_res_p) for slicing_func_p, big_res_p in zip(slicing_func_list, big_resolution_list)])
+            adding_axes = tuple(range(dimension_getter(self._detector_pixels), dimension_getter(big_resolution_arr)))
+            shadow_arr = np.array([int(pixel.shadow_factor) for pixel in self._detector_pixels])
+            def slice_and_smear(arr: np.ndarray) -> np.ndarray:
+                big_arr = np.array([slicing_func_p(arr) for slicing_func_p in slicing_func_list])
+                return np.sum(big_arr * big_resolution_arr, axis = adding_axes)
+            def slice_and_smear_and_shadow(arr: np.ndarray) -> np.ndarray:
+                return slice_and_smear(arr) * shadow_arr
+            setattr(self, slicing_func_name, slice_and_smear_and_shadow if shadow_is_zero else slice_and_smear)
+        slice_and_smear_fn = getattr(self, slicing_func_name)
+        simulated_intensity = slice_and_smear_fn(intensity)
         self.simulated_intensity = simulated_intensity
         return simulated_intensity
         
