@@ -4,9 +4,9 @@ from typing import List, Tuple
 
 import numpy as np
 from scipy.special import jv as j_bessel
-from scipy.integrate import quad, fixed_quad
+from scipy.integrate import fixed_quad
 
-from .particle import Particle
+from .particle import Particle, modulus_array
 from ..vector import Vector, broadcast_to_numpy_array
 from ..shapes.shapes import Shape, Cylinder
 from .. import constants
@@ -28,7 +28,7 @@ class CylindricalParticle(Particle):
         return super().shapes
 
     def _change_shapes(self, shape_list: List[Shape]):
-        return CylindricalParticle(
+        return type(self)(
             _magnetization = self._magnetization,
             _shapes = shape_list,
             solvent_sld=self.solvent_sld,
@@ -36,11 +36,17 @@ class CylindricalParticle(Particle):
         )
 
     def set_magnetization(self, magnetization: Vector):
-        return CylindricalParticle(
+        return type(self)(
             _magnetization = magnetization,
             _shapes = self._shapes,
             solvent_sld=self.solvent_sld,
             cylinder_sld=self.cylinder_sld
+        )
+
+    def set_radius(self, radius: float):
+        shape_list = [shape.change_radius(radius) for shape in self.shapes]
+        return self._change_shapes(
+            shape_list=shape_list
         )
 
     @property
@@ -81,7 +87,7 @@ class CylindricalParticle(Particle):
         if position is None:
             position = Vector.null_vector()
         if orientation is None:
-            orientation = Vector(0,1,0)
+            orientation = Vector(0,0, 1)
         return cls(
             _shapes = [Cylinder(
                 central_position = position,
@@ -96,12 +102,12 @@ class CylindricalParticle(Particle):
     def form_cylinder(self, q: float, alpha: float) -> float:
         yL = q * self.shapes[0].height * np.cos(alpha) / 2
         yR = q * self.shapes[0].radius * np.sin(alpha)
+        # This needs to be fixed to use delta sld
         scale =  2 * (self.cylinder_sld - self.solvent_sld) * self.volume
         return scale * np.sinc(yL / PI) * np.where(yR == 0, 1/2, j_bessel(1,  yR) / yR)
 
     def rotation(self, q):
         y, *_ = fixed_quad(lambda alpha : self.form_cylinder(q, alpha)**2, 0, PI/2 , n = 10)
-        #y, *_ = quad(lambda alpha : self.form_cylinder(q, alpha)**2, 0, PI/2 )
         return y
 
     def form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector) -> np.ndarray:
@@ -114,4 +120,38 @@ class CylindricalParticle(Particle):
 
     def magnetic_form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector, magnetization: Vector) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         return super().magnetic_form_array(qx_array, qy_array, orientation, magnetization)
+
+
+@dataclass
+class CylinderLong(CylindricalParticle):
+    _shapes: List[Cylinder] = field(
+        default_factory=lambda : [Cylinder()]
+    )
+    cylinder_sld: float = 0
+
+    @property
+    def shapes(self) -> List[Cylinder]:
+        return super().shapes
+
+    def _change_shapes(self, shape_list: List[Shape]):
+        return type(self)(
+            _magnetization = self._magnetization,
+            _shapes = shape_list,
+            solvent_sld=self.solvent_sld,
+            cylinder_sld=self.cylinder_sld
+        )
+
+    def form_cylinder(self, q: np.ndarray) -> np.ndarray:
+        yR = q * self.shapes[0].radius
+        scale =  2 * self.delta_sld(self.cylinder_sld) * self.volume
+        return scale * np.where(yR == 0, 1/2, j_bessel(1,  yR) / yR)
+
+    def form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector) -> np.ndarray:
+        if orientation.unit_vector * Vector(0,0,1) < 0.999:
+            return np.zeros(qx_array.shape)
+        if constants.NON_ZERO_LIST(qy_array):
+            q = modulus_array(qx_array, qy_array)
+            return self.form_cylinder(q)
+        return self.form_cylinder(qx_array)
+
 

@@ -449,7 +449,9 @@ class DetectorImage: # Major refactor needed for detector image, as it shouldn't
         pass_config_on = np.sum(all_sigma_para**2) == 0 and np.sum(all_sigma_perp**2) == 0
         return cls.gen_from_data(data_dict=data_dict, detector_config=detector_config if pass_config_on else None)
 
+
 private_attr_prefix_factory = lambda : ''.join(np.random.choice(['dsfa','ewrf','werfj','gjowq','glks','fjkds','jtks','dsaa','jgkda','ewiq']) for _ in range(10))
+
 
 @dataclass
 class SimulatedDetectorImage(DetectorImage):
@@ -482,9 +484,7 @@ class SimulatedDetectorImage(DetectorImage):
         dimension_getter = lambda arr: len(arr.shape)
         pixel_signature_key, pixel_signature_value = f"_pixel_signature_messing_with_this_is_unsafe_{self.private_attr_suffix}_" , ''.join(str(id(pixel)) for pixel in self._detector_pixels) 
         qxqy_name = f"qxqy_name_{id(qx_array)}_{id(qy_array)}_{shadow_is_zero}"
-        #resolution_name_attr = f"_big_resolution_array_{qxqy_name}_{self.private_attr_suffix}"
         slicing_func_name = f"_slicing_func_{qxqy_name}_{self.private_attr_suffix}"
-        #shadow_factor_array_name = f"_shadow_factor_array_{qxqy_name}_{self.private_attr_suffix}"
         if getattr(self, pixel_signature_key, "") != pixel_signature_value or not hasattr(self, slicing_func_name):
             setattr(self, pixel_signature_key, pixel_signature_value)
             big_resolution_list = [pixel._resolution_function_calculator(qx_array, qy_array) for pixel in self._detector_pixels]
@@ -495,9 +495,7 @@ class SimulatedDetectorImage(DetectorImage):
             def slice_and_smear(arr: np.ndarray) -> np.ndarray:
                 big_arr = np.array([slicing_func_p(arr) for slicing_func_p in slicing_func_list])
                 return np.sum(big_arr * big_resolution_arr, axis = adding_axes)
-            def slice_and_smear_and_shadow(arr: np.ndarray) -> np.ndarray:
-                return slice_and_smear(arr) * shadow_arr
-            setattr(self, slicing_func_name, slice_and_smear_and_shadow if shadow_is_zero else slice_and_smear)
+            setattr(self, slicing_func_name, (lambda arr : (slice_and_smear(arr) * shadow_arr)) if shadow_is_zero else slice_and_smear)
         slice_and_smear_fn = getattr(self, slicing_func_name)
         simulated_intensity = slice_and_smear_fn(intensity)
         self.simulated_intensity = simulated_intensity

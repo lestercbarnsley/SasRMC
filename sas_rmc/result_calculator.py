@@ -1,14 +1,15 @@
 #%%
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Callable, List, Protocol, Tuple
+from typing import Callable, Protocol, Tuple, List
 
 import numpy as np
 
 from .particles import Particle, ParticleComposite
 from .particles.particle import magnetic_sld_in_angstrom_minus_2
 from .vector import Vector, VectorSpace, broadcast_to_numpy_array, composite_function
-from .array_cache import method_array_cache#, array_cache
+from .array_cache import method_array_cache, array_cache
+from .box_simulation import Box
 from . import constants
 
 PI = constants.PI
@@ -174,15 +175,34 @@ class ProfileCalculator:
         return broadcast_to_numpy_array(self.q_array, sin_q_fn)
 
 
+@array_cache(max_size=40_000)
+def structure_factor(q: np.ndarray, distance: float) -> np.ndarray:
+    qr = q * distance
+    return np.sinc(qr / PI)
+
+
+@array_cache(max_size=5_000)
+def array_list_sum(arr_list: List[np.ndarray], bottom_level = False):
+    if bottom_level:
+        return np.sum(arr_list, axis = 0)
+    divs = int(np.sqrt(len(arr_list)))
+    return np.sum([array_list_sum(arr_list[i::divs], bottom_level = True)  for i in range(divs) ], axis = 0)
+
 
 @dataclass
 class ProfileCalculatorAnalytical:
     q_array: np.ndarray
 
     @method_array_cache(cache_holder_index=1)
-    def form_profile(self, particle: Particle):
+    def form_profile(self, particle: Particle) -> np.ndarray:
         return particle.form_array(self.q_array, 0, orientation=particle.orientation)
 
+    def structure_factor(self, particle_i: Particle, particle_j: Particle) -> np.ndarray:
+        distance = particle_i.position.distance_from_vector(particle_j.position)
+        return structure_factor(self.q_array, distance)
+
+    def box_intensity(self, box: Box) -> np.ndarray:
+        return 1e8 * (array_list_sum([self.form_profile(particle_i) * self.form_profile(particle_j) * self.structure_factor(particle_i, particle_j) for particle_i in box.particles for particle_j in box.particles]))
 
 
 if __name__ == "__main__":

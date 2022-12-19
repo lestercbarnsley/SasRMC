@@ -6,7 +6,7 @@ import numpy as np
 
 from .particle_factory import ParticleFactory, polydisperse_parameter
 from . import command_factory
-from ..particles import CylindricalParticle
+from ..particles import CylindricalParticle, CylinderLong
 from ..box_simulation import Box
 from .. scattering_simulation import SimulationParams
 from .. import Vector, constants, commands
@@ -21,16 +21,9 @@ class EnlargeCylinder(commands.ParticleCommand):
 
     def execute(self) -> None:
         old_particle: CylindricalParticle = self.particle
-        cylinder_shape = old_particle.shapes[0]
-        new_radius = self.change_by_factor * (cylinder_shape.radius)
-        new_particle = CylindricalParticle.gen_from_parameters(
-            radius = new_radius,
-            height=cylinder_shape.height,
-            cylinder_sld=old_particle.cylinder_sld,
-            solvent_sld=old_particle.solvent_sld,
-            position=old_particle.position,
-            orientation=old_particle.orientation,
-        )
+        old_radius = old_particle.shapes[0].radius
+        new_radius = self.change_by_factor * old_radius
+        new_particle = old_particle.set_radius(new_radius)
         commands.SetParticleState(self.box, self.particle_index, new_particle).execute()
 
 
@@ -59,6 +52,7 @@ class EnlargeCylinderCommandFactory(command_factory.CommandFactory):
 
     def create_command(self, box: Box, particle_index: int, simulation_params: SimulationParams = None) -> commands.Command:
         create = np.random.choice([self.create_single_command, self.create_all_command])
+        #create = self.create_single_command
         return create(box, particle_index, simulation_params)
 
 
@@ -83,8 +77,8 @@ class CylindricalCommandFactory(command_factory.CommandFactoryList):
             command_factory.OrbitParticleFactory(actual_angle_change=massive_angle_change),
             command_factory.NuclearMagneticRescaleFactory(change_by_factor=change_by_factor),
             command_factory.NuclearMagneticRescaleFactory(change_by_factor=massive_change_factor),
-            EnlargeCylinderCommandFactory(change_by_factor),
-            EnlargeCylinderCommandFactory(massive_change_factor)
+            #EnlargeCylinderCommandFactory(change_by_factor),
+            #EnlargeCylinderCommandFactory(massive_change_factor)
             ]
         return command_list
 
@@ -113,6 +107,18 @@ class CylindricalParticleFactory(ParticleFactory):
     def gen_from_dict(cls, d: dict):
         pass
 
+@dataclass
+class CylindricalLongParticleFactory(CylindricalParticleFactory):
+
+    def create_particle(self) -> CylinderLong:
+        return CylinderLong.gen_from_parameters(
+            radius=polydisperse_parameter(loc = self.cylinder_radius, polyd= self.cylinder_radius_polydispersity),
+            height = polydisperse_parameter(loc = self.cylinder_height, polyd=self.cylinder_height_polydispersity),
+            cylinder_sld=self.cylinder_sld,
+            solvent_sld=self.solvent_sld,
+            position=Vector(0,0,0),
+            orientation=Vector(0,0,1),
+        )
 
 
 if __name__ == "__main__":
