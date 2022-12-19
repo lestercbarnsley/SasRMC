@@ -22,26 +22,36 @@ from sas_rmc.logger import Logger, LogCallback
 rng = constants.RNG
 
 
-RADIUS = 68.0 / 10000 # ANGSTROM
-RADIUS_POLYD = 0.1# 10%
-LATTICE_PARAM = 92.0
+RADIUS = 68.0 /2 # ANGSTROM
+RADIUS_POLYD = 0.15# 10%
+LATTICE_PARAM = 2 * 92.0
 HEIGHT = 0.4e4# is a micron#100e3#300000.0 ### Make this extremely long?
 SOLVENT_SLD = 8.29179504046
-PARTICLE_NUMBER = 50#0
-CYCLES = 30
+PARTICLE_NUMBER = 100#0
+CYCLES = 100
+RUN = True
+STARTING_RESCALE = 9.3e-12 #1
+
+TWOPIDIVQMIN = 2 * constants.PI / 0.002
 
 def create_box(particle_number: int, particle_factory: ParticleFactory ) -> Box:
     particles = [particle_factory.create_particle() for _ in range(particle_number)]
-    cube = Cube(dimension_0=HEIGHT, dimension_1=HEIGHT, dimension_2=HEIGHT)
+    cube = Cube(dimension_0=TWOPIDIVQMIN, dimension_1=TWOPIDIVQMIN, dimension_2=HEIGHT)
     i_total = int(np.sqrt(particle_number)) + 1
     for i in range(i_total):
         for j in range(i_total):
             ij = i * i_total+j
             if ij < len(particles):
                 particle = particles[ij]
-                particles[ij] = particle.set_position(Vector(1 * i * LATTICE_PARAM, 1 * j * LATTICE_PARAM))
+                particles[ij] = particle.set_position(Vector(2 * i * LATTICE_PARAM, 2 * j * LATTICE_PARAM))
     
-    return Box(particles=particles, cube = cube)
+    box= Box(particles=particles, cube = cube)
+    #box.force_inside_box(in_plane= True)
+    return box
+
+def create_line(particle_number: int, particle_factory: ParticleFactory ) -> Box:
+    particles = [particle_factory.create_particle().set_position(Vector(i * LATTICE_PARAM, 0)) for i in range(particle_number)]
+    return Box(particles=particles, cube=Cube(dimension_0=HEIGHT, dimension_1=HEIGHT))
 
 def create_hexagonal_box(particle_number: int, particle_factory: ParticleFactory) -> Box:
     ROOT_THREE_ON_TWO = np.sqrt(3) / 2
@@ -79,19 +89,25 @@ def create_runner() -> RmcRunner:
         solvent_sld=SOLVENT_SLD
     )
     box = create_box(PARTICLE_NUMBER, particle_factory=particle_factory)
-    box = create_hexagonal_box(PARTICLE_NUMBER, particle_factory)
+    '''box = create_hexagonal_box(PARTICLE_NUMBER, particle_factory)
+    box = Box(particles = [particle_factory.create_particle() for _ in range(PARTICLE_NUMBER)], cube = Cube(dimension_0=TWOPIDIVQMIN, dimension_1=TWOPIDIVQMIN, dimension_2=HEIGHT))
+    box.force_inside_box(in_plane=True)
+    for i, particle in enumerate(box.particles):
+        box.particles[i] = particle.set_orientation(Vector(0,0,1))'''
+    #box = create_line(PARTICLE_NUMBER, particle_factory)
     box_list = [box]
     print('starting config collision found',box.collision_test())
     data_src = r"J:\Uni\Programming\SANS_Numerical_Simulation_v2\Results\20220204113917_p6mm_normalized_and_merged.txt"
     data = np.genfromtxt(data_src, delimiter='\t' )
     q = data[:,0]
     q_limited = lambda arr : np.array([a for a, q_i in zip(arr, q) if q_i > 2e-2])
+    #q_limited = lambda arr: arr
     intensity = data[:,1]
     intensity_err = data[:,2]
     r_array = np.linspace(0, HEIGHT, num = 100)
     single_profile_calculator = ProfileCalculatorAnalytical(q_limited(q))#ProfileCalculator(q_array=q, r_array=r_array)
     profile_fitter = ProfileFitter(box_list=box_list, single_profile_calculator=single_profile_calculator, experimental_intensity=q_limited(intensity), intensity_uncertainty=q_limited(intensity_err))
-    simulation = ScatteringSimulation(profile_fitter, simulation_params=sas_rmc.box_simulation_params_factory())
+    simulation = ScatteringSimulation(profile_fitter, simulation_params=sas_rmc.box_simulation_params_factory(STARTING_RESCALE))
     controller_factory = ControllerFactory(
         annealing_config=VeryFastAnneal(annealing_stop_cycle_number=CYCLES / 2,anneal_start_temp=10.0, anneal_fall_rate=0.1),
         total_cycles=CYCLES,
@@ -126,7 +142,8 @@ def create_runner() -> RmcRunner:
 
 if __name__ == "__main__":
     runner = create_runner()
-    #runner.run()
+    if RUN:
+        runner.run()
     simulation = runner.simulator.evaluator.simulation
     fitter = simulation.fitter
     box = fitter.box_list[0]

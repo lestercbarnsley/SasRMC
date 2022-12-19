@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Callable, Protocol, Tuple, List
 
 import numpy as np
+from scipy.special import j0 as j0_bessel
 
 from .particles import Particle, ParticleComposite
 from .particles.particle import magnetic_sld_in_angstrom_minus_2
@@ -178,7 +179,9 @@ class ProfileCalculator:
 @array_cache(max_size=40_000)
 def structure_factor(q: np.ndarray, distance: float) -> np.ndarray:
     qr = q * distance
-    return np.sinc(qr / PI)
+    return j0_bessel(qr)
+    #return np.where(qr == 0, 1, np.sin(qr) / qr)
+    #return np.sinc(qr / PI)
 
 
 @array_cache(max_size=5_000)
@@ -202,7 +205,19 @@ class ProfileCalculatorAnalytical:
         return structure_factor(self.q_array, distance)
 
     def box_intensity(self, box: Box) -> np.ndarray:
-        return 1e8 * (array_list_sum([self.form_profile(particle_i) * self.form_profile(particle_j) * self.structure_factor(particle_i, particle_j) for particle_i in box.particles for particle_j in box.particles]))
+        total_intensity_list = []
+        for particle_i in box.particles:
+            array_list = []
+            for particle_j in box.particles:
+                fifjstructure = self.form_profile(particle_i) * self.form_profile(particle_j) * self.structure_factor(particle_i, particle_j)
+                array_list.append(fifjstructure)
+            array_list_sum = np.sum(array_list, axis = 0)
+            total_intensity_list.append(array_list_sum)
+        return 1e8 * np.sum(total_intensity_list, axis = 0)
+
+        #return 1e8 * np.sum([np.sum([self.form_profile(particle_i) * self.form_profile(particle_j) * self.structure_factor(particle_i, particle_j) for particle_j in box.particles], axis = 0) for particle_i in box.particles], axis = 0)
+        #return 1e8 * (array_list_sum([array_list_sum([self.form_profile(particle_i) * self.form_profile(particle_j) * self.structure_factor(particle_i, particle_j) for particle_i in box.particles]) for particle_j in box.particles])
+        #return 1e8 * (array_list_sum([self.form_profile(particle_i) * self.form_profile(particle_j) * self.structure_factor(particle_i, particle_j) for particle_i in box.particles for particle_j in box.particles]))
 
 
 if __name__ == "__main__":

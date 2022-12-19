@@ -26,6 +26,15 @@ class EnlargeCylinder(commands.ParticleCommand):
         new_particle = old_particle.set_radius(new_radius)
         commands.SetParticleState(self.box, self.particle_index, new_particle).execute()
 
+@dataclass
+class MoveByAndEnlargeCylinder(commands.ParticleCommand):
+    change_by_factor: float
+    position_delta: Vector
+
+    def execute(self) -> None:
+        EnlargeCylinder(self.box, self.particle_index, change_by_factor=self.change_by_factor).execute()
+        commands.MoveParticleBy(self.box, self.particle_index, position_delta=self.position_delta).execute()
+        
 
 @dataclass
 class EnlargeAllCylinders(commands.ParticleCommand):
@@ -77,7 +86,7 @@ class CylindricalCommandFactory(command_factory.CommandFactoryList):
             command_factory.OrbitParticleFactory(actual_angle_change=massive_angle_change),
             command_factory.NuclearMagneticRescaleFactory(change_by_factor=change_by_factor),
             command_factory.NuclearMagneticRescaleFactory(change_by_factor=massive_change_factor),
-            #EnlargeCylinderCommandFactory(change_by_factor),
+            EnlargeCylinderCommandFactory(change_by_factor**0.1),
             #EnlargeCylinderCommandFactory(massive_change_factor)
             ]
         return command_list
