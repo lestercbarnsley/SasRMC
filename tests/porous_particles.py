@@ -2,8 +2,13 @@
 # from dataclasses import dataclass
 # from typing import List
 
+from typing import Tuple
 import numpy as np
 from matplotlib import pyplot as plt
+
+from scipy.interpolate import interp1d
+from scipy.integrate import fixed_quad
+from scipy.optimize import curve_fit
 
 import sas_rmc
 from sas_rmc import constants, Vector
@@ -20,19 +25,21 @@ from sas_rmc.rmc_runner import RmcRunner
 from sas_rmc.logger import Logger, LogCallback
 
 rng = constants.RNG
+PI = constants.PI
 
 
-RADIUS = 68.0 /2 # ANGSTROM
-RADIUS_POLYD = 0.15# 10%
-LATTICE_PARAM = 2 * 92.0
+RADIUS = 68.0 /3 # ANGSTROM
+RADIUS_POLYD = 0.3# 10%
+LATTICE_PARAM = 4 * PI / (np.sqrt(3) *  0.0707 )  #100#    / (np.sqrt(3) / 2)#92.0
+print(LATTICE_PARAM)
 HEIGHT = 0.4e4# is a micron#100e3#300000.0 ### Make this extremely long?
 SOLVENT_SLD = 8.29179504046
-PARTICLE_NUMBER = 100#0
-CYCLES = 100
+PARTICLE_NUMBER =50#0
+CYCLES = 100 
 RUN = True
-STARTING_RESCALE = 9.3e-12 #1
+STARTING_RESCALE = 1
 
-TWOPIDIVQMIN = 2 * constants.PI / 0.002
+TWOPIDIVQMIN = 2 * PI / 0.002
 
 def create_box(particle_number: int, particle_factory: ParticleFactory ) -> Box:
     particles = [particle_factory.create_particle() for _ in range(particle_number)]
@@ -43,7 +50,7 @@ def create_box(particle_number: int, particle_factory: ParticleFactory ) -> Box:
             ij = i * i_total+j
             if ij < len(particles):
                 particle = particles[ij]
-                particles[ij] = particle.set_position(Vector(2 * i * LATTICE_PARAM, 2 * j * LATTICE_PARAM))
+                particles[ij] = particle.set_position(Vector(1 * i * LATTICE_PARAM, 1 * j * LATTICE_PARAM))
     
     box= Box(particles=particles, cube = cube)
     #box.force_inside_box(in_plane= True)
@@ -89,8 +96,8 @@ def create_runner() -> RmcRunner:
         solvent_sld=SOLVENT_SLD
     )
     box = create_box(PARTICLE_NUMBER, particle_factory=particle_factory)
-    '''box = create_hexagonal_box(PARTICLE_NUMBER, particle_factory)
-    box = Box(particles = [particle_factory.create_particle() for _ in range(PARTICLE_NUMBER)], cube = Cube(dimension_0=TWOPIDIVQMIN, dimension_1=TWOPIDIVQMIN, dimension_2=HEIGHT))
+    box = create_hexagonal_box(PARTICLE_NUMBER, particle_factory)
+    '''box = Box(particles = [particle_factory.create_particle() for _ in range(PARTICLE_NUMBER)], cube = Cube(dimension_0=TWOPIDIVQMIN, dimension_1=TWOPIDIVQMIN, dimension_2=HEIGHT))
     box.force_inside_box(in_plane=True)
     for i, particle in enumerate(box.particles):
         box.particles[i] = particle.set_orientation(Vector(0,0,1))'''
@@ -99,8 +106,10 @@ def create_runner() -> RmcRunner:
     print('starting config collision found',box.collision_test())
     data_src = r"J:\Uni\Programming\SANS_Numerical_Simulation_v2\Results\20220204113917_p6mm_normalized_and_merged.txt"
     data = np.genfromtxt(data_src, delimiter='\t' )
+    nominal_q_min = 2 * PI / np.min([box.cube.dimension_0, box.cube.dimension_1])
+    nominal_q_min = 0.02
     q = data[:,0]
-    q_limited = lambda arr : np.array([a for a, q_i in zip(arr, q) if q_i > 2e-2])
+    q_limited = lambda arr : np.array([a for a, q_i in zip(arr, q) if q_i > nominal_q_min])
     #q_limited = lambda arr: arr
     intensity = data[:,1]
     intensity_err = data[:,2]
@@ -140,6 +149,30 @@ def create_runner() -> RmcRunner:
 
 
 
+def i_of_q(q: np.ndarray, intensity: np.ndarray, q_i: float):
+    argmin = np.argmin((q-q_i)**2)
+    if argmin < 5:
+        popt, _ = curve_fit(power_law, q[:5], intensity[:5], p0 = [-4, intensity[0]])
+        return power_law(q_i, *popt)
+    if argmin > q.shape[0] - 5:
+        popt, _ = curve_fit(power_law, q[-5:], intensity[-5:], p0 = [-4, intensity[-5]])
+        return power_law(q_i, *popt)
+    interpolator = interp1d(q[argmin - 2: argmin + 3], intensity[argmin - 2: argmin + 3])
+    return interpolator(q_i)
+
+
+    
+
+def pr_inversion(q:np.ndarray, intensity:np.ndarray):
+    r = np.linspace(2 * PI / np.max(q), 2 * PI / np.min(q), num = q.shape[0])
+    inversion = lambda q_i, r_i : np.array([i_of_q(q, intensity, q_i_i) * np.sinc(q_i_i * r_i / PI) * q_i_i**2 for q_i_i in q_i]) 
+    return r, (r**2 / (2*PI**2)) * np.array([fixed_quad(lambda q_i : inversion(q_i, r_i), 1e-4, 1e4)[0] for r_i in r])
+    
+    
+
+
+
+
 if __name__ == "__main__":
     runner = create_runner()
     if RUN:
@@ -154,6 +187,9 @@ if __name__ == "__main__":
     plt.hist([(p_1.position - p_2.position).mag for p_1 in box.particles for p_2 in box.particles], bins = 100)
     plt.show()
     q = fitter.single_profile_calculator.q_array
+    #r, pr = pr_inversion(q, fitter.experimental_intensity - 0.01)
+    #plt.plot(r, pr)
+    #plt.show()
     plt.loglog(q, fitter.experimental_intensity, 'b.')
     rescale = simulation.simulation_params.get_value(key = constants.NUCLEAR_RESCALE)
     plt.loglog(q, fitter.simulated_intensity(rescale = rescale), 'r-')

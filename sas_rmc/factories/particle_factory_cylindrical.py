@@ -61,7 +61,6 @@ class EnlargeCylinderCommandFactory(command_factory.CommandFactory):
 
     def create_command(self, box: Box, particle_index: int, simulation_params: SimulationParams = None) -> commands.Command:
         create = np.random.choice([self.create_single_command, self.create_all_command])
-        #create = self.create_single_command
         return create(box, particle_index, simulation_params)
 
 
@@ -104,8 +103,8 @@ class CylindricalParticleFactory(ParticleFactory):
 
     def create_particle(self) -> CylindricalParticle:
         return CylindricalParticle.gen_from_parameters(
-            radius=polydisperse_parameter(loc = self.cylinder_radius, polyd= self.cylinder_radius_polydispersity),
-            height = polydisperse_parameter(loc = self.cylinder_height, polyd=self.cylinder_height_polydispersity),
+            radius=np.abs(polydisperse_parameter(loc = self.cylinder_radius, polyd= self.cylinder_radius_polydispersity)),
+            height = np.abs(polydisperse_parameter(loc = self.cylinder_height, polyd=self.cylinder_height_polydispersity)),
             cylinder_sld=self.cylinder_sld,
             solvent_sld=self.solvent_sld,
             position=Vector(0,0,0),
@@ -121,8 +120,8 @@ class CylindricalLongParticleFactory(CylindricalParticleFactory):
 
     def create_particle(self) -> CylinderLong:
         return CylinderLong.gen_from_parameters(
-            radius=polydisperse_parameter(loc = self.cylinder_radius, polyd= self.cylinder_radius_polydispersity),
-            height = polydisperse_parameter(loc = self.cylinder_height, polyd=self.cylinder_height_polydispersity),
+            radius=np.abs(polydisperse_parameter(loc = self.cylinder_radius, polyd= self.cylinder_radius_polydispersity)),
+            height = np.abs(polydisperse_parameter(loc = self.cylinder_height, polyd=self.cylinder_height_polydispersity)),
             cylinder_sld=self.cylinder_sld,
             solvent_sld=self.solvent_sld,
             position=Vector(0,0,0),

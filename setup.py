@@ -26,7 +26,8 @@ setup(
         'scipy',
         'matplotlib',
         'openpyxl',
-        'ipython'
+        'ipython',
+        'plotly'
         ],
 )
 

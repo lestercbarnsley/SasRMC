@@ -119,8 +119,9 @@ class CylindricalParticle(Particle):
 
 
     def magnetic_form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector, magnetization: Vector) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        return super().magnetic_form_array(qx_array, qy_array, orientation, magnetization)
-
+        if self.is_magnetic():
+            return super().magnetic_form_array(qx_array, qy_array, orientation, magnetization)
+        return [np.zeros(qx_array.shape) for _ in range(3)]
 
 @dataclass
 class CylinderLong(CylindricalParticle):

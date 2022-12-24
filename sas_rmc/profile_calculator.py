@@ -58,7 +58,7 @@ class ProfileFitter:
         return np.sqrt(self.experimental_intensity)
 
     def simulated_intensity(self, rescale: float = 1.0) -> np.ndarray:
-        return rescale * np.sum([self.single_profile_calculator.box_intensity(box) for box in self.box_list], axis= 0)
+        return rescale * np.average([self.single_profile_calculator.box_intensity(box) for box in self.box_list], axis= 0)
         #return rescale * np.sum([box_profile_calculator(box, self.single_profile_calculator) for box in self.box_list], axis = 0)
 
     def fit(self, simulation_params: SimulationParams) -> float:
