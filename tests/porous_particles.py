@@ -34,8 +34,8 @@ LATTICE_PARAM = 4 * PI / (np.sqrt(3) *  0.0707 )  #100#    / (np.sqrt(3) / 2)#92
 print(LATTICE_PARAM)
 HEIGHT = 0.4e4# is a micron#100e3#300000.0 ### Make this extremely long?
 SOLVENT_SLD = 8.29179504046
-PARTICLE_NUMBER =50#0
-CYCLES = 100 
+PARTICLE_NUMBER =200#0
+CYCLES = 200 
 RUN = True
 STARTING_RESCALE = 1
 

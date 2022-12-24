@@ -147,12 +147,12 @@ class NumericalProfileCalculator:
 
     @method_array_cache(cache_holder_index=1)
     def form_profile(self, particle: ParticleNumerical):
-        #average_sld = [np.average([particle.get_sld(Vector.random_vector(r)) for _ in range(1000)]) for r in self.r_array]
         average_sld_fn = lambda r : np.average([particle.delta_sld( particle.get_sld(Vector.random_vector(r))) for _ in range(self.average_sphere_points)])
         average_sld = broadcast_to_numpy_array(self.r_array, average_sld_fn)
         dr = np.gradient(self.r_array)
         sin_q_fn = lambda q : np.sum(average_sld * np.sinc(q * self.r_array / PI) * dr * (self.r_array ** 2)) # Using np.sinc here guarantees sin(qr)/qr = 1 if qr = 0
         return broadcast_to_numpy_array(self.q_array, sin_q_fn)
+
 
 @dataclass
 class ParticleAverageNumerical(Protocol):
@@ -180,8 +180,6 @@ class ProfileCalculator:
 def structure_factor(q: np.ndarray, distance: float) -> np.ndarray:
     qr = q * distance
     return j0_bessel(qr)
-    #return np.where(qr == 0, 1, np.sin(qr) / qr)
-    #return np.sinc(qr / PI)
 
 
 @array_cache(max_size=5_000)
@@ -204,27 +202,17 @@ class ProfileCalculatorAnalytical:
         distance = particle_i.position.distance_from_vector(particle_j.position)
         return structure_factor(self.q_array, distance)
 
+    @method_array_cache(cache_holder_index=1, max_size=1000)
+    def form_structure_product(self, particle_i: Particle, particle_j: Particle) -> np.ndarray:
+        return self.form_profile(particle_i) * self.form_profile(particle_j) * self.structure_factor(particle_i, particle_j)
+
     def box_intensity(self, box: Box) -> np.ndarray:
-        fifj_structure_calculator = lambda particle_0, partilce_1: self.form_profile(particle_0) * self.form_profile(partilce_1) * self.structure_factor(particle_0, partilce_1)
-        return (1e8 / box.volume) * np.sum(
-            [np.sum(
-                [fifj_structure_calculator(particle_i, particle_j) for particle_j in box.particles]
-                , axis = 0) for particle_i in box.particles]
-            , axis = 0) 
-        '''total_intensity_list = []
-        for particle_i in box.particles:
-            array_list = []
-            for particle_j in box.particles:
-                fifjstructure = self.form_profile(particle_i) * self.form_profile(particle_j) * self.structure_factor(particle_i, particle_j)
-                array_list.append(fifjstructure)
-            array_list_sum = np.sum(array_list, axis = 0)
-            total_intensity_list.append(array_list_sum)
-        return 1e8 * np.sum(total_intensity_list, axis = 0)'''
-
-        #return 1e8 * np.sum([np.sum([self.form_profile(particle_i) * self.form_profile(particle_j) * self.structure_factor(particle_i, particle_j) for particle_j in box.particles], axis = 0) for particle_i in box.particles], axis = 0)
-        #return 1e8 * (array_list_sum([array_list_sum([self.form_profile(particle_i) * self.form_profile(particle_j) * self.structure_factor(particle_i, particle_j) for particle_i in box.particles]) for particle_j in box.particles])
-        #return 1e8 * (array_list_sum([self.form_profile(particle_i) * self.form_profile(particle_j) * self.structure_factor(particle_i, particle_j) for particle_i in box.particles for particle_j in box.particles]))
-
+        return (1e8 / box.volume) * array_list_sum(
+            [array_list_sum(
+                [self.form_structure_product(particle_i, particle_j) for particle_j in box.particles]
+            ) for particle_i in box.particles]
+        )
+            
 
 if __name__ == "__main__":
     pass
