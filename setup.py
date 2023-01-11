@@ -27,7 +27,8 @@ setup(
         'matplotlib',
         'openpyxl',
         'ipython',
-        'plotly'
+        'plotly',
+        'pytest'
         ],
 )
 

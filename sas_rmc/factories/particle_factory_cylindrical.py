@@ -1,5 +1,5 @@
 #%%
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List
 
 import numpy as np
@@ -35,6 +35,44 @@ class MoveByAndEnlargeCylinder(commands.ParticleCommand):
         EnlargeCylinder(self.box, self.particle_index, change_by_factor=self.change_by_factor).execute()
         commands.MoveParticleBy(self.box, self.particle_index, position_delta=self.position_delta).execute()
         
+@dataclass
+class LatticeCommandFactory(command_factory.CommandFactory):
+    reference_angle: float
+
+    def create_command(self, box: Box, particle_index: int, simulation_params: SimulationParams = None) -> commands.Command:
+        return commands.FormLattice(box, particle_index, reference_particle_index=command_factory.different_random_int(len(box), particle_index), reference_angle=self.reference_angle)
+
+@dataclass
+class FixedJumpFactory(command_factory.CommandFactory):
+    default_loc: float = 100.0
+    default_scale: float = 10.0
+
+    def create_command(self, box: Box, particle_index: int, simulation_params: SimulationParams = None) -> commands.Command:
+        return commands.JumpParticleFixedDistance(box, particle_index, reference_particle_index=command_factory.different_random_int(len(box), particle_index), fixed_distance=np.random.normal(loc = self.default_loc, scale = self.default_scale ) )
+
+
+'''@dataclass
+class MoveMultipleParticles(commands.ParticleCommand):
+    possible_commands: List[commands.ParticleCommand]
+
+    def execute(self) -> None:
+        for command in self.possible_commands:
+            command.execute()
+
+
+@dataclass
+class MoveMultipleParticleFactory(command_factory.CommandFactory):
+    command_number: int
+    command_factory_list: List[command_factory.CommandFactory] = field(default_factory=list, repr = False, init = False)
+
+    def set_command_list(self, command_factory_list: List[command_factory.CommandFactory]):
+        self.command_factory_list = [command_factory_ for command_factory_ in command_factory_list] # make a new list
+
+    def create_command(self, box: Box, particle_index: int, simulation_params: SimulationParams = None) -> commands.Command:
+        possible_commands_factory = [np.random.choice(self.command_factory_list) for _ in range(self.command_number)]
+        possible_commands = [possible_command.create_command(box, particle_index if i == 0 else np.random.choice(range(len(box.particles))), simulation_params) for i, possible_command in enumerate(possible_commands_factory)]
+        return MoveMultipleParticles(box, particle_index, possible_commands = possible_commands)'''
+
 
 @dataclass
 class EnlargeAllCylinders(commands.ParticleCommand):
@@ -83,11 +121,17 @@ class CylindricalCommandFactory(command_factory.CommandFactoryList):
             command_factory.MoveParticleByFactory(position_delta),
             command_factory.OrbitParticleFactory(actual_angle_change=actual_angle_change),
             command_factory.OrbitParticleFactory(actual_angle_change=massive_angle_change),
+            command_factory.JumpToParticleFactory(), 
             command_factory.NuclearMagneticRescaleFactory(change_by_factor=change_by_factor),
             command_factory.NuclearMagneticRescaleFactory(change_by_factor=massive_change_factor),
             EnlargeCylinderCommandFactory(change_by_factor**0.1),
+            LatticeCommandFactory(massive_angle_change),
+            FixedJumpFactory(),
             #EnlargeCylinderCommandFactory(massive_change_factor)
             ]
+        #multiple_move_factory = MoveMultipleParticleFactory(np.random.choice(range(6)))
+        #multiple_move_factory.set_command_list(command_list)
+        #command_list.append(multiple_move_factory)
         return command_list
 
 

@@ -3,8 +3,9 @@ from dataclasses import dataclass, field
 from typing import List, Tuple
 
 import numpy as np
-from scipy.special import jv as j_bessel
-from scipy.integrate import fixed_quad
+#import scipy as sp
+from scipy import special, integrate
+#from scipy.special import jv as j_bessel
 
 from .particle import Particle, modulus_array
 from ..vector import Vector, broadcast_to_numpy_array
@@ -12,7 +13,7 @@ from ..shapes.shapes import Shape, Cylinder
 from .. import constants
 
 #def long_cylinder_average_fraction(cylinder_radius: float, radius: float) -> float:
-
+j_bessel = special.jv
 PI = constants.PI
 
 
@@ -107,7 +108,7 @@ class CylindricalParticle(Particle):
         return scale * np.sinc(yL / PI) * np.where(yR == 0, 1/2, j_bessel(1,  yR) / yR)
 
     def rotation(self, q):
-        y, *_ = fixed_quad(lambda alpha : self.form_cylinder(q, alpha)**2, 0, PI/2 , n = 10)
+        y, *_ = integrate.fixed_quad(lambda alpha : self.form_cylinder(q, alpha)**2, 0, PI/2 , n = 10)
         return y
 
     def form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector) -> np.ndarray:

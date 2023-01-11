@@ -4,7 +4,9 @@ from dataclasses import dataclass
 from typing import Callable, Protocol, Tuple, List
 
 import numpy as np
-from scipy.special import j0 as j0_bessel
+#import scipy as sp
+from scipy import special
+#from scipy.special import j0 as j0_bessel
 
 from .particles import Particle, ParticleComposite
 from .particles.particle import magnetic_sld_in_angstrom_minus_2
@@ -14,6 +16,7 @@ from .box_simulation import Box
 from . import constants
 
 PI = constants.PI
+j0_bessel = special.j0
 
 @dataclass
 class FormResult:

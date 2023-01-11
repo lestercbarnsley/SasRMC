@@ -124,17 +124,6 @@ class Vector:
         key_prefix = f"{vector_str}." if vector_str is not None else ""
         keys = [f"{key_prefix}{dimension}" for dimension in ["X", "Y", "Z"]]
         return {key: component for (key, component) in zip(keys, self.itercomps())}
-        '''if vector_str is None:
-            return {
-                "X": self.x,
-                "Y": self.y,
-                "Z": self.z
-            }
-        return {
-            f"{vector_str}.X" : self.x,
-            f"{vector_str}.Y" : self.y,
-            f"{vector_str}.Z" : self.z,
-        }'''
 
     @classmethod
     def from_list(cls, l: List[float]):
@@ -153,18 +142,6 @@ class Vector:
             y = d.get(keys[1], 0.0),
             z = d.get(keys[2], 0.0)
         )
-        '''
-        if vector_str is None:
-            return cls(
-                x = d.get('X', 0.0),
-                y = d.get('Y', 0.0),
-                z = d.get('Z', 0.0)
-            )
-        return cls(
-            x = d.get(f'{vector_str}.X', 0.0),
-            y = d.get(f'{vector_str}.Y', 0.0),
-            z = d.get(f'{vector_str}.Z', 0.0)
-        )'''
 
     def rotated_basis(self) -> Tuple:
         unit_a = self.unit_vector

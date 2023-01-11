@@ -478,26 +478,36 @@ class SimulatedDetectorImage(DetectorImage):
         get_simulated_intensity_err = lambda pixel: pixel.simulated_intensity_err
         return self.array_from_pixels(get_simulated_intensity_err)
 
+    def make_smearing_function(self, qx_array, qy_array, shadow_is_zero) -> Callable[[np.ndarray], np.ndarray]:
+        idx_pixels = [(idx, pixel) for idx, pixel in np.ndenumerate(self._detector_pixels)]
+        idxs = [idx for idx, _ in idx_pixels]
+        pixels = [pixel for _, pixel in idx_pixels]
+        big_resolution_list = [pixel._resolution_function_calculator(qx_array, qy_array) for pixel in pixels]
+        slicing_func_list = [get_slicing_func_from_gaussian(big_resolution) for big_resolution in big_resolution_list]
+        big_resolution_arr = np.array([slicing_func(big_res) for slicing_func, big_res in zip(slicing_func_list, big_resolution_list)])
+        shadow_arr = np.array([int(pixel.shadow_factor) for pixel in pixels])
+        shadow_arr_func = (lambda arr : (arr * shadow_arr)) if shadow_is_zero else (lambda arr : arr)
+        shape = self._detector_pixels.shape
+
+        def smearing_function(intensity: np.ndarray) -> np.ndarray:
+            smeared_arr = np.zeros(shape)
+            big_sliced_intensity = np.array([slicing_func(intensity) for slicing_func in slicing_func_list])
+            smeared_intensity = np.sum(big_resolution_arr * big_sliced_intensity, axis = tuple(range(1, len(big_resolution_arr.shape))))
+            for idx, smeared_ntensity in zip(idxs, shadow_arr_func(smeared_intensity)):
+                smeared_arr[idx] = smeared_ntensity
+            return smeared_arr
+
+        return smearing_function
+
     def smear(self, intensity: np.ndarray, qx_array: np.ndarray, qy_array: np.ndarray, shadow_is_zero: bool = True) -> np.ndarray:
-        # This function works for a one dimensional array of self._detector_pixels
-        # Want a challenge? Make it work for N dimensions of detector pixels. I gave up
-        dimension_getter = lambda arr: len(arr.shape)
         pixel_signature_key, pixel_signature_value = f"_pixel_signature_messing_with_this_is_unsafe_{self.private_attr_suffix}_" , ''.join(str(id(pixel)) for pixel in self._detector_pixels) 
         qxqy_name = f"qxqy_name_{id(qx_array)}_{id(qy_array)}_{shadow_is_zero}"
-        slicing_func_name = f"_slicing_func_{qxqy_name}_{self.private_attr_suffix}"
-        if getattr(self, pixel_signature_key, "") != pixel_signature_value or not hasattr(self, slicing_func_name):
+        smearing_func_name = f"_slicing_func_{qxqy_name}_{self.private_attr_suffix}"
+        if getattr(self, pixel_signature_key, "") != pixel_signature_value or not hasattr(self, smearing_func_name):
             setattr(self, pixel_signature_key, pixel_signature_value)
-            big_resolution_list = [pixel._resolution_function_calculator(qx_array, qy_array) for pixel in self._detector_pixels]
-            slicing_func_list = [get_slicing_func_from_gaussian(big_resolution) for big_resolution in big_resolution_list]
-            big_resolution_arr = np.array([slicing_func_p(big_res_p) for slicing_func_p, big_res_p in zip(slicing_func_list, big_resolution_list)])
-            adding_axes = tuple(range(dimension_getter(self._detector_pixels), dimension_getter(big_resolution_arr)))
-            shadow_arr = np.array([int(pixel.shadow_factor) for pixel in self._detector_pixels])
-            def slice_and_smear(arr: np.ndarray) -> np.ndarray:
-                big_arr = np.array([slicing_func_p(arr) for slicing_func_p in slicing_func_list])
-                return np.sum(big_arr * big_resolution_arr, axis = adding_axes)
-            setattr(self, slicing_func_name, (lambda arr : (slice_and_smear(arr) * shadow_arr)) if shadow_is_zero else slice_and_smear)
-        slice_and_smear_fn = getattr(self, slicing_func_name)
-        simulated_intensity = slice_and_smear_fn(intensity)
+            setattr(self, smearing_func_name, self.make_smearing_function(qx_array, qy_array, shadow_is_zero))
+        smearing_function = getattr(self, smearing_func_name)
+        simulated_intensity = smearing_function(intensity)
         self.simulated_intensity = simulated_intensity
         return simulated_intensity
         
