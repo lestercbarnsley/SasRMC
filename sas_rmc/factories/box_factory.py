@@ -104,7 +104,7 @@ def gen_from_dict(d: dict, detector_list: List[DetectorImage]) -> BoxFactory:
     box_dimension_1 = d.get("box_dimension_2", 0.0)
     box_dimension_2 = d.get("box_dimension_3", 0.0)
     in_plane = d.get("in_plane", True)
-    if constants.NON_ZERO_LIST([box_dimension_0, box_dimension_1, box_dimension_2]):
+    if constants.non_zero_list([box_dimension_0, box_dimension_1, box_dimension_2]):
         return BoxDFactory(box_dimension_0, box_dimension_1, box_dimension_2, in_plane=in_plane)
     return BoxFromDetectorListFactory(detector_list, in_plane=in_plane)
 

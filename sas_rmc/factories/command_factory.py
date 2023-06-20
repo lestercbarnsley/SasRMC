@@ -12,11 +12,11 @@ rng = constants.RNG
 
 
 def different_random_int(n: int, number_to_avoid: int) -> int:
-    for _ in range(200000):
+    for _ in range(200_000):
         x = rng.choice(range(n))
         if x != number_to_avoid:
             return x
-    return -1
+    raise ValueError("Cannot find different random int")
 
 
 @dataclass

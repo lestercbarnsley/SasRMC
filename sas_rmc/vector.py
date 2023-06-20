@@ -1,7 +1,7 @@
 #%%
 from functools import reduce
-from typing import Any, Callable, Generator, List, Tuple, Type
-from dataclasses import dataclass
+from typing import Callable, Type, Iterator
+from dataclasses import dataclass, field
 import math
 
 import numpy as np
@@ -10,7 +10,7 @@ from . import constants
 PI = constants.PI
 rng = constants.RNG
 
-def cross(a: Tuple, b: Tuple) -> Tuple:
+def cross(a: tuple[float], b: tuple[float]) -> tuple[float, float, float]:
     ax, ay, az = a[0], a[1], a[2]
     bx, by, bz = b[0], b[1], b[2]
     cx = ay*bz-az*by
@@ -18,7 +18,7 @@ def cross(a: Tuple, b: Tuple) -> Tuple:
     cz = ax*by-ay*bx
     return cx, cy, cz
 
-def dot(a: Tuple, b: Tuple) -> Any:
+def dot(a: tuple[float], b: tuple[float]) -> float:
     ax, ay = a[:2]
     az = a[2] if len(a) > 2 else 0
     bx, by = b[:2]
@@ -48,7 +48,7 @@ class Vector:
     def mag(self) -> float:
         return math.sqrt(self.x**2 + self.y**2 + self.z**2)
 
-    def itercomps(self) -> Generator: 
+    def itercomps(self) -> Iterator[float]: 
         yield self.x
         yield self.y
         yield self.z
@@ -59,7 +59,7 @@ class Vector:
     def to_numpy(self) -> np.ndarray:
         return np.array(self.to_list())
 
-    def to_tuple(self) -> Tuple[float, float, float]:
+    def to_tuple(self) -> tuple[float, float, float]:
         return tuple(self.itercomps())
 
     def __len__(self) -> int:
@@ -126,11 +126,12 @@ class Vector:
         return {key: component for (key, component) in zip(keys, self.itercomps())}
 
     @classmethod
-    def from_list(cls, l: List[float]):
-        return cls(x = l[0], y = l[1], z = l[2])
+    def from_list(cls, ls: list[float]):
+        x, y, z, *_ = ls
+        return cls(x = x, y = y, z = z)
 
     @classmethod
-    def from_numpy(cls, arr):
+    def from_numpy(cls, arr: np.ndarray):
         return cls(x = arr[0], y = arr[1], z = arr[2])
 
     @classmethod
@@ -143,7 +144,7 @@ class Vector:
             z = d.get(keys[2], 0.0)
         )
 
-    def rotated_basis(self) -> Tuple:
+    def rotated_basis(self) -> tuple:
         unit_a = self.unit_vector
         mostly_orthogonal_basis = [-1 * Vector(0,0,1), -1 * Vector(1,0,0), -1 * Vector(0,1,0)]
         mostly_orthog = mostly_orthogonal_basis[np.argmax(unit_a.to_numpy() ** 2)]
@@ -173,7 +174,7 @@ class Vector:
 
 @dataclass
 class VectorElement:
-    position: Vector = Vector.null_vector()
+    position: Vector = field(default_factory=Vector.null_vector)
     dx: float = 0.0
     dy: float = 0.0
     dz: float = 0.0
@@ -273,8 +274,8 @@ class VectorSpace:
 
 @dataclass
 class Interface:
-    position_marker: Vector = Vector.null_vector()
-    normal: Vector = Vector.null_vector()
+    position_marker: Vector = field(default_factory = Vector.null_vector)
+    normal: Vector = field(default_factory = Vector.null_vector)
 
     def is_inside(self, position: Vector):
         return (position - self.position_marker) * self.normal < 0

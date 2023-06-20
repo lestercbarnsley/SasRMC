@@ -1,7 +1,6 @@
 #%%
 
 from functools import wraps
-from typing import Tuple
 from enum import Enum
 
 import numpy as np
@@ -21,7 +20,7 @@ def _round_vector_comp(comp: float, precision: float):
         if np.abs(comp * 10**i) > 1:
             return int(comp * 10**(precision + i)) / 10**(precision + i)
 
-def round_vector(vector: Vector, precision: int = DEFAULT_PRECISION) -> Tuple[float, float, float]:
+def round_vector(vector: Vector, precision: int = DEFAULT_PRECISION) -> tuple[float, float, float]:
     return tuple(_round_vector_comp(comp, precision) for comp in vector.itercomps())
 
 def pass_arg(arg):
@@ -50,8 +49,8 @@ def array_cache(func = None, max_size: int = None):
             argument_tuple = pass_arg(args) + kwarg_tuple
             if argument_tuple not in cache:
                 if len(cache) >= max_size:
-                    keys = list(cache.keys())
-                    uncached = [cache.pop(key) for key in keys[0:int(max_size / 2)]]
+                    deletable_keys = tuple(cache.keys())[0:int(max_size / 2)]
+                    uncached = [cache.pop(key) for key in deletable_keys]
                 result = func(*args, **kwargs)
                 cache[argument_tuple] = result
             return cache[argument_tuple]
@@ -78,8 +77,8 @@ def method_array_cache(func = None, max_size: int = CLASS_MAX_SIZE, cache_holder
             object_cache = getattr(obj, cache_name)
             if argument_tuple not in object_cache:
                 if len(object_cache) >= max_size:
-                    keys = list(object_cache.keys())
-                    uncached = [object_cache.pop(key) for key in keys[0:-2]]
+                    deletable_keys = tuple(object_cache.keys())[0:-2]
+                    uncached = [object_cache.pop(key) for key in deletable_keys]
                 result = func(*args, **kwargs)
                 object_cache[argument_tuple] = result
             return object_cache[argument_tuple]

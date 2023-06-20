@@ -11,6 +11,7 @@ from .particle import Particle, modulus_array
 from ..vector import Vector, broadcast_to_numpy_array
 from ..shapes.shapes import Shape, Cylinder
 from .. import constants
+from ..array_cache import array_cache
 
 #def long_cylinder_average_fraction(cylinder_radius: float, radius: float) -> float:
 j_bessel = special.jv
@@ -112,17 +113,22 @@ class CylindricalParticle(Particle):
         return y
 
     def form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector) -> np.ndarray:
-        if constants.NON_ZERO_LIST(qy_array):
+        if constants.non_zero_list(qy_array):
             pass
         else:
             return np.sqrt(broadcast_to_numpy_array(qx_array, lambda q : self.rotation(q)))
-            
-
 
     def magnetic_form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector, magnetization: Vector) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         if self.is_magnetic():
             return super().magnetic_form_array(qx_array, qy_array, orientation, magnetization)
         return [np.zeros(qx_array.shape) for _ in range(3)]
+
+
+@array_cache(max_size=1000)
+def j1_bessel(q: np.ndarray, radius: float) -> np.ndarray:
+    qr = q * radius
+    return np.where(qr == 0, 1/2, j_bessel(1, qr) / qr)
+
 
 @dataclass
 class CylinderLong(CylindricalParticle):
@@ -144,16 +150,17 @@ class CylinderLong(CylindricalParticle):
         )
 
     def form_cylinder(self, q: np.ndarray) -> np.ndarray:
-        yR = q * self.shapes[0].radius
+        #yR = q * self.shapes[0].radius
         scale =  2 * self.delta_sld(self.cylinder_sld) * self.volume
-        return scale * np.where(yR == 0, 1/2, j_bessel(1,  yR) / yR)
+        return scale * j1_bessel(q, self.shapes[0].radius)#np.where(yR == 0, 1/2, j_bessel(1,  yR) / yR)
 
     def form_array(self, qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector) -> np.ndarray:
         if orientation.unit_vector * Vector(0,0,1) < 0.999:
             return np.zeros(qx_array.shape)
-        if constants.NON_ZERO_LIST(qy_array):
-            q = modulus_array(qx_array, qy_array)
-            return self.form_cylinder(q)
-        return self.form_cylinder(qx_array)
+        if not constants.non_zero_list(qy_array):
+            return self.form_cylinder(qx_array)
+        q = modulus_array(qx_array, qy_array)
+        return self.form_cylinder(q)
+        
 
 

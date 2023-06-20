@@ -356,8 +356,8 @@ class DetectorImage: # Major refactor needed for detector image, as it shouldn't
     def gen_from_data(cls, data_dict: dict, detector_config: DetectorConfig = None):
         qX_data = data_dict[QX]
         qY_data = data_dict[QY]
-        qX_1d = fuzzy_unique(qX_data, lambda a: a[np.abs(qY_data) < 0.025 * np.max(qY_data)])#.tolist() Ultimately, this should be a strategy somehow
-        qY_1d = fuzzy_unique(qY_data, lambda a: a[np.abs(qX_data) < 0.025 * np.max(qX_data)])#.tolist()
+        qX_1d = fuzzy_unique(qX_data, lambda a: a[np.abs(qY_data) < 0.025 * np.max(qY_data)])
+        qY_1d = fuzzy_unique(qY_data, lambda a: a[np.abs(qX_data) < 0.025 * np.max(qX_data)])
         qx, qy = np.meshgrid(qX_1d, qY_1d)
         blank_canvas_pixel = lambda qx_i, qy_i : DetectorPixel.row_to_pixel({QX : qx_i, QY : qy_i, INTENSITY : 0}, detector_config= detector_config)
         make_blank_canvas = np.frompyfunc(blank_canvas_pixel, 2, 1)

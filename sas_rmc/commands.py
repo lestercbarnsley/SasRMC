@@ -7,7 +7,7 @@ import numpy as np
 from .shapes.shapes import Sphere
 from .acceptance_scheme import AcceptanceScheme
 from .scattering_simulation import ScatteringSimulation
-from .box_simulation import Box
+from .box_simulation import Box, BoxLattice
 from .particles import Particle, CoreShellParticle
 from .scattering_simulation import SimulationParams
 from .vector import Vector
@@ -187,6 +187,74 @@ class FormLattice(ParticleCommand):
         vector_to_reference = min(pointing_vectors, key= lambda v : v.mag)
         new_position = reference_particle.position + rotate_vector(vector_to_reference, self.reference_angle)
         MoveParticleTo(self.box, self.particle_index, new_position).execute()
+
+
+@dataclass
+class SetBoxLatticeParameter(ParticleCommand):
+    lattice_parameter: float
+
+    def execute(self) -> None:
+        if not isinstance(self.box, BoxLattice):
+            raise TypeError("Command only works on BoxLattice object")
+        self.box.set_lattice_parameter(self.lattice_parameter)
+
+
+@dataclass
+class ScaleBoxLatticeParameter(ParticleCommand):
+    change_by_factor: float
+
+    def execute(self) -> None:
+        if not isinstance(self.box, BoxLattice):
+            raise TypeError("Command only works on BoxLattice object")
+        old_lattice_parameter = self.box.lattice_parameter
+        new_lattice_parameter = self.change_by_factor * old_lattice_parameter
+        SetBoxLatticeParameter(self.box, self.particle_index, new_lattice_parameter).execute()
+
+@dataclass
+class SetBoxLatticeDisplacement(ParticleCommand):
+    displacement: float
+
+    def execute(self) -> None:
+        if not isinstance(self.box, BoxLattice):
+            raise TypeError("Command only works on BoxLattice object")
+        self.box.set_displacements(self.displacement)
+
+
+@dataclass
+class ScaleBoxLatticeDisplacement(ParticleCommand):
+    change_by_factor: float
+
+    def execute(self) -> None:
+        if not isinstance(self.box, BoxLattice):
+            raise TypeError("Command only works on BoxLattice object")
+        old_displacement = self.box.displacement
+        new_displacement = self.change_by_factor * old_displacement
+        SetBoxLatticeDisplacement(self.box, self.particle_index, new_displacement).execute()
+
+
+@dataclass
+class SetBoxLatticeRadius(ParticleCommand):
+    radius: float
+
+    def execute(self) -> None:
+        if not isinstance(self.box, BoxLattice):
+            raise TypeError("Command only works on BoxLattice object")
+        old_radius = np.average([particle.shapes[0].radius for particle in self.box.particles])
+        for i, particle in enumerate(self.box.particles):
+            new_particle = particle.set_radius(self.radius * particle.shapes[0].radius / old_radius)
+            SetParticleState(self.box, i, new_particle).execute()
+
+
+@dataclass
+class ScaleBoxLatticeRadius(ParticleCommand):
+    change_by_factor: float
+
+    def execute(self) -> None:
+        old_radius = np.average([particle.shapes[0].radius for particle in self.box.particles])
+        new_radius = self.change_by_factor * old_radius
+        SetBoxLatticeRadius(self.box, self.particle_index, new_radius).execute()
+
+
 
 
 @dataclass

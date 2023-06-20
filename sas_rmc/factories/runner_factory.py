@@ -97,9 +97,7 @@ def load_config(config_file: str) -> Runner:
     config_file_path = Path(config_file)
     with open(config_file_path, "r") as f:
         configs = yaml.load(f, Loader = yaml.FullLoader)
-    input_config_source = configs['input_config_source']
-    
-    input_config_path = Path(input_config_source)
+    input_config_path = Path(configs['input_config_source'])
     if not input_config_path.exists():
         input_config_path = config_file_path.parent / input_config_path
     output_path = configs["output_folder"]
