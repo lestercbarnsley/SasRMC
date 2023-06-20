@@ -148,6 +148,47 @@ class JumpParticleTo(ParticleCommand):
         particle_move_command.execute()
 
 
+def jump_by_vector(position_1: Vector, position_2: Vector, fixed_distance: float) -> Vector:
+    pointing_vector = position_2 - position_1
+    return pointing_vector - (fixed_distance * pointing_vector.unit_vector)
+
+
+@dataclass
+class JumpParticleFixedDistance(ParticleCommand): # Not yet tested
+    reference_particle_index: int
+    fixed_distance: float
+
+    def execute(self) -> None:
+        particle = self.particle
+        reference_particle = self.box[self.reference_particle_index]
+        jump_by_vec = (jump_by_vector(shape.central_position, shape_2.central_position, self.fixed_distance) for shape in particle.shapes for shape_2 in reference_particle.shapes)
+        move_by_command = MoveParticleBy(self.box, self.particle_index, position_delta=min(jump_by_vec, key= lambda v : v.mag))
+        move_by_command.execute()
+
+
+def rotate_vector(vector: Vector, angle: float) -> Vector:
+    x, y, z = vector.to_tuple()
+    if z:
+        raise ValueError("remember, no z")
+    return Vector(
+        x = x * np.cos(angle) - y * np.sin(angle),
+        y = x * np.sin(angle) + y * np.cos(angle)
+    )
+
+
+@dataclass
+class FormLattice(ParticleCommand):
+    reference_particle_index: int
+    reference_angle: float
+
+    def execute(self) -> None:
+        reference_particle = self.box[self.reference_particle_index]
+        pointing_vectors = ((particle.position - reference_particle.position) for particle in self.box.particles)
+        vector_to_reference = min(pointing_vectors, key= lambda v : v.mag)
+        new_position = reference_particle.position + rotate_vector(vector_to_reference, self.reference_angle)
+        MoveParticleTo(self.box, self.particle_index, new_position).execute()
+
+
 @dataclass
 class OrbitParticle(ParticleCommand):
     relative_angle: float

@@ -17,6 +17,8 @@ rng = constants.RNG
 
 
 def collision_detected_3d(particle_1: Particle, particle_2: Particle) -> bool:
+    #distance = particle_1.position - particle_2.position
+    #sum_radii = particle_1.shapes[0].radius + particle_2.shapes[0].radius
     if particle_1.collision_detected(particle_2):
         return True
     if particle_1.position.z == particle_2.position.z:

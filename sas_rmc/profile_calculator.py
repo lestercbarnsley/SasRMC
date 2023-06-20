@@ -6,7 +6,7 @@ import numpy as np
 
 #from .detector import SimulatedDetectorImage
 from .box_simulation import Box
-from .result_calculator import NumericalProfileCalculator
+from .result_calculator import NumericalProfileCalculator, ProfileCalculatorAnalytical
 from .form_calculator import mod
 from .scattering_simulation import SimulationParams
 from .array_cache import method_array_cache, array_cache
@@ -23,8 +23,9 @@ def array_list_sum(arr_list: List[np.ndarray], bottom_level = False):
 
 @array_cache(max_size = 5_000)
 def structure_factor_func(q_array: np.ndarray, distance: float) -> np.ndarray:# position_1: Vector, position_2: Vector):
-    #distance = (position_2 - position_1).mag
-    return np.sinc(q_array * distance / PI)
+    qr = q_array * distance
+    #return np.where(qr == 0, 1, np.sin(qr) / qr)
+    return np.sinc(qr / PI)
 
 @array_cache(max_size=5_000)
 def structure_factor(q_array: np.ndarray, particle_position: Vector, box_position_list: List[Vector]) -> np.ndarray:
@@ -41,11 +42,12 @@ def box_profile_calculator(box: Box, profile_calculator: NumericalProfileCalcula
     return mod(total_form) / box.volume
 
 
+
 @dataclass
 class ProfileFitter:
 
     box_list: List[Box]
-    single_profile_calculator: NumericalProfileCalculator
+    single_profile_calculator: ProfileCalculatorAnalytical
     experimental_intensity: np.ndarray
     intensity_uncertainty: np.ndarray = field(default_factory=lambda : np.zeros(1000))
 
@@ -56,7 +58,8 @@ class ProfileFitter:
         return np.sqrt(self.experimental_intensity)
 
     def simulated_intensity(self, rescale: float = 1.0) -> np.ndarray:
-        return rescale * np.sum([box_profile_calculator(box, self.single_profile_calculator) for box in self.box_list], axis = 0)
+        return rescale * np.average([self.single_profile_calculator.box_intensity(box) for box in self.box_list], axis= 0)
+        #return rescale * np.sum([box_profile_calculator(box, self.single_profile_calculator) for box in self.box_list], axis = 0)
 
     def fit(self, simulation_params: SimulationParams) -> float:
         rescale = simulation_params.get_value(key = constants.NUCLEAR_RESCALE)

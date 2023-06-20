@@ -1,5 +1,5 @@
 #%%
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Tuple#List,
 
@@ -450,8 +450,12 @@ class DetectorImage: # Major refactor needed for detector image, as it shouldn't
         return cls.gen_from_data(data_dict=data_dict, detector_config=detector_config if pass_config_on else None)
 
 
+private_attr_prefix_factory = lambda : ''.join(np.random.choice(['dsfa','ewrf','werfj','gjowq','glks','fjkds','jtks','dsaa','jgkda','ewiq']) for _ in range(10))
+
+
 @dataclass
 class SimulatedDetectorImage(DetectorImage):
+    private_attr_suffix: str = field(default_factory = private_attr_prefix_factory, init = False, repr = False)
     
     @property
     def experimental_intensity(self) -> np.ndarray:
@@ -474,11 +478,26 @@ class SimulatedDetectorImage(DetectorImage):
         get_simulated_intensity_err = lambda pixel: pixel.simulated_intensity_err
         return self.array_from_pixels(get_simulated_intensity_err)
 
-    def smear(self, intensity: np.ndarray, qx_array: np.ndarray, qy_array: np.ndarray, shadow_is_zero: bool = True) -> np.ndarray:
-        def smear_pixel(pixel: DetectorPixel) -> float:
-            pixel.smear_pixel(intensity, qx_array, qy_array, shadow_is_zero)
-            return pixel.simulated_intensity
-        return self.array_from_pixels(smear_pixel)
+    def make_smearing_function(self, qx_array, qy_array, shadow_is_zero) -> Callable[[np.ndarray], np.ndarray]:
+        idx_pixels = [(idx, pixel) for idx, pixel in np.ndenumerate(self._detector_pixels)]
+        idxs = [idx for idx, _ in idx_pixels]
+        pixels = [pixel for _, pixel in idx_pixels]
+        big_resolution_list = [pixel._resolution_function_calculator(qx_array, qy_array) for pixel in pixels]
+        slicing_func_list = [get_slicing_func_from_gaussian(big_resolution) for big_resolution in big_resolution_list]
+        big_resolution_arr = np.array([slicing_func(big_res) for slicing_func, big_res in zip(slicing_func_list, big_resolution_list)])
+        shadow_arr = np.array([int(pixel.shadow_factor) for pixel in pixels])
+        shadow_arr_func = (lambda arr : (arr * shadow_arr)) if shadow_is_zero else (lambda arr : arr)
+        shape = self._detector_pixels.shape
+
+        def smearing_function(intensity: np.ndarray) -> np.ndarray:
+            smeared_arr = np.zeros(shape)
+            big_sliced_intensity = np.array([slicing_func(intensity) for slicing_func in slicing_func_list])
+            smeared_intensity = np.sum(big_resolution_arr * big_sliced_intensity, axis = tuple(range(1, len(big_resolution_arr.shape))))
+            for idx, smeared_ntensity in zip(idxs, shadow_arr_func(smeared_intensity)):
+                smeared_arr[idx] = smeared_ntensity
+            return smeared_arr
+
+        return smearing_function
 
     def smear(self, intensity: np.ndarray, qx_array: np.ndarray, qy_array: np.ndarray, shadow_is_zero: bool = True) -> np.ndarray:
         zero_intensity = 0 * intensity
@@ -524,6 +543,7 @@ class SimulatedDetectorImage(DetectorImage):
         big_resolution_arr, big_intensity_arr = np.array([p for p in pixel_smear]), np.array([b for b in pixel_intensity])
         adding_axes = tuple(range(dimension_getter(self._detector_pixels), dimension_getter(big_intensity_arr)))
         return np.sum(big_resolution_arr * big_intensity_arr, axis = adding_axes)'''
+       
         
     def simulated_intensity_2d(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         qx, qy, _, shadow = self.intensity_2d()

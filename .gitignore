@@ -19,3 +19,5 @@ sas_rmc/shapes/__pycache__/
 sas_rmc/factories/__pycache__/
 *.yaml
 dev_config.txt
+Untitled.ipynb
+.ipynb_checkpoints/Untitled-checkpoint.ipynb

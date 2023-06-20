@@ -1,17 +1,22 @@
 #%%
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Callable, List, Protocol, Tuple
+from typing import Callable, Protocol, Tuple, List
 
 import numpy as np
+#import scipy as sp
+from scipy import special
+#from scipy.special import j0 as j0_bessel
 
 from .particles import Particle, ParticleComposite
 from .particles.particle import magnetic_sld_in_angstrom_minus_2
 from .vector import Vector, VectorSpace, broadcast_to_numpy_array, composite_function
-from .array_cache import method_array_cache#, array_cache
+from .array_cache import method_array_cache, array_cache
+from .box_simulation import Box
 from . import constants
 
 PI = constants.PI
+j0_bessel = special.j0
 
 @dataclass
 class FormResult:
@@ -145,12 +150,12 @@ class NumericalProfileCalculator:
 
     @method_array_cache(cache_holder_index=1)
     def form_profile(self, particle: ParticleNumerical):
-        #average_sld = [np.average([particle.get_sld(Vector.random_vector(r)) for _ in range(1000)]) for r in self.r_array]
         average_sld_fn = lambda r : np.average([particle.delta_sld( particle.get_sld(Vector.random_vector(r))) for _ in range(self.average_sphere_points)])
         average_sld = broadcast_to_numpy_array(self.r_array, average_sld_fn)
         dr = np.gradient(self.r_array)
         sin_q_fn = lambda q : np.sum(average_sld * np.sinc(q * self.r_array / PI) * dr * (self.r_array ** 2)) # Using np.sinc here guarantees sin(qr)/qr = 1 if qr = 0
         return broadcast_to_numpy_array(self.q_array, sin_q_fn)
+
 
 @dataclass
 class ParticleAverageNumerical(Protocol):
@@ -174,16 +179,43 @@ class ProfileCalculator:
         return broadcast_to_numpy_array(self.q_array, sin_q_fn)
 
 
+@array_cache(max_size=40_000)
+def structure_factor(q: np.ndarray, distance: float) -> np.ndarray:
+    qr = q * distance
+    return j0_bessel(qr)
+
+
+@array_cache(max_size=5_000)
+def array_list_sum(arr_list: List[np.ndarray], bottom_level = False):
+    if bottom_level:
+        return np.sum(arr_list, axis = 0)
+    divs = int(np.sqrt(len(arr_list)))
+    return np.sum([array_list_sum(arr_list[i::divs], bottom_level = True)  for i in range(divs) ], axis = 0)
+
 
 @dataclass
 class ProfileCalculatorAnalytical:
     q_array: np.ndarray
 
     @method_array_cache(cache_holder_index=1)
-    def form_profile(self, particle: Particle):
+    def form_profile(self, particle: Particle) -> np.ndarray:
         return particle.form_array(self.q_array, 0, orientation=particle.orientation)
 
+    def structure_factor(self, particle_i: Particle, particle_j: Particle) -> np.ndarray:
+        distance = particle_i.position.distance_from_vector(particle_j.position)
+        return structure_factor(self.q_array, distance)
 
+    @method_array_cache(cache_holder_index=1, max_size=1000)
+    def form_structure_product(self, particle_i: Particle, particle_j: Particle) -> np.ndarray:
+        return self.form_profile(particle_i) * self.form_profile(particle_j) * self.structure_factor(particle_i, particle_j)
+
+    def box_intensity(self, box: Box) -> np.ndarray:
+        return (1e8 / box.volume) * array_list_sum(
+            [array_list_sum(
+                [self.form_structure_product(particle_i, particle_j) for particle_j in box.particles]
+            ) for particle_i in box.particles]
+        )
+            
 
 if __name__ == "__main__":
     pass

@@ -20,18 +20,21 @@ class FieldDirection(Enum):
     X = "X"
     Y = "Y"
     Z = "Z"
-    
+
+@array_cache(max_size=5000)
+def _sum_array_list_low_lvl(array_list: List[np.ndarray]) -> np.ndarray:
+    return np.sum(array_list, axis = 0) # This is defined so we can use the cache
 
 @array_cache(max_size=5_000)
 def sum_array_list(array_list: List[np.ndarray]) -> np.ndarray:
-    return np.sum(array_list, axis = 0)
+    divisions = int(np.sqrt(len(array_list)))
+    partial_sums = [_sum_array_list_low_lvl(array_list[i::divisions]) for i in range(divisions)]
+    return _sum_array_list_low_lvl(partial_sums)#sum_array_list(array_list)
 
 def form_result_adder(form_results: List[FormResult], getter_fn: Callable[[FormResult], np.ndarray], rescale: float = 1) -> np.ndarray:
     array_list = [getter_fn(form_result) for form_result in form_results]
-    divisions = int(np.sqrt(len(array_list)))
-    partial_sums = [sum_array_list(array_list[i::divisions]) for i in range(divisions)]
-    return np.sqrt(rescale) * sum_array_list(partial_sums)#sum_array_list(array_list)
-
+    return np.sqrt(rescale) * sum_array_list(array_list)
+    
 def nuclear_amplitude(form_results: List[FormResult], rescale_factor: float = 1) -> np.ndarray:
     form_nuclear_getter =  lambda form_result: form_result.form_nuclear
     return form_result_adder(form_results, form_nuclear_getter, rescale=rescale_factor)

@@ -162,6 +162,9 @@ class Sphere(Shape):
     def change_orientation(self, orientation: Vector):
         return self
 
+    def change_radius(self, radius: float):
+        return type(self)(central_position=self.central_position,radius = radius)
+
 @dataclass
 class Cylinder(Shape):
     radius: float = 0
@@ -239,6 +242,14 @@ class Cylinder(Shape):
             orientation=orientation,
             radius=self.radius,
             height=self.height
+        )
+
+    def change_radius(self, radius: float):
+        return type(self)(
+            central_position=self.central_position,
+            orientation=self.orientation,
+            radius = radius,
+            height= self.height
         )
     
 @dataclass
