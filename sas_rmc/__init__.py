@@ -1,6 +1,6 @@
 #%%
 
-from .shapes import shapes
+from sas_rmc.shapes import shapes
 from .particles import particle
 from . import commands, scattering_simulation, simulator, acceptance_scheme, viewer, array_cache, result_calculator, form_calculator
 
