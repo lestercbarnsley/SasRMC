@@ -1,16 +1,15 @@
 #%%
 from functools import reduce
-from typing import Any, Callable, Generator, List, Tuple, Type
+from typing import Callable, Iterator, Type, Self
 from dataclasses import dataclass
-import math
 
 import numpy as np
-from . import constants
+from sas_rmc import constants
 
 PI = constants.PI
 rng = constants.RNG
 
-def cross(a: Tuple, b: Tuple) -> Tuple:
+def cross(a: tuple[float, float, float], b: tuple[float, float, float]) -> tuple[float, float, float]:
     ax, ay, az = a[0], a[1], a[2]
     bx, by, bz = b[0], b[1], b[2]
     cx = ay*bz-az*by
@@ -18,7 +17,7 @@ def cross(a: Tuple, b: Tuple) -> Tuple:
     cz = ax*by-ay*bx
     return cx, cy, cz
 
-def dot(a: Tuple, b: Tuple) -> Any:
+def dot(a: tuple[float], b: tuple[float]) -> float:
     ax, ay = a[:2]
     az = a[2] if len(a) > 2 else 0
     bx, by = b[:2]
@@ -46,20 +45,20 @@ class Vector:
 
     @property
     def mag(self) -> float:
-        return math.sqrt(self.x**2 + self.y**2 + self.z**2)
+        return np.sqrt(self.x**2 + self.y**2 + self.z**2)
 
-    def itercomps(self) -> Generator: 
+    def itercomps(self) -> Iterator[float]: 
         yield self.x
         yield self.y
         yield self.z
 
-    def to_list(self) -> list:
+    def to_list(self) -> list[float]:
         return list(self.itercomps())#[self.x, self.y, self.z]
 
     def to_numpy(self) -> np.ndarray:
         return np.array(self.to_list())
 
-    def to_tuple(self) -> Tuple[float, float, float]:
+    def to_tuple(self) -> tuple[float, float, float]:
         return tuple(self.itercomps())
 
     def __len__(self) -> int:
@@ -69,18 +68,20 @@ class Vector:
     def null_vector(cls):
         return cls(0,0,0)
 
-    def __add__(self, vector2):
+    def __add__(self, vector2: Self) -> Self:
         x = self.x + vector2.x
         y = self.y + vector2.y
         z = self.z + vector2.z
         return type(self)(x = x, y = y, z = z)
 
-    def dot(self, vector_or_tuple) -> float:
+    def dot(self, vector_or_tuple: Self | tuple[float]) -> float:
         vector_as_tuple = vector_or_tuple.to_tuple() if isinstance(vector_or_tuple, Vector) else vector_or_tuple
         return dot(self.to_tuple(), vector_as_tuple)
 
-    def __mul__(self, vector_or_scalar):
-        if isinstance(vector_or_scalar, Vector) or type(vector_or_scalar) in [list, tuple]:#This should be hardcodes as the base class because a sub class should be multipliable by any Vector
+    def __mul__(self, vector_or_scalar: Self | float) -> Self | float:
+        if isinstance(vector_or_scalar, Vector):
+            return self.dot(vector_or_scalar)
+        if isinstance(vector_or_scalar, list) or isinstance(vector_or_scalar, tuple):
             return self.dot(vector_or_scalar)
         return type(self)(
             x = self.x * vector_or_scalar,
@@ -88,21 +89,21 @@ class Vector:
             z = self.z * vector_or_scalar
             )
 
-    def __rmul__(self, scalar: float):
+    def __rmul__(self, scalar: float) -> Self:
         return self * scalar
 
-    def __sub__(self, vector2):
+    def __sub__(self, vector2) -> Self:
         return self + (-1 * vector2)
 
-    def __truediv__(self, divisor: float):
+    def __truediv__(self, divisor: float) -> Self:
         return self * (1/divisor)
 
-    def cross(self, vector2):
+    def cross(self, vector2: Self) -> Self:
         x, y, z = cross(self.to_tuple(), vector2.to_tuple())
         return type(self)(x, y, z)
 
     @property
-    def unit_vector(self):
+    def unit_vector(self) -> Self:
         if self.mag == 0:
             return type(self).null_vector()
         if self.mag == 1:
@@ -110,23 +111,19 @@ class Vector:
         else:
             return self / self.mag
 
-    def distance_from_vector(self, vector) -> float:
+    def distance_from_vector(self, vector: Self) -> float:
         return (self - vector).mag
 
-    def copy(self):
-        return type(self)(
-            x = self.x + 0.0,
-            y = self.y + 0.0,
-            z = self.z + 0.0
-            )
+    def copy(self) -> Self:
+        return self + Vector.null_vector()
 
-    def to_dict(self, vector_str: str = None) -> dict:
+    def to_dict(self, vector_str: str = None) -> dict[str, float]:
         key_prefix = f"{vector_str}." if vector_str is not None else ""
         keys = [f"{key_prefix}{dimension}" for dimension in ["X", "Y", "Z"]]
         return {key: component for (key, component) in zip(keys, self.itercomps())}
 
     @classmethod
-    def from_list(cls, l: List[float]):
+    def from_list(cls, l: list[float]):
         return cls(x = l[0], y = l[1], z = l[2])
 
     @classmethod
@@ -143,7 +140,7 @@ class Vector:
             z = d.get(keys[2], 0.0)
         )
 
-    def rotated_basis(self) -> Tuple:
+    def rotated_basis(self) -> tuple[Self, Self, Self]:
         unit_a = self.unit_vector
         mostly_orthogonal_basis = [-1 * Vector(0,0,1), -1 * Vector(1,0,0), -1 * Vector(0,1,0)]
         mostly_orthog = mostly_orthogonal_basis[np.argmax(unit_a.to_numpy() ** 2)]
@@ -173,10 +170,10 @@ class Vector:
 
 @dataclass
 class VectorElement:
-    position: Vector = Vector.null_vector()
-    dx: float = 0.0
-    dy: float = 0.0
-    dz: float = 0.0
+    position: Vector
+    dx: float
+    dy: float
+    dz: float
 
     @property
     def volume(self) -> float:
@@ -273,16 +270,16 @@ class VectorSpace:
 
 @dataclass
 class Interface:
-    position_marker: Vector = Vector.null_vector()
-    normal: Vector = Vector.null_vector()
+    position_marker: Vector
+    normal: Vector
 
-    def is_inside(self, position: Vector):
+    def is_inside(self, position: Vector) -> bool:
         return (position - self.position_marker) * self.normal < 0
 
-    def on_surface(self, position: Vector):
+    def on_surface(self, position: Vector) -> bool:
         return (position - self.position_marker) * self.normal == 0
 
-    def project_onto_surface(self, position: Vector):
+    def project_onto_surface(self, position: Vector) -> bool:
         position_ref = position - self.position_marker
         return position_ref - (self.normal.unit_vector * position_ref) * self.normal.unit_vector + self.position_marker
 

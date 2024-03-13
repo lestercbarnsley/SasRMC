@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 from matplotlib import patches
 
-from ..vector import Vector, Interface
+from sas_rmc.vector import Vector, Interface
 
 PI = np.pi
 

@@ -1,6 +1,5 @@
 #%%
 import sys
-from typing import List
 from pathlib import Path
 
 import sas_rmc
@@ -16,7 +15,7 @@ def run_dev_rmc() -> None:
         secret_dev_config = dev_config.read()
     run_rmc(secret_dev_config)
 
-def generate_template(args: List[str]) -> None:
+def generate_template(args: list[str]) -> None:
     command = ' '.join(args)
     sas_rmc.generate_template(command, Path(CONFIG_FILE).parent)
 
