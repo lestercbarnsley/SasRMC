@@ -1,15 +1,17 @@
-from typing import List, Tuple
 from dataclasses import field, dataclass
 from abc import ABC, abstractmethod
+from typing import Self
 
 import numpy as np
 from matplotlib import patches
 
 from sas_rmc.vector import Vector, Interface
 
+
 PI = np.pi
 
-sphere_volume = lambda radius: (4 *PI / 3) * (radius**3)
+def sphere_volume(radius: float) -> float:
+    return (4 *PI / 3) * (radius**3)
 
 
 @dataclass
@@ -29,7 +31,7 @@ class Shape(ABC):
 
     @property
     @abstractmethod
-    def dimensions(self) -> Tuple[float, float, float]:
+    def dimensions(self) -> tuple[float, float, float]:
         """Get a tuple of float values indicating the relative dimensions of the shape.
         
         This is used to give guidance to other methods about physical boundaries required to encapsulate the shape, i.e., constructing a VectorSpace that entire encloses the shape 
@@ -86,7 +88,7 @@ class Shape(ABC):
         """
         pass
 
-    def collision_detected(self, shape) -> bool:
+    def collision_detected(self, shape: Self) -> bool:
         """Tests whether another shape has collided with or impinged with this shape.
 
         Parameters
@@ -119,11 +121,11 @@ class Shape(ABC):
         pass
 
     @abstractmethod
-    def change_position(self, position: Vector):
+    def change_position(self, position: Vector) -> Self:
         pass
 
     @abstractmethod
-    def change_orientation(self, orientation: Vector):
+    def change_orientation(self, orientation: Vector) -> Self:
         pass
 
 
@@ -132,7 +134,7 @@ class Sphere(Shape):
     radius: float = 0
 
     @property
-    def dimensions(self) -> Tuple[float, float, float]:
+    def dimensions(self) -> tuple[float, float, float]:
         return 2 * self.radius, 2 * self.radius, 2 * self.radius
 
     def is_inside(self, position: Vector) -> bool:
@@ -156,13 +158,13 @@ class Sphere(Shape):
             **kwargs
         )
 
-    def change_position(self, position: Vector):
+    def change_position(self, position: Vector) -> Self:
         return type(self)(central_position=position,radius = self.radius)
 
-    def change_orientation(self, orientation: Vector):
+    def change_orientation(self, orientation: Vector) -> Self:
         return self
 
-    def change_radius(self, radius: float):
+    def change_radius(self, radius: float) -> Self:
         return type(self)(central_position=self.central_position,radius = radius)
 
 @dataclass
@@ -171,18 +173,19 @@ class Cylinder(Shape):
     height: float = 0
 
     @property
-    def dimensions(self) -> Tuple[float, float, float]:
+    def dimensions(self) -> tuple[float, float, float]:
         return 2 * self.radius, 2 * self.radius, self.height
 
     @property
-    def end_interfaces(self) -> List[Interface]:
-        def define_interface(plus_or_minus: bool) -> Interface:
-            factor = +1 if plus_or_minus else -1
-            position_marker = self.central_position + factor * (self.height / 2) * (self.orientation.unit_vector)
-            return Interface(position_marker, normal = factor * self.orientation.unit_vector)
-        return [define_interface(plus_or_minus) for plus_or_minus in [True, False]]
+    def end_interfaces(self) -> list[Interface]:
+        orientation_unit_vector = self.orientation.unit_vector
+        return [Interface(
+            position_marker = self.central_position + f * (self.height / 2) * orientation_unit_vector, 
+            normal=f * orientation_unit_vector
+            ) for f in [-1, +1]]
         
-    def _project_to_cylinder_axis(self, position: Vector) -> Vector:
+        
+    def _project_to_cylinder_axis(self, position: Vector) -> Vector: 
         interfaces = self.end_interfaces
         orientation_reffed = interfaces[1].position_marker - interfaces[0].position_marker
         position_reffed = position - interfaces[0].position_marker
