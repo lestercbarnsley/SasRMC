@@ -1,13 +1,13 @@
 #%%
 from functools import reduce
-from typing import Callable, Iterator, Type, Self
+from typing import Callable, Iterator, Type
 from dataclasses import dataclass
 
 import numpy as np
-from sas_rmc import constants
+from sas_rmc.constants import PI, RNG
 
-PI = constants.PI
-rng = constants.RNG
+
+rng = RNG
 
 def cross(a: tuple[float, float, float], b: tuple[float, float, float]) -> tuple[float, float, float]:
     ax, ay, az = a[0], a[1], a[2]
@@ -68,17 +68,17 @@ class Vector:
     def null_vector(cls):
         return cls(0,0,0)
 
-    def __add__(self, vector2: Self) -> Self:
+    def __add__(self, vector2):
         x = self.x + vector2.x
         y = self.y + vector2.y
         z = self.z + vector2.z
         return type(self)(x = x, y = y, z = z)
 
-    def dot(self, vector_or_tuple: Self | tuple[float]) -> float:
+    def dot(self, vector_or_tuple: tuple[float]) -> float:
         vector_as_tuple = vector_or_tuple.to_tuple() if isinstance(vector_or_tuple, Vector) else vector_or_tuple
         return dot(self.to_tuple(), vector_as_tuple)
 
-    def __mul__(self, vector_or_scalar: Self | float) -> Self | float:
+    def __mul__(self, vector_or_scalar: float) -> float:
         if isinstance(vector_or_scalar, Vector):
             return self.dot(vector_or_scalar)
         if isinstance(vector_or_scalar, list) or isinstance(vector_or_scalar, tuple):
@@ -89,21 +89,21 @@ class Vector:
             z = self.z * vector_or_scalar
             )
 
-    def __rmul__(self, scalar: float) -> Self:
+    def __rmul__(self, scalar: float):
         return self * scalar
 
-    def __sub__(self, vector2) -> Self:
+    def __sub__(self, vector2):
         return self + (-1 * vector2)
 
-    def __truediv__(self, divisor: float) -> Self:
+    def __truediv__(self, divisor: float):
         return self * (1/divisor)
 
-    def cross(self, vector2: Self) -> Self:
+    def cross(self, vector2):
         x, y, z = cross(self.to_tuple(), vector2.to_tuple())
         return type(self)(x, y, z)
 
     @property
-    def unit_vector(self) -> Self:
+    def unit_vector(self):
         if self.mag == 0:
             return type(self).null_vector()
         if self.mag == 1:
@@ -111,10 +111,10 @@ class Vector:
         else:
             return self / self.mag
 
-    def distance_from_vector(self, vector: Self) -> float:
+    def distance_from_vector(self, vector) -> float:
         return (self - vector).mag
 
-    def copy(self) -> Self:
+    def copy(self):
         return self + Vector.null_vector()
 
     def to_dict(self, vector_str: str = None) -> dict[str, float]:
@@ -140,7 +140,7 @@ class Vector:
             z = d.get(keys[2], 0.0)
         )
 
-    def rotated_basis(self) -> tuple[Self, Self, Self]:
+    def rotated_basis(self) -> tuple:
         unit_a = self.unit_vector
         mostly_orthogonal_basis = [-1 * Vector(0,0,1), -1 * Vector(1,0,0), -1 * Vector(0,1,0)]
         mostly_orthog = mostly_orthogonal_basis[np.argmax(unit_a.to_numpy() ** 2)]
@@ -289,5 +289,5 @@ if __name__ == "__main__":
 
 
 
-#%%
+ #%%
 

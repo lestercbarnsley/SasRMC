@@ -1,50 +1,49 @@
 #%%
 
 from enum import Enum
-from typing import Callable, List
+from typing import Callable
 
 import numpy as np
 
-from .array_cache import array_cache
-from .box_simulation import Box
-from .result_calculator import FormResult, ResultCalculator
-from .detector import Polarization
-from .vector import cross
-from . import constants
+from sas_rmc.array_cache import array_cache
+from sas_rmc.box_simulation import Box
+from sas_rmc.result_calculator import FormResult, ResultCalculator
+from sas_rmc.detector import Polarization
+from sas_rmc.vector import cross
 
-PI = constants.PI
 
-mod = lambda arr: np.real(arr * np.conj(arr)) # this function is NOT a good candidate for caching
+@array_cache(max_size=1_000)
+def mod(arr: np.ndarray) -> np.ndarray:
+    return np.real(arr * np.conj(arr))
+# this function is NOT a good candidate for caching
+# why did I think this?
 
 class FieldDirection(Enum):
     X = "X"
     Y = "Y"
     Z = "Z"
 
-@array_cache(max_size=5000)
-def _sum_array_list_low_lvl(array_list: List[np.ndarray]) -> np.ndarray:
-    return np.sum(array_list, axis = 0) # This is defined so we can use the cache
 
 @array_cache(max_size=5_000)
-def sum_array_list(array_list: List[np.ndarray]) -> np.ndarray:
-    divisions = int(np.sqrt(len(array_list)))
-    partial_sums = [_sum_array_list_low_lvl(array_list[i::divisions]) for i in range(divisions)]
-    return _sum_array_list_low_lvl(partial_sums)#sum_array_list(array_list)
-
-def form_result_adder(form_results: List[FormResult], getter_fn: Callable[[FormResult], np.ndarray], rescale: float = 1) -> np.ndarray:
+def sum_array_list(array_list: list[np.ndarray]) -> np.ndarray:
+    if len(array_list) < 3:
+        return np.sum(array_list, axis = 0)
+    divisions = 2
+    return sum_array_list([sum_array_list(array_list[i::divisions]) for i in range(divisions)])
+    
+def form_result_adder(form_results: list[FormResult], getter_fn: Callable[[FormResult], np.ndarray], rescale: float = 1) -> np.ndarray:
     array_list = [getter_fn(form_result) for form_result in form_results]
     return np.sqrt(rescale) * sum_array_list(array_list)
     
-def nuclear_amplitude(form_results: List[FormResult], rescale_factor: float = 1) -> np.ndarray:
-    form_nuclear_getter =  lambda form_result: form_result.form_nuclear
-    return form_result_adder(form_results, form_nuclear_getter, rescale=rescale_factor)
+def nuclear_amplitude(form_results: list[FormResult], rescale_factor: float = 1) -> np.ndarray:
+    return form_result_adder(form_results, lambda form_result : form_result.form_nuclear, rescale=rescale_factor)
 
 @array_cache(max_size=5_000)
 def q_squared(qx: np.ndarray, qy: np.ndarray, offset: float = 1e-16) -> np.ndarray:
     qq = qx**2 + qy**2
     return np.where(qq !=0 , qq, offset)
 
-def magnetic_amplitude(form_results: List[FormResult], qx: np.ndarray, qy: np.ndarray, magnetic_rescale:float = 1) -> List[np.ndarray]:
+def magnetic_amplitude(form_results: list[FormResult], qx: np.ndarray, qy: np.ndarray, magnetic_rescale:float = 1) -> list[np.ndarray]:
     getters = [
         lambda form_result: form_result.form_magnetic_x, 
         lambda form_result: form_result.form_magnetic_y, 
@@ -97,12 +96,12 @@ def intensity_polarization(fn: np.ndarray, fmx: np.ndarray, fmy: np.ndarray, fmz
     polarization_functions = polarization_splitter[polarization]
     return np.sum([mod(polarization_fn()) for polarization_fn in polarization_functions], axis=0) / (2 if polarization == Polarization.UNPOLARIZED else 1)
 
-def box_intensity(form_results: List[FormResult], box_volume: float, qx: np.ndarray, qy: np.ndarray, rescale_factor: float = 1, magnetic_rescale: float = 1, polarization: Polarization = Polarization.UNPOLARIZED, field_direction: FieldDirection = FieldDirection.Y) -> np.ndarray:
+def box_intensity(form_results: list[FormResult], box_volume: float, qx: np.ndarray, qy: np.ndarray, rescale_factor: float = 1, magnetic_rescale: float = 1, polarization: Polarization = Polarization.UNPOLARIZED, field_direction: FieldDirection = FieldDirection.Y) -> np.ndarray:
     fn = nuclear_amplitude(form_results, rescale_factor=rescale_factor)
     fmx, fmy, fmz = magnetic_amplitude(form_results, qx, qy, magnetic_rescale=magnetic_rescale)
     return 1e8 * intensity_polarization(fn, fmx, fmy, fmz, polarization, field_direction=field_direction) / box_volume
 
-def box_intensity_average(box_list: List[Box], result_calculator: ResultCalculator, rescale_factor: float = 1, magnetic_rescale: float = 1, polarization: Polarization = Polarization.UNPOLARIZED, field_direction: FieldDirection = FieldDirection.Y) -> np.ndarray:
+def box_intensity_average(box_list: list[Box], result_calculator: ResultCalculator, rescale_factor: float = 1, magnetic_rescale: float = 1, polarization: Polarization = Polarization.UNPOLARIZED, field_direction: FieldDirection = FieldDirection.Y) -> np.ndarray:
     return np.average(
         [box_intensity(
             [result_calculator.form_result(p) for p in box.particles],
@@ -118,7 +117,7 @@ def box_intensity_average(box_list: List[Box], result_calculator: ResultCalculat
 
 
 if __name__ == "__main__":
-    pass
+    print(sum_array_list([np.ones(3,3)]))
         
 #%%
         

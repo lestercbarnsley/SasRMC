@@ -1,12 +1,11 @@
 #%%
 
 from functools import wraps
-from typing import Tuple
 from enum import Enum
 
 import numpy as np
 
-from .vector import Vector
+from sas_rmc import Vector
 
 CLASS_MAX_SIZE = 18
 MAX_SIZE = 50
@@ -14,6 +13,7 @@ DEFAULT_PRECISION = 8
 
 immutable_types = (str, float, int, Enum, np.float64)
 
+'''
 def _round_vector_comp(comp: float, precision: float):
     if np.abs(comp) < 1e-16:
         return 0.0
@@ -37,7 +37,22 @@ def pass_arg(arg):
         return tuple(pass_arg(a) for a in arg)
     if isinstance(arg, dict):
         return tuple((pass_arg(k), pass_arg(v)) for k, v in arg.items())
+    return id(arg)'''
+
+def create_arg_key(arg: tuple) -> tuple:
+    if any(isinstance(arg, t) for t in [str, float, int, Enum, np.float64]):
+        return arg
+    if any(isinstance(arg, t) for t in [tuple, list, set]):
+        return tuple(create_arg_key(a) for a in arg)
+    if isinstance(arg, dict):
+        return tuple((create_arg_key(k), create_arg_key(v)) for k, v in arg.items())
+    if isinstance(arg, Vector):
+        return tuple(create_arg_key(c) for c in arg.itercomps())
+    if isinstance(arg, np.ndarray):
+        if arg.flags.writeable:
+            arg.flags.writeable = False
     return id(arg)
+    
 
 def array_cache(func = None, max_size: int = None):
     max_size = max_size if max_size is not None else MAX_SIZE
@@ -46,15 +61,19 @@ def array_cache(func = None, max_size: int = None):
 
         @wraps(func)
         def wrapper(*args, **kwargs):
-            kwarg_tuple = pass_arg(kwargs)
-            argument_tuple = pass_arg(args) + kwarg_tuple
+            argument_tuple = () + create_arg_key(args) + create_arg_key(kwargs)
             if argument_tuple not in cache:
                 if len(cache) >= max_size:
                     keys = list(cache.keys())
-                    uncached = [cache.pop(key) for key in keys[0:int(max_size / 2)]]
+                    for key in keys[0:int(max_size / 2)]:
+                        cache.pop(key)
                 result = func(*args, **kwargs)
-                cache[argument_tuple] = result
-            return cache[argument_tuple]
+                cache[argument_tuple] = {
+                    'result' : result,
+                    'args' : args,
+                    'kwargs' : kwargs
+                }
+            return cache[argument_tuple]['result']
         
         return wrapper
     if func is not None:

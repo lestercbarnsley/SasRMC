@@ -8,10 +8,10 @@ from matplotlib import pyplot as plt
 from matplotlib.figure import Figure
 import pandas as pd
 
-from .array_cache import array_cache, method_array_cache
-from .vector import Vector, broadcast_array_function#, dot
-from .particles.particle import modulus_array 
-from . import constants
+from sas_rmc.array_cache import array_cache, method_array_cache
+from sas_rmc.vector import Vector, broadcast_array_function#, dot
+from sas_rmc.particles.particle import modulus_array 
+from sas_rmc import constants
 
 
 PI = constants.PI
