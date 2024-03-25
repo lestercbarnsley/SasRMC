@@ -1,6 +1,5 @@
 from dataclasses import field, dataclass
 from abc import ABC, abstractmethod
-from typing import Self
 
 import numpy as np
 from matplotlib import patches
@@ -263,7 +262,7 @@ class Cube(Shape):
     dimension_2: float = 0
 
     @property
-    def dimensions(self) -> Tuple[float, float, float]:
+    def dimensions(self) -> tuple[float, float, float]:
         return self.dimension_0, self.dimension_1, self.dimension_2
 
     @property
@@ -271,7 +270,7 @@ class Cube(Shape):
         return self.dimension_0 * self.dimension_1 * self.dimension_2
 
     @property
-    def end_interfaces(self) -> List[Interface]:
+    def end_interfaces(self) -> list[Interface]:
         central_position = self.central_position
         basis_c, basis_a, basis_b = self.orientation.rotated_basis()
         interfaces = []
@@ -328,7 +327,7 @@ class Cube(Shape):
         )
     
 
-def collision_detected(shapes_1: List[Shape], shape_2: List[Shape]) -> bool:
+def collision_detected(shapes_1: list[Shape], shape_2: list[Shape]) -> bool:
     """Detect if a collision has occured between two lists of shapes.
 
     I made this as a helper function for collision detection because it has less coupling than my first implementation.

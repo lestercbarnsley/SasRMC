@@ -6,10 +6,9 @@ from typing import List, Tuple
 import numpy as np
 from scipy import constants
 
-from ..array_cache import round_vector, array_cache
-from ..vector import Vector
-from ..shapes.shapes import Shape, Sphere, collision_detected
-from .. import constants
+from sas_rmc.array_cache import array_cache
+from sas_rmc.shapes import Shape, Sphere, collision_detected
+from sas_rmc import constants, Vector
 
 
 PI = constants.PI
@@ -25,8 +24,6 @@ def magnetic_sld_in_angstrom_minus_2(magnetization_vector_in_amp_per_metre: Vect
     sld_vector = B_H_IN_INVERSE_AMP_METRES * magnetization / (1e10**2)
     return sld_vector.x, sld_vector.y, sld_vector.z
 
-
-sphere_volume = lambda radius: (4 * PI / 3) * radius**3
 theta = lambda qR: np.where(qR == 0, 1, 3 * (np.sin(qR) - qR* np.cos(qR)) / (qR**3))
 #modulus_array = lambda x_arr, y_arr: np.sqrt(x_arr**2 + y_arr**2)
 

@@ -3,8 +3,8 @@
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 
-from .vector import Vector
-from .particles import Dumbbell, Particle, CoreShellParticle
+from sas_rmc import Vector
+from sas_rmc.particles import Dumbbell, Particle, CoreShellParticle
 
 
 

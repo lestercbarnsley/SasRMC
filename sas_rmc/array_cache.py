@@ -9,35 +9,8 @@ from sas_rmc import Vector
 
 CLASS_MAX_SIZE = 18
 MAX_SIZE = 50
-DEFAULT_PRECISION = 8
 
 immutable_types = (str, float, int, Enum, np.float64)
-
-'''
-def _round_vector_comp(comp: float, precision: float):
-    if np.abs(comp) < 1e-16:
-        return 0.0
-    for i in range(34):
-        if np.abs(comp * 10**i) > 1:
-            return int(comp * 10**(precision + i)) / 10**(precision + i)
-
-def round_vector(vector: Vector, precision: int = DEFAULT_PRECISION) -> Tuple[float, float, float]:
-    return tuple(_round_vector_comp(comp, precision) for comp in vector.itercomps())
-
-def pass_arg(arg):
-    if type(arg) in immutable_types:
-        return arg
-    if isinstance(arg, np.ndarray):
-        if arg.flags.writeable:
-            arg.flags.writeable = False
-        return id(arg)
-    if isinstance(arg, Vector):
-        return round_vector(arg)
-    if isinstance(arg, list) or isinstance(arg, tuple):
-        return tuple(pass_arg(a) for a in arg)
-    if isinstance(arg, dict):
-        return tuple((pass_arg(k), pass_arg(v)) for k, v in arg.items())
-    return id(arg)'''
 
 def create_arg_key(arg: tuple) -> tuple:
     if any(isinstance(arg, t) for t in [str, float, int, Enum, np.float64]):
@@ -52,6 +25,9 @@ def create_arg_key(arg: tuple) -> tuple:
         if arg.flags.writeable:
             arg.flags.writeable = False
     return id(arg)
+
+def create_function_cache_key(*args, **kwargs) -> tuple:
+    return () + create_arg_key(args) + create_arg_key(kwargs)
     
 
 def array_cache(func = None, max_size: int = None):
@@ -61,7 +37,7 @@ def array_cache(func = None, max_size: int = None):
 
         @wraps(func)
         def wrapper(*args, **kwargs):
-            argument_tuple = () + create_arg_key(args) + create_arg_key(kwargs)
+            argument_tuple = create_function_cache_key(*args, **kwargs)
             if argument_tuple not in cache:
                 if len(cache) >= max_size:
                     keys = list(cache.keys())

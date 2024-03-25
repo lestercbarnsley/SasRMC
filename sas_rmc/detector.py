@@ -1,7 +1,7 @@
 #%%
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Tuple#List,
+from typing import Any, Callable
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -121,7 +121,7 @@ class DetectorConfig:
         return sigma_para
 
 
-def orthogonal_xy(x: float, y: float) -> Tuple[float, float]: # If I find I need this function a lot, I'll make it a method in the Vector class, but for now I'm happy for it to be a helper function
+def orthogonal_xy(x: float, y: float) -> tuple[float, float]: # If I find I need this function a lot, I'll make it a method in the Vector class, but for now I'm happy for it to be a helper function
     if not np.sqrt(x**2 + y**2):
         return 0, 0
     orth_y = 0.0 if x == 0 else np.sqrt(1 / (1 + (y / x)**2)) * np.sign(x)
@@ -302,7 +302,7 @@ class DetectorImage: # Major refactor needed for detector image, as it shouldn't
         
 
     @property
-    def qxqy_delta(self) -> Tuple[float, float]:
+    def qxqy_delta(self) -> tuple[float, float]:
         return self.qx_delta, self.qy_delta
 
     @staticmethod
@@ -326,7 +326,7 @@ class DetectorImage: # Major refactor needed for detector image, as it shouldn't
             plt.show()
         return fig
 
-    def intensity_2d(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def intensity_2d(self) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         qx_delta, qy_delta = self.qxqy_delta
         line_maker = lambda arr, step: np.arange(start = np.min(arr), stop = np.max(arr), step = step)
         qx_line = line_maker(self.qX, qx_delta / 2)
@@ -527,25 +527,8 @@ class SimulatedDetectorImage(DetectorImage):
         simulated_intensity = np.sum(big_resolution * big_intensity, axis = adding_axes)
         self.simulated_intensity = simulated_intensity
         return simulated_intensity
-        '''def pixel_smear_and_intensity(pixel: DetectorPixel) -> Tuple[np.ndarray, np.ndarray]:
-            sliced_resolution_name = f"_sliced_resolution_do_not_touch_{id(qx_array)}_{id(qy_array)}"
-            slicing_func_name = f"_slicing_func_do_not_touch_{id(qx_array)}_{id(qy_array)}"
-            if not all(hasattr(pixel, att) for att in (sliced_resolution_name, slicing_func_name)):
-                resolution = pixel._resolution_function_calculator(qx_array, qy_array)
-                res_slicing_func = get_slicing_func_from_gaussian(resolution)
-                setattr(pixel, sliced_resolution_name, res_slicing_func(resolution))
-                setattr(pixel, slicing_func_name, res_slicing_func)
-            sliced_resolution = getattr(pixel, sliced_resolution_name)
-            slicing_func = getattr(pixel, slicing_func_name)
-            return sliced_resolution, slicing_func(intensity if (pixel.shadow_factor or not shadow_is_zero) else zero_intensity)
-        pixel_smear_and_intensity_pyfunc = np.frompyfunc(pixel_smear_and_intensity, nin = 1, nout = 2)
-        pixel_smear, pixel_intensity = pixel_smear_and_intensity_pyfunc(self._detector_pixels)
-        big_resolution_arr, big_intensity_arr = np.array([p for p in pixel_smear]), np.array([b for b in pixel_intensity])
-        adding_axes = tuple(range(dimension_getter(self._detector_pixels), dimension_getter(big_intensity_arr)))
-        return np.sum(big_resolution_arr * big_intensity_arr, axis = adding_axes)'''
-       
         
-    def simulated_intensity_2d(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def simulated_intensity_2d(self) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         qx, qy, _, shadow = self.intensity_2d()
         simulated_tensities = qx * 0
         this_qX, this_qY, this_simulated_intensity = self.qX, self.qY, self.simulated_intensity
@@ -555,7 +538,7 @@ class SimulatedDetectorImage(DetectorImage):
             simulated_tensities[idx] = this_simulated_intensity[np.argmin(distances)]
         return qx, qy, simulated_tensities, shadow
 
-    def experimental_simulated_2d(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def experimental_simulated_2d(self) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         qx, qy, experimental_intensity, shadow = self.intensity_2d()
         simulated_tensities = qx * 0
         this_qX, this_qY, this_simulated_intensity = self.qX, self.qY, self.simulated_intensity

@@ -2,8 +2,9 @@
 SasRMC is a Python library for numerical modelling of small-angle scattering data. 
 
 ## Setup
-**SasRMC will use Python 3.10 after the next push to main. Upgrade your virtual environment today!**
-SasRMC is compatible with Python 3.8 and newer. An upgrade to Python 3.10 is planned.
+**SasRMC will use Python 3.11 after the next push to main. Upgrade your virtual environment today!**
+SasRMC is compatible with Python 3.10 and newer. An upgrade to Python 3.11 is planned for very soon.
+SaSRMC is dropping support **conda**. Dependency management using **poetry** will be the preferred way going forward. Find out more here: https://python-poetry.org/
 
 1. Download source files from https://github.com/lestercbarnsley/SasRMC -> `Code` -> `Download ZIP`
 2. If you have an existing virtual environment or conda environment you wish to use, activate it in the usual way and jump to step 9.

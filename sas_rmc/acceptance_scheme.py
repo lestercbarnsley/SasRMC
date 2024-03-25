@@ -5,10 +5,10 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
-from .scattering_simulation import ScatteringSimulation
-from . import constants
+from sas_rmc.scattering_simulation import ScatteringSimulation
+from sas_rmc.constants import RNG
 
-rng = constants.RNG
+rng = RNG
 
 
 class AcceptanceState(Enum):
