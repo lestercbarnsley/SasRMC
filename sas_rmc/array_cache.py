@@ -13,7 +13,7 @@ MAX_SIZE = 50
 immutable_types = (str, float, int, Enum, np.float64)
 
 def create_arg_key(arg: tuple) -> tuple:
-    if any(isinstance(arg, t) for t in [str, float, int, Enum, np.float64]):
+    if any(isinstance(arg, t) for t in immutable_types):
         return arg
     if any(isinstance(arg, t) for t in [tuple, list, set]):
         return tuple(create_arg_key(a) for a in arg)
@@ -40,9 +40,8 @@ def array_cache(func = None, max_size: int = None):
             argument_tuple = create_function_cache_key(*args, **kwargs)
             if argument_tuple not in cache:
                 if len(cache) >= max_size:
-                    keys = list(cache.keys())
-                    for key in keys[0:int(max_size / 2)]:
-                        cache.pop(key)
+                    half_keys = list(cache.keys())[0:int(max_size / 2)]
+                    uncached = [cache.pop(key) for key in half_keys]
                 result = func(*args, **kwargs)
                 cache[argument_tuple] = {
                     'result' : result,
@@ -66,18 +65,21 @@ def method_array_cache(func = None, max_size: int = CLASS_MAX_SIZE, cache_holder
         def wrapper(*args, **kwargs):
             obj = args[cache_holder_index]
             other_args = [a for i, a in enumerate(args) if i!=cache_holder_index]
-            kwarg_tuple = tuple((k, pass_arg(v)) for k, v in kwargs.items())
-            argument_tuple = tuple(pass_arg(arg) for arg in other_args) + kwarg_tuple
+            argument_tuple = create_function_cache_key(*other_args, **kwargs)#tuple(pass_arg(arg) for arg in other_args) + kwarg_tuple
             if not hasattr(obj, cache_name):
                 setattr(obj, cache_name, {})
             object_cache = getattr(obj, cache_name)
             if argument_tuple not in object_cache:
                 if len(object_cache) >= max_size:
-                    keys = list(object_cache.keys())
-                    uncached = [object_cache.pop(key) for key in keys[0:-2]]
+                    half_keys = list(object_cache.keys())[0:-2]
+                    uncached = [object_cache.pop(key) for key in half_keys]
                 result = func(*args, **kwargs)
-                object_cache[argument_tuple] = result
-            return object_cache[argument_tuple]
+                object_cache[argument_tuple] = {
+                    'result' : result,
+                    'args' : args,
+                    'kwargs' : kwargs
+                }
+            return object_cache[argument_tuple]['result']
         
         return wrapper
     if func is not None:

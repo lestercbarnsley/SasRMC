@@ -117,7 +117,7 @@ class Vector:
     def copy(self):
         return self + Vector.null_vector()
 
-    def to_dict(self, vector_str: str = None) -> dict[str, float]:
+    def to_dict(self, vector_str: str | None = None) -> dict[str, float]:
         key_prefix = f"{vector_str}." if vector_str is not None else ""
         keys = [f"{key_prefix}{dimension}" for dimension in ["X", "Y", "Z"]]
         return {key: component for (key, component) in zip(keys, self.itercomps())}
@@ -131,7 +131,7 @@ class Vector:
         return cls(x = arr[0], y = arr[1], z = arr[2])
 
     @classmethod
-    def from_dict(cls, d: dict, vector_str: str = None):
+    def from_dict(cls, d: dict, vector_str: str | None = None):
         key_prefix = f"{vector_str}." if vector_str is not None else ""
         keys = [f"{key_prefix}{dimension}" for dimension in ["X", "Y", "Z"]]
         return cls(
