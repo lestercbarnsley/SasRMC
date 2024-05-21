@@ -2,12 +2,13 @@
 from functools import reduce
 from typing import Callable, Iterator, Type
 from dataclasses import dataclass
+from __future__ import annotations
 
 import numpy as np
-from sas_rmc.constants import PI, RNG
+from sas_rmc import constants
 
-
-rng = RNG
+PI = constants.PI
+rng = constants.RNG
 
 def cross(a: tuple[float, float, float], b: tuple[float, float, float]) -> tuple[float, float, float]:
     ax, ay, az = a[0], a[1], a[2]
@@ -53,7 +54,7 @@ class Vector:
         yield self.z
 
     def to_list(self) -> list[float]:
-        return list(self.itercomps())#[self.x, self.y, self.z]
+        return [comp for comp in self.itercomps()]
 
     def to_numpy(self) -> np.ndarray:
         return np.array(self.to_list())
@@ -68,42 +69,36 @@ class Vector:
     def null_vector(cls):
         return cls(0,0,0)
 
-    def __add__(self, vector2):
+    def __add__(self, vector2: Vector):
         x = self.x + vector2.x
         y = self.y + vector2.y
         z = self.z + vector2.z
         return type(self)(x = x, y = y, z = z)
 
-    def dot(self, vector_or_tuple: tuple[float]) -> float:
-        vector_as_tuple = vector_or_tuple.to_tuple() if isinstance(vector_or_tuple, Vector) else vector_or_tuple
-        return dot(self.to_tuple(), vector_as_tuple)
-
-    def __mul__(self, vector_or_scalar: float) -> float:
+    def __mul__(self, vector_or_scalar: float | Vector) -> float | Vector:
         if isinstance(vector_or_scalar, Vector):
-            return self.dot(vector_or_scalar)
-        if isinstance(vector_or_scalar, list) or isinstance(vector_or_scalar, tuple):
-            return self.dot(vector_or_scalar)
+            return dot(self.to_tuple(), vector_or_scalar.to_tuple())
         return type(self)(
             x = self.x * vector_or_scalar,
             y = self.y * vector_or_scalar,
             z = self.z * vector_or_scalar
             )
 
-    def __rmul__(self, scalar: float):
+    def __rmul__(self, scalar: float) -> Vector:
         return self * scalar
 
-    def __sub__(self, vector2):
+    def __sub__(self, vector2) -> Vector:
         return self + (-1 * vector2)
 
-    def __truediv__(self, divisor: float):
+    def __truediv__(self, divisor: float) -> Vector:
         return self * (1/divisor)
 
-    def cross(self, vector2):
+    def cross(self, vector2: Vector) -> Vector:
         x, y, z = cross(self.to_tuple(), vector2.to_tuple())
         return type(self)(x, y, z)
 
     @property
-    def unit_vector(self):
+    def unit_vector(self) -> Vector:
         if self.mag == 0:
             return type(self).null_vector()
         if self.mag == 1:
@@ -111,10 +106,10 @@ class Vector:
         else:
             return self / self.mag
 
-    def distance_from_vector(self, vector) -> float:
+    def distance_from_vector(self, vector: Vector) -> float:
         return (self - vector).mag
 
-    def copy(self):
+    def copy(self) -> Vector:
         return self + Vector.null_vector()
 
     def to_dict(self, vector_str: str | None = None) -> dict[str, float]:
@@ -140,7 +135,7 @@ class Vector:
             z = d.get(keys[2], 0.0)
         )
 
-    def rotated_basis(self) -> tuple:
+    def rotated_basis(self) -> tuple[Vector, Vector, Vector]:
         unit_a = self.unit_vector
         mostly_orthogonal_basis = [-1 * Vector(0,0,1), -1 * Vector(1,0,0), -1 * Vector(0,1,0)]
         mostly_orthog = mostly_orthogonal_basis[np.argmax(unit_a.to_numpy() ** 2)]
@@ -289,5 +284,5 @@ if __name__ == "__main__":
 
 
 
- #%%
+   #%%
 
