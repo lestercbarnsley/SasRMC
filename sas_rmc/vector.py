@@ -263,21 +263,6 @@ class VectorSpace:
         return cls(vector_elements = np.array(elements))
 
 
-@dataclass
-class Interface:
-    position_marker: Vector
-    normal: Vector
-
-    def is_inside(self, position: Vector) -> bool:
-        return (position - self.position_marker) * self.normal < 0
-
-    def on_surface(self, position: Vector) -> bool:
-        return (position - self.position_marker) * self.normal == 0
-
-    def project_onto_surface(self, position: Vector) -> bool:
-        position_ref = position - self.position_marker
-        return position_ref - (self.normal.unit_vector * position_ref) * self.normal.unit_vector + self.position_marker
-
 
 if __name__ == "__main__":
     pass
