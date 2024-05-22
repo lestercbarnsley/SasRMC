@@ -1,11 +1,9 @@
-from dataclasses import field, dataclass
-from abc import ABC, abstractmethod
 from __future__ import annotations
+from dataclasses import dataclass
+from abc import ABC, abstractmethod
 
-import numpy as np
-from matplotlib import patches
 
-from sas_rmc.vector import Vector, Interface
+from sas_rmc.vector import Vector
 
 
 
@@ -25,8 +23,6 @@ class Shape(ABC):
     def get_orientation(self) -> Vector:
         pass
     
-    
-
     @abstractmethod
     def is_inside(self, position: Vector) -> bool:
         """Indicates whether a vector is inside the shape.
@@ -45,9 +41,9 @@ class Shape(ABC):
         """
         pass
 
-    @property
+    
     @abstractmethod
-    def volume(self) -> float:
+    def get_volume(self) -> float:
         """Calculates the volume of a shape.
 
         Returns
@@ -125,86 +121,13 @@ class Interface:
     def on_surface(self, position: Vector) -> bool:
         return (position - self.position_marker) * self.normal == 0
 
-    def project_onto_surface(self, position: Vector) -> bool:
+    def project_onto_surface(self, position: Vector) -> Vector:
         position_ref = position - self.position_marker
         return position_ref - (self.normal.unit_vector * position_ref) * self.normal.unit_vector + self.position_marker
 
 
 
-    
-@dataclass
-class Cube(Shape):
-    orientation: Vector = field(default_factory=lambda : Vector(0, 0, 1))
-    dimension_0: float = 0
-    dimension_1: float = 0
-    dimension_2: float = 0
-
-    @property
-    def dimensions(self) -> tuple[float, float, float]:
-        return self.dimension_0, self.dimension_1, self.dimension_2
-
-    @property
-    def volume(self) -> float:
-        return self.dimension_0 * self.dimension_1 * self.dimension_2
-
-    @property
-    def end_interfaces(self) -> list[Interface]:
-        central_position = self.central_position
-        basis_c, basis_a, basis_b = self.orientation.rotated_basis()
-        interfaces = []
-        for h, basis in zip([self.dimension_0, self.dimension_1, self.dimension_2], [basis_a, basis_b, basis_c]):
-            for m in [-1, +1]:
-                position_marker = central_position + m * (h / 2) * basis
-                normal = m * basis
-                interfaces.append(Interface(position_marker, normal))
-        return interfaces
-
-    def is_inside(self, position: Vector) -> bool:
-        return all(interface.is_inside(position) for interface in self.end_interfaces)
-
-    def closest_surface_position(self, position: Vector) -> Vector:
-        distances_to_surface = []
-        positions_on_surface = []
-        for interface in self.end_interfaces:
-            position_on_surface = interface.project_onto_surface(position)
-            distance_to_surface = (positions_on_surface - position).mag
-            distances_to_surface.append(distance_to_surface)
-            positions_on_surface.append(position_on_surface)
-        return position_on_surface[np.argmin(distances_to_surface)]
-
-    def random_position_inside(self) -> Vector:
-        a, b, c = [np.random.uniform(low = -h/2, high = +h/2) for h in [self.dimension_0, self.dimension_1, self.dimension_2]]
-        basis_c, basis_a, basis_b = self.orientation.rotated_basis()
-        return self.central_position + a * basis_a + b * basis_b + c * basis_c
-
-    def get_patches(self, **kwargs) -> patches.Rectangle:
-        return patches.Rectangle(
-            xy = (self.central_position.x - self.dimension_0 / 2, self.central_position.y - self.dimension_1 / 2),
-            width = self.dimension_0,
-            height = 2 * self.dimension_1,
-            angle = np.arctan2(self.orientation.y, self.orientation.x),
-            **kwargs
-        )
-
-    def change_position(self, position: Vector):
-        return Cube(
-            central_position=position,
-            orientation=self.orientation,
-            dimension_0=self.dimension_0,
-            dimension_1=self.dimension_1,
-            dimension_2=self.dimension_2
-        )
-
-    def change_orientation(self, orientation: Vector):
-        return Cube(
-            central_position=self.central_position,
-            orientation=orientation,
-            dimension_0=self.dimension_0,
-            dimension_1=self.dimension_1,
-            dimension_2=self.dimension_2
-        )
-    
-
+ 
 def collision_detected(shapes_1: list[Shape], shape_2: list[Shape]) -> bool:
     """Detect if a collision has occured between two lists of shapes.
 
@@ -227,3 +150,9 @@ def collision_detected(shapes_1: list[Shape], shape_2: list[Shape]) -> bool:
             if shape.collision_detected(other_shape):
                 return True
     return False
+
+#%%
+if __name__ == "__main__":
+    interface = Interface(Vector(0, 0, 0), normal=Vector(0, 0, 1))
+
+#%%

@@ -1,8 +1,8 @@
 #%%
+from __future__ import annotations
 from functools import reduce
 from typing import Callable, Iterator, Type
 from dataclasses import dataclass
-from __future__ import annotations
 
 import numpy as np
 from sas_rmc import constants

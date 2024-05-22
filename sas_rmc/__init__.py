@@ -1,5 +1,6 @@
 #%%
-
+from sas_rmc.vector import Vector
+'''
 from sas_rmc.shapes import shapes
 from sas_rmc.particles import particle
 from sas_rmc import commands, scattering_simulation, simulator, acceptance_scheme, viewer, array_cache, result_calculator, form_calculator
@@ -15,7 +16,7 @@ from sas_rmc.vector import Vector, VectorSpace, VectorElement
 from sas_rmc.detector import DetectorImage, SimulatedDetectorImage, DetectorPixel, DetectorConfig, Polarization
 from sas_rmc.controller import Controller
 from sas_rmc.logger import Logger
-
+'''
 
 if __name__ == "__main__":
     pass

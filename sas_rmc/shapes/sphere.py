@@ -1,5 +1,6 @@
-from dataclasses import dataclass
+
 from __future__ import annotations
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -26,8 +27,7 @@ class Sphere(Shape):
     def is_inside(self, position: Vector) -> bool:
         return (position - self.central_position).mag <= self.radius
 
-    @property
-    def volume(self) -> float:
+    def get_volume(self) -> float:
         return sphere_volume(self.radius)
 
     def closest_surface_position(self, position: Vector) -> Vector:
@@ -51,3 +51,5 @@ class Sphere(Shape):
             radius=radius,
             central_position=self.central_position
         )
+    
+

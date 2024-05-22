@@ -1,5 +1,5 @@
-from dataclasses import dataclass
 from __future__ import annotations
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -50,9 +50,8 @@ class Cylinder(Shape):
             axis_position = self._project_to_cylinder_axis(position)
             return (position - axis_position).mag <= self.radius
         return False
-
-    @property
-    def volume(self) -> float:
+    
+    def get_volume(self) -> float:
         return cylinder_volume(self.radius, self.height)
 
     def closest_surface_position(self, position: Vector) -> Vector:
@@ -102,3 +101,5 @@ class Cylinder(Shape):
             radius=self.radius,
             height=height
         )
+    
+
