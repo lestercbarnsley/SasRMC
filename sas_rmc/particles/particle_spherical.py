@@ -111,6 +111,6 @@ class SphericalParticle(Particle):
 
 
 if __name__ == "__main__":
-    pass
-
+    test = SphericalParticle.gen_from_parameters(
+        position=Vector(0, 0, 1))
   #%%

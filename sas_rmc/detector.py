@@ -9,8 +9,7 @@ from matplotlib.figure import Figure
 import pandas as pd
 
 from sas_rmc.array_cache import array_cache, method_array_cache
-from sas_rmc.vector import Vector, broadcast_array_function#, dot
-from sas_rmc.particles.particle import modulus_array 
+from sas_rmc.vector import Vector, broadcast_array_function
 from sas_rmc import constants
 
 
@@ -116,8 +115,8 @@ class DetectorConfig:
 
     def get_sigma_parallel(self, qx: float, qy: float) -> float:
         sigma_geom = self.get_sigma_geometric()
-        q = modulus_array(qx, qy)
-        sigma_para = modulus_array(q * (self.wavelength_spread / 2), sigma_geom)
+        q = np.sqrt(qx**2 + qy**2)
+        sigma_para = np.sqrt((q * (self.wavelength_spread / 2))**2 + sigma_geom**2)
         return sigma_para
 
 

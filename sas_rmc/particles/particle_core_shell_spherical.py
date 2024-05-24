@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from sas_rmc.particles import Particle, FormResult
+from sas_rmc.particles import FormResult, Particle
 from sas_rmc.particles.particle_spherical import SphericalParticle
 from sas_rmc import Vector
 from sas_rmc.shapes import Shape, Sphere, collision_detected
@@ -20,13 +20,13 @@ class CoreShellParticle(Particle):
 
     @classmethod
     def gen_from_parameters(cls, position: Vector, magnetization: Vector | None = None, core_radius: float = 0, thickness: float = 0, core_sld: float = 0, shell_sld: float = 0, solvent_sld: float = 0):
-        return CoreShellParticle(
+        return cls(
             core_sphere=Sphere(radius=core_radius, central_position=position),
             shell_sphere=Sphere(radius=core_radius + thickness, central_position=position),
             core_sld=core_sld,
             shell_sld=shell_sld,
             solvent_sld=solvent_sld,
-            magnetization=magnetization
+            magnetization=magnetization if magnetization is not None else Vector.null_vector()
         )
     
     @property
@@ -91,7 +91,7 @@ class CoreShellParticle(Particle):
     
     def collision_detected(self, other_particle: Particle) -> bool:
         self.validate_shape()
-        return collision_detected([self.shell_sphere], other_particle.get_shapes)
+        return collision_detected([self.shell_sphere], other_particle.get_shapes())
     
     def get_scattering_length(self) -> float:
         return (self.core_sld - self.shell_sld) * self.core_sphere.get_volume() + self.shell_sld * self.shell_sphere.get_volume()
@@ -116,8 +116,8 @@ class CoreShellParticle(Particle):
             solvent_sld=self.solvent_sld
         )
 
-
 if __name__ == "__main__":
-    test = CoreShellParticle.gen_from_parameters(position= Vector(0,0,1))
+    pass
+    #test = CoreShellParticle.gen_from_parameters(position= Vector(0,0,1))
 
 #%%
