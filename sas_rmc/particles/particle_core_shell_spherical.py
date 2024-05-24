@@ -1,12 +1,13 @@
 #%%
+from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
 
 from sas_rmc.particles import Particle, FormResult
-from sas_rmc.particles.particle_spherical import SphericalParticle, form_array_sphere
+from sas_rmc.particles.particle_spherical import SphericalParticle
 from sas_rmc import Vector
-from sas_rmc.shapes import Sphere
+from sas_rmc.shapes import Shape, Sphere, collision_detected
 
 @dataclass
 class CoreShellParticle(Particle):
@@ -28,20 +29,31 @@ class CoreShellParticle(Particle):
             magnetization=magnetization
         )
     
-    def get_position(self) -> Vector:
+    @property
+    def core_radius(self) -> float:
+        return self.core_sphere.radius
+    
+    @property
+    def thickness(self) -> float:
+        return self.shell_sphere.radius - self.core_radius
+    
+    def validate_shape(self) -> None:
         if self.core_sphere.get_position() != self.shell_sphere.get_position():
             raise ValueError("Core shell particle position failure")
+    
+    def get_position(self) -> Vector:
+        self.validate_shape()
         return self.core_sphere.get_position()
     
     def get_orientation(self) -> Vector:
         return self.core_sphere.get_orientation()
-    
+
     def form_array(self, qx_array: np.ndarray, qy_array: np.ndarray) -> np.ndarray:
         core_particle = SphericalParticle(
             core_sphere=self.core_sphere,
             sphere_sld=self.core_sld - self.shell_sld,
             solvent_sld=self.solvent_sld,
-            magnetization=self.magnetization
+            magnetization=Vector.null_vector()
         )
         shell_particle = SphericalParticle(
             core_sphere=self.shell_sphere,
@@ -69,9 +81,43 @@ class CoreShellParticle(Particle):
             form_magnetic_y=form_mag_y,
             form_magnetic_z=form_mag_z
         )
+    
+    def get_shapes(self) -> list[Shape]:
+        return [self.core_sphere, self.shell_sphere]
+    
+    def is_inside(self, position: Vector) -> bool:
+        self.validate_shape()
+        return self.shell_sphere.is_inside(position)
+    
+    def collision_detected(self, other_particle: Particle) -> bool:
+        self.validate_shape()
+        return collision_detected([self.shell_sphere], other_particle.get_shapes)
+    
+    def get_scattering_length(self) -> float:
+        return (self.core_sld - self.shell_sld) * self.core_sphere.get_volume() + self.shell_sld * self.shell_sphere.get_volume()
+
+    def change_position(self, position: Vector) -> CoreShellParticle:
+        return CoreShellParticle.gen_from_parameters(
+            position=position,
+            magnetization=self.magnetization,
+            core_radius=self.core_radius,
+            thickness=self.thickness,
+            core_sld=self.core_sld,
+            shell_sld=self.shell_sld,
+            solvent_sld=self.solvent_sld
+        )
+    
+    def change_magnetization(self, magnetization: Vector) -> CoreShellParticle:
+        return CoreShellParticle.gen_from_parameters(
+            position=self.get_position(),
+            magnetization=magnetization,
+            core_radius=self.core_radius,
+            shell_sld=self.shell_sld,
+            solvent_sld=self.solvent_sld
+        )
 
 
 if __name__ == "__main__":
-    pass
+    test = CoreShellParticle.gen_from_parameters(position= Vector(0,0,1))
 
 #%%
