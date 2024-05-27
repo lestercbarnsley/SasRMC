@@ -95,12 +95,12 @@ class Vector:
 
     def cross(self, vector2: Vector) -> Vector:
         x, y, z = cross(self.to_tuple(), vector2.to_tuple())
-        return type(self)(x, y, z)
+        return Vector(x, y, z)
 
     @property
     def unit_vector(self) -> Vector:
         if self.mag == 0:
-            return type(self).null_vector()
+            return Vector.null_vector()
         if self.mag == 1:
             return self
         else:
@@ -155,7 +155,7 @@ class Vector:
     @classmethod
     def random_vector_xy(cls, length: float = 1):
         random_angle = rng.uniform(low = -PI, high = +PI)
-        return cls.xy_from_angle(length = length, angle = random_angle)#length * cls(x = np.cos(random_angle), y = np.sin(random_angle))
+        return cls.xy_from_angle(length = length, angle = random_angle)
 
     @classmethod
     def random_normal_vector(cls, step_size=1):
