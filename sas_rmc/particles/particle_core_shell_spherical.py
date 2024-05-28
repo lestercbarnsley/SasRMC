@@ -47,6 +47,12 @@ class CoreShellParticle(Particle):
     
     def get_orientation(self) -> Vector:
         return self.core_sphere.get_orientation()
+    
+    def get_magnetization(self) -> Vector:
+        return self.magnetization
+    
+    def get_volume(self) -> float:
+        return self.shell_sphere.get_volume()
 
     def form_array(self, qx_array: np.ndarray, qy_array: np.ndarray) -> np.ndarray:
         core_particle = SphericalParticle(
@@ -107,6 +113,9 @@ class CoreShellParticle(Particle):
             solvent_sld=self.solvent_sld
         )
     
+    def change_orientation(self, orientation: Vector) -> CoreShellParticle:
+        return self
+
     def change_magnetization(self, magnetization: Vector) -> CoreShellParticle:
         return CoreShellParticle.gen_from_parameters(
             position=self.get_position(),
@@ -115,9 +124,24 @@ class CoreShellParticle(Particle):
             shell_sld=self.shell_sld,
             solvent_sld=self.solvent_sld
         )
-
+    
+    def get_loggable_data(self) -> dict:
+        loggable_data = super().get_loggable_data()
+        return loggable_data | {
+            "Core radius" : self.core_radius,
+            "Thickness" : self.thickness,
+            "Core SLD" : self.core_sld,
+            "Shell SLD" : self.shell_sld,
+            "Solvent SLD" : self.solvent_sld,
+        }
+    
 if __name__ == "__main__":
-    pass
-    #test = CoreShellParticle.gen_from_parameters(position= Vector(0,0,1))
+    t = CoreShellParticle.gen_from_parameters(
+        position=Vector(0,0,0),
+        core_radius=50,
+        thickness=10,
+        core_sld=6,
+        shell_sld=1
+    )
 
 #%%

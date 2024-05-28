@@ -1,7 +1,7 @@
 #%%
 from dataclasses import dataclass, field
 from functools import wraps
-from typing import List, Optional, Protocol, Union
+from typing import Iterator, List, Optional, Protocol, Union
 import time
 
 from .controller import Controller
@@ -55,6 +55,46 @@ class Simulator:
             controller.compute_states()
             self.evaluator.evaluate(command)
             
+@dataclass
+class Callback:
+    def __call__(self, document: dict) -> None:
+        pass
+
+@dataclass
+class Command:
+    def execute(self, scattering_simulation: ScatteringSimulation | None = None) -> ScatteringSimulation:
+        pass
+
+    def get_document(self) -> dict:
+        pass
+@dataclass
+class Controller:
+    commands: list[Command]
+    acceptance_scheme: list[AcceptanceScheme]
+
+    @property
+    def ledger(self) -> Iterator[tuple[Command, AcceptanceScheme]]:
+        for command, acceptance in zip(self.commands, self.acceptance_scheme):
+            yield command, acceptance
+
+
+@dataclass
+class Simulator:
+    controller: Controller
+    state: ScatteringSimulation
+    evaluator: Evaluator
+    callback: Callback
+
+    def simulate(self) -> None:
+        for command, acceptance_scheme in self.controller.ledger:
+            new_state = command.execute(self.state)
+            command_document = command.get_document()
+            evaluation = self.evaluator.evaluate(new_state, acceptance_scheme)
+            evaluation_document = self.evaluator.get_document()
+            if evaluation:
+                self.state = new_state
+            self.callback(command_document | evaluation_document)
+    
 
 class Viewer(Protocol):
     def show_view(simulation: ScatteringSimulation, command: CommandOrAcceptableCommand, acc_scheme: AcceptanceScheme) -> None:
@@ -108,4 +148,4 @@ class MemorizedSimulator(Simulator):
 if __name__ == "__main__":
     pass
 
-#%%
+  #%%
