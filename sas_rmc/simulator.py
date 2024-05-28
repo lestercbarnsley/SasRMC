@@ -57,7 +57,13 @@ class Simulator:
             
 @dataclass
 class Callback:
-    def __call__(self, document: dict) -> None:
+    def start(self, document: dict) -> None:
+        pass
+
+    def event(self, document: dict) -> None:
+        pass
+
+    def stop(self, document: dict) -> None:
         pass
 
 @dataclass
@@ -85,6 +91,9 @@ class Simulator:
     evaluator: Evaluator
     callback: Callback
 
+    def start(self) -> None:
+        self.callback.start(self.state.get_loggable_data() | self.evaluator.get_loggable_data())
+
     def simulate(self) -> None:
         for command, acceptance_scheme in self.controller.ledger:
             new_state = command.execute(self.state)
@@ -93,7 +102,10 @@ class Simulator:
             evaluation_document = self.evaluator.get_document()
             if evaluation:
                 self.state = new_state
-            self.callback(command_document | evaluation_document)
+            self.callback.event(command_document | evaluation_document)
+
+    def stop(self) -> None:
+        self.callback.stop(self.state.get_loggable_data() | self.evaluator.get_loggable_data())
     
 
 class Viewer(Protocol):
@@ -148,4 +160,4 @@ class MemorizedSimulator(Simulator):
 if __name__ == "__main__":
     pass
 
-  #%%
+   #%%
