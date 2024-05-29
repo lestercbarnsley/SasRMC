@@ -32,12 +32,45 @@ class LoggableCommandProtocol(CommandProtocol, Loggable, Protocol):
 class LogCallback:
 
     @abstractmethod
-    def before_event(self, d: dict = None) -> None:
+    def start(self, document: dict  | None = None) -> None:
         pass
 
     @abstractmethod
-    def after_event(self, d: dict = None) -> None:
+    def event(self, document: dict  | None = None) -> None:
         pass
+
+    @abstractmethod
+    def stop(self, document: dict  | None = None) -> None:
+        pass
+
+
+@dataclass
+class NoLogCallback(LogCallback):
+    def start(self, document: dict | None = None) -> None:
+        pass
+
+    def event(self, document: dict | None = None) -> None:
+        pass
+
+    def stop(self, document: dict | None = None) -> None:
+        pass
+
+
+@dataclass
+class LogEventBus(LogCallback):
+    log_callbacks: list[LogCallback]
+
+    def start(self, document: dict  | None = None) -> None:
+        for callback in self.log_callbacks:
+            callback.start(document)
+
+    def event(self, document: dict | None = None) -> None:
+        for callback in self.log_callbacks:
+            callback.event(document)
+
+    def stop(self, document: dict | None = None) -> None:
+        for callback in self.log_callbacks:
+            callback.stop(document)
 
 
 def box_writer(box: Box) -> pd.DataFrame:

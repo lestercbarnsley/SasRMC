@@ -4,14 +4,7 @@ from typing import List
 
 import numpy as np
 
-from .shapes.shapes import Sphere
-from .acceptance_scheme import AcceptanceScheme
-from .scattering_simulation import ScatteringSimulation
-from .box_simulation import Box
-from .particles import Particle, CoreShellParticle
-from .scattering_simulation import SimulationParams
-from .vector import Vector
-from . import constants
+from sas_rmc.scattering_simulation import ScatteringSimulation
 
 # execute should be a pure function, so I get rid of the instance of rng
 
@@ -27,29 +20,16 @@ def small_angle_change(vector: Vector, angle_change: float, reference_vector: Ve
 
 @dataclass
 class Command(ABC):
-    data: dict = field(default_factory = dict, init = False, repr = False)
+    document: dict | None = field(default_factory=lambda : None, init = False, repr=False)
 
     @abstractmethod
-    def execute(self) -> None:
+    def execute(self, scattering_simulation: ScatteringSimulation | None = None) -> ScatteringSimulation:
         pass
 
-    @abstractmethod
-    def _cls_specific_loggable_data(self) -> dict:
-        return {}
-
-    def update_loggable_data(self, data: dict) -> None:
-        self.data.update(data)
-
-    def get_loggable_data(self) -> dict:
-        return {
-            **self.data,
-            **self._cls_specific_loggable_data(),
-        }
-
-    @abstractmethod
-    def physical_acceptance_weak(self) -> bool:
-        '''A weak physical acceptance test only tests the most recent command. It assumes all prior allowed commands are also physically acceptable'''
-        pass
+    def get_document(self) -> dict:
+        if self.document is None:
+            return {}
+        return self.document
 
 
 

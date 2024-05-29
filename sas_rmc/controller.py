@@ -1,32 +1,20 @@
-from dataclasses import dataclass, field
-from typing import List, Protocol
+from dataclasses import dataclass
+from typing import Iterator
 
+from sas_rmc.commands import Command
+from sas_rmc.acceptance_scheme import AcceptanceScheme
 
-class CommandProtocol(Protocol):
-    def execute(self) -> None:
-        pass
 
 
 @dataclass
 class Controller:
-    ledger: List[CommandProtocol] = field(default_factory=list)
-    _current: int = 0
+    commands: list[Command]
+    acceptance_scheme: list[AcceptanceScheme]
 
     @property
-    def completed_commands(self) -> List[CommandProtocol]:
-        return self.ledger[: self._current]
-
-    def action(self) -> None:
-        if self._current < len(self.ledger):
-            self._current += 1
-
-    def compute_states(self) -> None:
-        for command in self.completed_commands:
-            command.execute()
-
-    def add_command(self, command: CommandProtocol) -> None:
-        self.ledger.append(command)
-
+    def ledger(self) -> Iterator[tuple[Command, AcceptanceScheme]]:
+        for command, acceptance in zip(self.commands, self.acceptance_scheme):
+            yield command, acceptance
 
 
 

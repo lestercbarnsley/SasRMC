@@ -13,7 +13,7 @@ class CLIViewer:
         base_command = command.base_command if isinstance(command, commands.AcceptableCommand) else command
         print(type(base_command).__name__)
         if isinstance(base_command, commands.ParticleCommand):
-            print(base_command.data, 'Particle index: ',base_command.particle_index)
+            print(base_command.document, 'Particle index: ',base_command.particle_index)
 
     def show_simulation(self, simulation: ScatteringSimulation) -> None:
         rescale_factor = simulation.simulation_params.params[0].value

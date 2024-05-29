@@ -63,7 +63,16 @@ class Box:
     def get_nearest_particle(self, position: Vector) -> Particle:
         return min(self.particles, key = lambda particle : position.distance_from_vector(particle.get_position()))
         
-
+    def get_loggable_data(self) -> dict:
+        return {
+            f'Particle {i}' : particle.get_loggable_data() 
+            for i, particle 
+            in enumerate(self.particles)
+        } | {
+            'Dimension 0' : self.cube.dimension_0,
+            'Dimension 1' : self.cube.dimension_1,
+            'Dimension 2' : self.cube.dimension_2
+        }
 
     
 if __name__ == "__main__":

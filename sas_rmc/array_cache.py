@@ -28,6 +28,7 @@ def create_arg_key(arg: tuple) -> tuple:
 
 def create_function_cache_key(*args, **kwargs) -> tuple:
     return () + create_arg_key(args) + create_arg_key(kwargs)
+
     
 
 def array_cache(func = None, max_size: int = None):
@@ -65,7 +66,7 @@ def method_array_cache(func = None, max_size: int = CLASS_MAX_SIZE, cache_holder
         def wrapper(*args, **kwargs):
             obj = args[cache_holder_index]
             other_args = [a for i, a in enumerate(args) if i!=cache_holder_index]
-            argument_tuple = create_function_cache_key(*other_args, **kwargs)#tuple(pass_arg(arg) for arg in other_args) + kwarg_tuple
+            argument_tuple = create_function_cache_key(*other_args, **kwargs)
             if not hasattr(obj, cache_name):
                 setattr(obj, cache_name, {})
             object_cache = getattr(obj, cache_name)
