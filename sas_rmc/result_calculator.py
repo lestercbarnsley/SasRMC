@@ -8,32 +8,43 @@ import numpy as np
 from scipy import special
 #from scipy.special import j0 as j0_bessel
 
-from .particles import Particle, ParticleComposite
-from .particles.particle import magnetic_sld_in_angstrom_minus_2
-from .vector import Vector, VectorSpace, broadcast_to_numpy_array, composite_function
-from .array_cache import method_array_cache, array_cache
-from .box_simulation import Box
-from . import constants
+from sas_rmc.array_cache import array_cache
+from sas_rmc.detector import DetectorImage
+from sas_rmc.form_calculator import sum_array_list
+from sas_rmc.particles.particle import FormResult, Particle
+from sas_rmc.scattering_simulation import ScatteringSimulation
+from sas_rmc import constants
 
 PI = constants.PI
 j0_bessel = special.j0
 
-@dataclass
-class FormResult:
-    form_nuclear: np.ndarray
-    form_magnetic_x: np.ndarray
-    form_magnetic_y: np.ndarray
-    form_magnetic_z: np.ndarray
+
 
 
 @dataclass
 class ResultCalculator(ABC):
+    
+    @abstractmethod
+    def intensity_result(self, scattering_simulation: ScatteringSimulation) -> np.ndarray:
+        pass
+
+
+@array_cache
+def modulated_form_array(particle: Particle, qx_array: np.ndarray, qy_array: np.ndarray) -> FormResult:
+    form_result = particle.form_result(qx_array, qy_array)
+    return form_result.modulate_form_result(particle.get_position(), qx_array, qy_array)
+
+
+@dataclass
+class AnalyticalCalculator(ResultCalculator):
     qx_array: np.ndarray
     qy_array: np.ndarray
+    experimental_detector: DetectorImage
 
-    @abstractmethod
-    def form_result(self, particle: Particle) -> FormResult:
-        pass
+    def intensity_result(self, scattering_simulation: ScatteringSimulation) -> np.ndarray:
+        for box in scattering_simulation.box_list:
+            form_results = [modulated_form_array(particle, self.qx_array, self.qy_array) for particle in box.particles]
+            sum_array_list
 
 
 @dataclass
@@ -183,14 +194,6 @@ class ProfileCalculator:
 def structure_factor(q: np.ndarray, distance: float) -> np.ndarray:
     qr = q * distance
     return j0_bessel(qr)
-
-
-@array_cache(max_size=5_000)
-def array_list_sum(arr_list: List[np.ndarray], bottom_level = False):
-    if bottom_level:
-        return np.sum(arr_list, axis = 0)
-    divs = int(np.sqrt(len(arr_list)))
-    return np.sum([array_list_sum(arr_list[i::divs], bottom_level = True)  for i in range(divs) ], axis = 0)
 
 
 @dataclass

@@ -2,6 +2,7 @@
 
 from functools import wraps
 from enum import Enum
+from typing import Callable, ParamSpec, TypeVar
 
 import numpy as np
 
@@ -29,15 +30,16 @@ def create_arg_key(arg: tuple) -> tuple:
 def create_function_cache_key(*args, **kwargs) -> tuple:
     return () + create_arg_key(args) + create_arg_key(kwargs)
 
-    
+R = TypeVar("R")
+P = ParamSpec("P")
 
-def array_cache(func = None, max_size: int = None):
+def array_cache(func: Callable[P, R] | None = None, max_size: int | None = None) -> Callable[P, R]:
     max_size = max_size if max_size is not None else MAX_SIZE
-    def _array_cache(func):
+    def _array_cache(func: Callable[P, R]) -> Callable[P, R]:
         cache = {}
 
         @wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             argument_tuple = create_function_cache_key(*args, **kwargs)
             if argument_tuple not in cache:
                 if len(cache) >= max_size:
