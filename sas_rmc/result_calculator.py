@@ -8,12 +8,12 @@ import numpy as np
 from scipy import special
 #from scipy.special import j0 as j0_bessel
 
-from sas_rmc.array_cache import array_cache
+from sas_rmc.array_cache import array_cache, method_array_cache
 from sas_rmc.detector import DetectorImage
 from sas_rmc.form_calculator import sum_array_list
 from sas_rmc.particles.particle import FormResult, Particle
 from sas_rmc.scattering_simulation import ScatteringSimulation
-from sas_rmc import constants
+from sas_rmc import constants, Vector
 
 PI = constants.PI
 j0_bessel = special.j0

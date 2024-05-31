@@ -1,21 +1,22 @@
 #%%
 
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from enum import Enum
-from typing import Callable
+from typing import Callable, Iterator
 
 import numpy as np
 
 from sas_rmc.array_cache import array_cache
 from sas_rmc.box_simulation import Box
-from sas_rmc.result_calculator import FormResult, ResultCalculator
 from sas_rmc.detector import Polarization
 from sas_rmc.vector import cross
+from sas_rmc.particles import FormResult
 
 
 @array_cache(max_size=1_000)
 def mod(arr: np.ndarray) -> np.ndarray:
     return np.real(arr * np.conj(arr))
-# this function is NOT a good candidate for caching
 # why did I think this?
 
 class FieldDirection(Enum):
@@ -30,30 +31,88 @@ def sum_array_list(array_list: list[np.ndarray]) -> np.ndarray:
         return np.sum(array_list, axis = 0)
     divisions = 2
     return sum_array_list([sum_array_list(array_list[i::divisions]) for i in range(divisions)])
-    
+
+@array_cache(max_size = 5000)
+def add_form_results(form_results: list[FormResult]) -> FormResult:
+    return FormResult(
+        form_nuclear=sum_array_list([form_result.form_nuclear for form_result in form_results]),
+        form_magnetic_x=sum_array_list([form_result.form_magnetic_x for form_result in form_results]),
+        form_magnetic_y=sum_array_list([form_result.form_magnetic_y for form_result in form_results]),
+        form_magnetic_z=sum_array_list([form_result.form_magnetic_z for form_result in form_results])
+    )
+
 def form_result_adder(form_results: list[FormResult], getter_fn: Callable[[FormResult], np.ndarray], rescale: float = 1) -> np.ndarray:
     array_list = [getter_fn(form_result) for form_result in form_results]
     return np.sqrt(rescale) * sum_array_list(array_list)
     
-def nuclear_amplitude(form_results: list[FormResult], rescale_factor: float = 1) -> np.ndarray:
-    return form_result_adder(form_results, lambda form_result : form_result.form_nuclear, rescale=rescale_factor)
-
+def nuclear_amplitude(form_results: list[FormResult]) -> np.ndarray:
+    return add_form_results(form_results).form_nuclear
+    
 @array_cache(max_size=5_000)
 def q_squared(qx: np.ndarray, qy: np.ndarray, offset: float = 1e-16) -> np.ndarray:
     qq = qx**2 + qy**2
     return np.where(qq !=0 , qq, offset)
 
-def magnetic_amplitude(form_results: list[FormResult], qx: np.ndarray, qy: np.ndarray, magnetic_rescale:float = 1) -> list[np.ndarray]:
-    getters = [
-        lambda form_result: form_result.form_magnetic_x, 
-        lambda form_result: form_result.form_magnetic_y, 
-        lambda form_result: form_result.form_magnetic_z 
-        ]
-    fm_x, fm_y, fm_z = [form_result_adder(form_results, getter_fn, magnetic_rescale) for getter_fn in getters]
+def magnetic_amplitude(form_results: list[FormResult], qx: np.ndarray, qy: np.ndarray) -> list[np.ndarray]:
+    added_form_results = add_form_results(form_results)
+    fm_x, fm_y, fm_z = added_form_results.form_magnetic_x, added_form_results.form_magnetic_y, added_form_results.form_magnetic_z
     q = [qx, qy, 0]
     q_square = q_squared(qx, qy)
     mqm = cross(q, cross([fm_x, fm_y, fm_z], q))
     return [mq_comp / q_square for mq_comp in mqm]
+
+@dataclass
+class FormPolarizer(ABC):
+
+    @abstractmethod
+    def minus_minus(self) -> Iterator[np.ndarray]:
+        pass
+
+    @abstractmethod
+    def plus_plus(self) -> Iterator[np.ndarray]:
+        pass
+
+    @abstractmethod
+    def minus_plus(self) -> Iterator[np.ndarray]:
+        pass
+
+    @abstractmethod
+    def plus_minus(self) -> Iterator[np.ndarray]:
+        pass
+
+    def spin_up(self) -> Iterator[np.ndarray]:
+        yield from self.minus_minus()
+        yield from self.minus_plus()
+
+    def spin_down(self) -> Iterator[np.ndarray]:
+        yield from self.plus_plus()
+        yield from self.minus_plus()
+
+    def unpolarized(self) -> Iterator[np.ndarray]:
+        yield from self.spin_down()
+        yield from self.spin_up()
+
+
+@dataclass
+class FormPolarizerX(FormPolarizer):
+    form_nuclear: np.ndarray
+    form_magnetic_x: np.ndarray
+    form_magnetic_y: np.ndarray
+    form_magnetic_z: np.ndarray
+
+    def minus_minus(self) -> Iterator[np.ndarray]:
+        yield self.form_nuclear + self.form_magnetic_x
+
+    def plus_plus(self) -> Iterator[np.ndarray]:
+        yield self.form_nuclear - self.form_magnetic_x
+
+    def minus_plus(self) -> Iterator[np.ndarray]:
+        yield -self.form_magnetic_y - 1j * self.form_magnetic_z
+
+    def plus_minus(self) -> Iterator[np.ndarray]:
+        yield -self.form_magnetic_y + 1j * self.form_magnetic_z
+    
+
 
 def form_polarization_x(fn: np.ndarray, fmx: np.ndarray, fmy: np.ndarray, fmz: np.ndarray):
     minus_minus_fn = lambda : fn + fmx

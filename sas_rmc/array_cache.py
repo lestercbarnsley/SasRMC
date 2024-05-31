@@ -60,12 +60,12 @@ def array_cache(func: Callable[P, R] | None = None, max_size: int | None = None)
 
 key_cache_avoider = ''.join(np.random.choice(['dsfa','ewrf','werfj','gjowq','glks','fjkds','jtks','dsaa','jgkda','ewiq']) for _ in range(10))
 
-def method_array_cache(func = None, max_size: int = CLASS_MAX_SIZE, cache_holder_index: int = 0):
-    def _method_array_cache(func):
+def method_array_cache(func: Callable[P, R] | None = None, max_size: int = CLASS_MAX_SIZE, cache_holder_index: int = 0) -> Callable[P, R]:
+    def _method_array_cache(func: Callable[P, R]) -> Callable[P, R]:
         cache_name = f'_method_cache_{func.__name__}_{key_cache_avoider}_'
 
         @wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             obj = args[cache_holder_index]
             other_args = [a for i, a in enumerate(args) if i!=cache_holder_index]
             argument_tuple = create_function_cache_key(*other_args, **kwargs)
