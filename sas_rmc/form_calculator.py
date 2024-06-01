@@ -40,10 +40,6 @@ def add_form_results(form_results: list[FormResult]) -> FormResult:
         form_magnetic_y=sum_array_list([form_result.form_magnetic_y for form_result in form_results]),
         form_magnetic_z=sum_array_list([form_result.form_magnetic_z for form_result in form_results])
     )
-
-def form_result_adder(form_results: list[FormResult], getter_fn: Callable[[FormResult], np.ndarray], rescale: float = 1) -> np.ndarray:
-    array_list = [getter_fn(form_result) for form_result in form_results]
-    return np.sqrt(rescale) * sum_array_list(array_list)
     
 def nuclear_amplitude(form_results: list[FormResult]) -> np.ndarray:
     return add_form_results(form_results).form_nuclear
@@ -60,66 +56,27 @@ def magnetic_amplitude(form_results: list[FormResult], qx: np.ndarray, qy: np.nd
     q_square = q_squared(qx, qy)
     mqm = cross(q, cross([fm_x, fm_y, fm_z], q))
     return [mq_comp / q_square for mq_comp in mqm]
-
-@dataclass
-class FormPolarizer(ABC):
-
-    @abstractmethod
-    def minus_minus(self) -> Iterator[np.ndarray]:
-        pass
-
-    @abstractmethod
-    def plus_plus(self) -> Iterator[np.ndarray]:
-        pass
-
-    @abstractmethod
-    def minus_plus(self) -> Iterator[np.ndarray]:
-        pass
-
-    @abstractmethod
-    def plus_minus(self) -> Iterator[np.ndarray]:
-        pass
-
-    def spin_up(self) -> Iterator[np.ndarray]:
-        yield from self.minus_minus()
-        yield from self.minus_plus()
-
-    def spin_down(self) -> Iterator[np.ndarray]:
-        yield from self.plus_plus()
-        yield from self.minus_plus()
-
-    def unpolarized(self) -> Iterator[np.ndarray]:
-        yield from self.spin_down()
-        yield from self.spin_up()
-
-
-@dataclass
-class FormPolarizerX(FormPolarizer):
-    form_nuclear: np.ndarray
-    form_magnetic_x: np.ndarray
-    form_magnetic_y: np.ndarray
-    form_magnetic_z: np.ndarray
-
-    def minus_minus(self) -> Iterator[np.ndarray]:
-        yield self.form_nuclear + self.form_magnetic_x
-
-    def plus_plus(self) -> Iterator[np.ndarray]:
-        yield self.form_nuclear - self.form_magnetic_x
-
-    def minus_plus(self) -> Iterator[np.ndarray]:
-        yield -self.form_magnetic_y - 1j * self.form_magnetic_z
-
-    def plus_minus(self) -> Iterator[np.ndarray]:
-        yield -self.form_magnetic_y + 1j * self.form_magnetic_z
     
 
-
-def form_polarization_x(fn: np.ndarray, fmx: np.ndarray, fmy: np.ndarray, fmz: np.ndarray):
+def form_polarization(fn: np.ndarray, fm_para: np.ndarray, fm_perp_1: np.ndarray, fm_perp_2: np.ndarray):
+    def minus_minus() -> np.ndarray:
+        return fn + fm_para
+    def plus_plus() -> np.ndarray:
+        return fn - fm_para
+    def minus_plus() -> np.ndarray:
+        return -fm_perp_1 - 1j * fm_perp_2
+    def plus_minus() -> np.ndarray:
+        return -fm_perp_1 + 1j * fm_perp_2
+    return minus_minus, plus_plus, minus_plus, plus_minus
+    '''
     minus_minus_fn = lambda : fn + fmx
     plus_plus_fn = lambda : fn - fmx
     minus_plus_fn = lambda : -fmy - 1j * fmz
     plus_minus_fn = lambda : -fmy + 1j * fmz
-    return minus_minus_fn, plus_plus_fn, minus_plus_fn, plus_minus_fn
+    return minus_minus_fn, plus_plus_fn, minus_plus_fn, plus_minus_fn'''
+
+def form_polarization_x(fn: np.ndarray, fmx: np.ndarray, fmy: np.ndarray, fmz: np.ndarray):
+    return form_polarization(fn, fm_para = fmx, fm_perp_1=fmy, fm_perp_2=fmz)
 
 def form_polarization_y(fn: np.ndarray, fmx: np.ndarray, fmy: np.ndarray, fmz: np.ndarray):
     minus_minus_fn = lambda : fn + fmy
@@ -136,24 +93,43 @@ def form_polarization_z(fn: np.ndarray, fmx: np.ndarray, fmy: np.ndarray, fmz: n
     plus_minus_fn = lambda : -fmx + 1j * fmy
     return minus_minus_fn, plus_plus_fn, minus_plus_fn, plus_minus_fn
 
+def minus_minus(fn: np.ndarray, fm_para: np.ndarray, fm_perp_1: np.ndarray, fm_perp_2: np.ndarray) -> np.ndarray:
+    return mod(fn + fm_para)
+
+def plus_plus(fn: np.ndarray, fm_para: np.ndarray, fm_perp_1: np.ndarray, fm_perp_2: np.ndarray) -> np.ndarray:
+    return mod(fn - fm_para)
+
+def minus_plus(fn: np.ndarray, fm_para: np.ndarray, fm_perp_1: np.ndarray, fm_perp_2: np.ndarray) -> np.ndarray:
+    return mod(-fm_perp_1 - 1j * fm_perp_2)
+
+def plus_minus(fn: np.ndarray, fm_para: np.ndarray, fm_perp_1: np.ndarray, fm_perp_2: np.ndarray) -> np.ndarray:
+    return mod(-fm_perp_1 + 1j * fm_perp_2)
+
+def spin_up(fn: np.ndarray, fm_para: np.ndarray, fm_perp_1: np.ndarray, fm_perp_2: np.ndarray) -> np.ndarray:
+    return sum_array_list([pol_func(fn, fm_para, fm_perp_1, fm_perp_2) for pol_func in (minus_minus, minus_plus)])
+
+def spin_down(fn: np.ndarray, fm_para: np.ndarray, fm_perp_1: np.ndarray, fm_perp_2: np.ndarray) -> np.ndarray:
+    return sum_array_list([pol_func(fn, fm_para, fm_perp_1, fm_perp_2) for pol_func in (minus_minus, minus_plus)])
+
+def unpolarized(fn: np.ndarray, fm_para: np.ndarray, fm_perp_1: np.ndarray, fm_perp_2: np.ndarray) -> np.ndarray:
+    return sum_array_list([pol_func(fn, fm_para, fm_perp_1, fm_perp_2) for pol_func in (spin_up, spin_down)]) / 2 # The two is necessary to normalize unpolarized
+
 def intensity_polarization(fn: np.ndarray, fmx: np.ndarray, fmy: np.ndarray, fmz: np.ndarray, polarization: Polarization, field_direction: FieldDirection = FieldDirection.Y) -> np.ndarray:
-    form_polarization = {
-        FieldDirection.X : form_polarization_x,
-        FieldDirection.Y : form_polarization_y,
-        FieldDirection.Z: form_polarization_z
+    form_set = {
+        FieldDirection.X : (fn, fmx, fmy, fmz),
+        FieldDirection.Y : (fn, fmy, fmx, fmz),
+        FieldDirection.Z: (fn, fmz, fmx, fmy)
     }[field_direction]
-    minus_minus_fn, plus_plus_fn, minus_plus_fn, plus_minus_fn = form_polarization(fn, fmx, fmy, fmz)
-    polarization_splitter = {
-        Polarization.MINUS_MINUS: [minus_minus_fn],
-        Polarization.PLUS_PLUS: [plus_plus_fn],
-        Polarization.MINUS_PLUS: [minus_plus_fn],
-        Polarization.PLUS_MINUS: [plus_minus_fn],
-        Polarization.SPIN_UP: [minus_minus_fn,minus_plus_fn], 
-        Polarization.SPIN_DOWN: [plus_plus_fn,plus_minus_fn],
-        Polarization.UNPOLARIZED: [minus_minus_fn,minus_plus_fn,plus_plus_fn,plus_minus_fn]
-    }
-    polarization_functions = polarization_splitter[polarization]
-    return np.sum([mod(polarization_fn()) for polarization_fn in polarization_functions], axis=0) / (2 if polarization == Polarization.UNPOLARIZED else 1)
+    polarization_function = {
+        Polarization.MINUS_MINUS: minus_minus,
+        Polarization.PLUS_PLUS: plus_plus,
+        Polarization.MINUS_PLUS: minus_plus,
+        Polarization.PLUS_MINUS: plus_minus,
+        Polarization.SPIN_UP: spin_up, 
+        Polarization.SPIN_DOWN: spin_down,
+        Polarization.UNPOLARIZED: unpolarized
+    }[polarization]
+    return polarization_function(fn = form_set[0], fm_para=form_set[1], fm_perp_1=form_set[2], fm_perp_2=form_set[3])
 
 def box_intensity(form_results: list[FormResult], box_volume: float, qx: np.ndarray, qy: np.ndarray, rescale_factor: float = 1, magnetic_rescale: float = 1, polarization: Polarization = Polarization.UNPOLARIZED, field_direction: FieldDirection = FieldDirection.Y) -> np.ndarray:
     fn = nuclear_amplitude(form_results, rescale_factor=rescale_factor)
