@@ -1,10 +1,14 @@
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import List
+from functools import wraps
+from typing import ParamSpec, TypeVar
 
 import numpy as np
 
+from sas_rmc.particles import Particle
 from sas_rmc.scattering_simulation import ScatteringSimulation
+from sas_rmc import Vector
 
 # execute should be a pure function, so I get rid of the instance of rng
 
@@ -20,7 +24,7 @@ def small_angle_change(vector: Vector, angle_change: float, reference_vector: Ve
 
 @dataclass
 class Command(ABC):
-    document: dict | None = field(default_factory=lambda : None, init = False, repr=False)
+    document: dict | None = field(default_factory=lambda : None, repr=False, init=False)
 
     @abstractmethod
     def execute(self, scattering_simulation: ScatteringSimulation | None = None) -> ScatteringSimulation:
@@ -35,72 +39,68 @@ class Command(ABC):
 
 @dataclass
 class ParticleCommand(Command):
-    box: Box
+    box_index: int
     particle_index: int
 
-    @property
-    def particle(self) -> Particle:
-        return self.box[self.particle_index]
+    def get_particle(self, scattering_simulation: ScatteringSimulation) -> Particle:
+        return scattering_simulation.get_particle(self.box_index, self.particle_index)
 
-    @abstractmethod
-    def execute(self) -> None:
-        return super().execute()
+    def execute(self, scattering_simulation: ScatteringSimulation) -> ScatteringSimulation:
+        if scattering_simulation is None:
+            raise ValueError("scattering_simulation is not optional for this class")
+        return scattering_simulation
 
-    def _cls_specific_loggable_data(self):
-        particle = self.particle
-        return {
-            "Particle Index": self.particle_index,
-            "Action": type(self).__name__,
-            "Particle": type(particle).__name__,
-            "Position.X": particle.position.x,
-            "Position.Y": particle.position.y,
-            "Position.Z": particle.position.z,
-            "Orientation.X": particle.orientation.x,
-            "Orientation.Y": particle.orientation.y,
-            "Orientation.Z": particle.orientation.z,
-            "Magnetization.X": particle._magnetization.x,
-            "Magnetization.Y": particle._magnetization.y,
-            "Magnetization.Z": particle._magnetization.z,
-            "Volume": particle.volume,
-            "Scattering Length": particle.scattering_length,
-        }
 
-    def physical_acceptance_weak(self) -> bool:
-        return not self.box.wall_or_particle_collision(self.particle_index)
+R = TypeVar("R")
+P = ParamSpec("P")
 
+def generate_document(func: Callable[P, R]) -> Callable[P, R]:
+
+    @wraps(func)
+    def execute_with_document(*args: P.args, **kwargs: P.kwargs) -> R:
+        result = func(*args, **kwargs)
+        obj = args[0]
+        if not isinstance(obj, ParticleCommand):
+            raise TypeError("inappropriate use of generate document decorator")
+        particle = obj.get_particle(result)
+        obj.document = {
+            "Action" : type(obj).__name__,
+            "Box index" : obj.box_index,
+            "Particle index" : obj.particle_index } | particle.get_loggable_data()
+        return result
+    return execute_with_document
 
 
 @dataclass
 class SetParticleState(ParticleCommand):
     new_particle: Particle
 
-    def execute(self) -> None:
-        self.box.particles[self.particle_index] = self.new_particle
-
-    @classmethod
-    def gen_from_particle(cls, box: Box, particle_index: int):
-        return cls(box, particle_index, new_particle = box[particle_index])
-
+    @generate_document
+    def execute(self, scattering_simulation: ScatteringSimulation) -> ScatteringSimulation:
+        scattering_simulation = super().execute(scattering_simulation)
+        return scattering_simulation.change_particle(self.box_index, self.particle_index, self.new_particle)
 
 
 @dataclass
 class MoveParticleTo(ParticleCommand):
     position_new: Vector
 
-    def execute(self) -> None:
-        particle = self.particle
-        SetParticleState(self.box, self.particle_index, particle.set_position(self.position_new)).execute()
-        
-        
+    @generate_document
+    def execute(self, scattering_simulation: ScatteringSimulation) -> ScatteringSimulation:
+        particle = self.get_particle(scattering_simulation)
+        new_particle = particle.change_position(self.position_new)
+        return SetParticleState(self.box_index, self.particle_index, new_particle).execute(scattering_simulation)
+
 
 @dataclass
 class MoveParticleBy(ParticleCommand):
     position_delta: Vector
 
-    def execute(self) -> None:
-        particle = self.particle
-        position_new = particle.position + self.position_delta
-        MoveParticleTo(self.box, self.particle_index, position_new).execute()
+    @generate_document
+    def execute(self, scattering_simulation: ScatteringSimulation) -> ScatteringSimulation:
+        particle = self.get_particle(scattering_simulation)
+        position_new = particle.get_position() + self.position_delta
+        return MoveParticleTo(self.box_index, self.particle_index, position_new).execute(scattering_simulation)
 
 
 @dataclass
@@ -133,17 +133,6 @@ def jump_by_vector(position_1: Vector, position_2: Vector, fixed_distance: float
     return pointing_vector - (fixed_distance * pointing_vector.unit_vector)
 
 
-@dataclass
-class JumpParticleFixedDistance(ParticleCommand): # Not yet tested
-    reference_particle_index: int
-    fixed_distance: float
-
-    def execute(self) -> None:
-        particle = self.particle
-        reference_particle = self.box[self.reference_particle_index]
-        jump_by_vec = (jump_by_vector(shape.central_position, shape_2.central_position, self.fixed_distance) for shape in particle.shapes for shape_2 in reference_particle.shapes)
-        move_by_command = MoveParticleBy(self.box, self.particle_index, position_delta=min(jump_by_vec, key= lambda v : v.mag))
-        move_by_command.execute()
 
 
 def rotate_vector(vector: Vector, angle: float) -> Vector:
