@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "sas-rmc"
-version = "0.1.3"
+version = "0.1.4"
 description = "SasRMC is a Python library for numerical modelling of small-angle scattering data."
 authors = ["Lester Barnsley <lester.barnsley@gmail.com>"]
 license = "MIT"

@@ -9,11 +9,13 @@ from scipy import special
 #from scipy.special import j0 as j0_bessel
 
 from sas_rmc.array_cache import array_cache, method_array_cache
-from sas_rmc.detector import DetectorImage
-from sas_rmc.form_calculator import sum_array_list
+from sas_rmc.box_simulation import Box
+from sas_rmc.detector import DetectorImage, Polarization
+from sas_rmc.form_calculator import box_intensity, FieldDirection
 from sas_rmc.particles.particle import FormResult, Particle
 from sas_rmc.scattering_simulation import ScatteringSimulation
 from sas_rmc import constants, Vector
+from sas_rmc.vector import dot
 
 PI = constants.PI
 j0_bessel = special.j0
@@ -32,59 +34,37 @@ class ResultCalculator(ABC):
 @array_cache
 def modulated_form_array(particle: Particle, qx_array: np.ndarray, qy_array: np.ndarray) -> FormResult:
     form_result = particle.form_result(qx_array, qy_array)
-    return form_result.modulate_form_result(particle.get_position(), qx_array, qy_array)
+    position = particle.get_position()
+    modulation = np.exp(1j * dot(position.to_tuple(), [qx_array, qy_array]))
+    return FormResult(
+        form_nuclear=form_result.form_nuclear * modulation,
+        form_magnetic_x=form_result.form_magnetic_x * modulation,
+        form_magnetic_y=form_result.form_magnetic_y * modulation,
+        form_magnetic_z=form_result.form_magnetic_z * modulation
+    )
+
 
 
 @dataclass
 class AnalyticalCalculator(ResultCalculator):
     qx_array: np.ndarray
     qy_array: np.ndarray
-    experimental_detector: DetectorImage
+    polarization: Polarization
+    field_direction: FieldDirection = FieldDirection.Y
 
     def intensity_result(self, scattering_simulation: ScatteringSimulation) -> np.ndarray:
-        for box in scattering_simulation.box_list:
-            form_results = [modulated_form_array(particle, self.qx_array, self.qy_array) for particle in box.particles]
-            sum_array_list
-
-
-@dataclass
-class AnalyticalCalculator(ResultCalculator):
-    
-    @method_array_cache(cache_holder_index=1)
-    def modulated_form_array_calculator(self, particle: Particle, orientation: Vector) -> Callable[[Vector], np.ndarray]:
-        form_array = particle.form_array(self.qx_array, self.qy_array, orientation)
-        return lambda position : form_array * np.exp(1j * (position * (self.qx_array, self.qy_array)))
-
-    @method_array_cache(cache_holder_index=1)
-    def modulated_form_array(self, particle: Particle, orientation: Vector, position: Vector) -> np.ndarray:
-        if isinstance(particle, ParticleComposite):
-            return np.sum([self.modulated_form_array(particle_component, particle_component.orientation, particle_component.position) for particle_component in particle.particle_list], axis=0)        
-        modulated_array_calculator = self.modulated_form_array_calculator(particle, orientation)
-        return modulated_array_calculator(position)
-
-    @method_array_cache(cache_holder_index=1)
-    def magnetic_modulated_array_calculator(self, particle: Particle, orientation: Vector, magnetization: Vector) -> Callable[[Vector],Tuple[np.ndarray, np.ndarray, np.ndarray]]:
-        magnetic_form_arrays = particle.magnetic_form_array(self.qx_array, self.qy_array, orientation, magnetization)
-        return lambda position : [magnetic_form_array * np.exp(1j * (position * (self.qx_array, self.qy_array))) for magnetic_form_array in magnetic_form_arrays]
-
-    @method_array_cache(cache_holder_index=1)
-    def magnetic_modulated_array(self, particle: Particle, orientation: Vector, magnetization: Vector, position: Vector) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        if isinstance(particle, ParticleComposite):
-            mag_arrs = [self.magnetic_modulated_array(particle_component, particle_component.orientation, particle_component.magnetization, particle_component.position) for particle_component in particle.particle_list]
-            get_added_mag_comp = lambda i: np.sum([m[i] for m in mag_arrs], axis=0)
-            return [get_added_mag_comp(i) for i in range(3)]
-        magnetic_array_calculator = self.magnetic_modulated_array_calculator(particle, orientation, magnetization)
-        return magnetic_array_calculator(position)
-    
-    def form_result(self, particle: Particle) -> FormResult:
-        form_nuclear = self.modulated_form_array(particle, particle.orientation, particle.position)
-        form_magnetic_x, form_magnetic_y, form_magnetic_z = self.magnetic_modulated_array(particle, particle.orientation, particle.magnetization, particle.position)
-        return FormResult(
-            form_nuclear=form_nuclear,
-            form_magnetic_x=form_magnetic_x,
-            form_magnetic_y=form_magnetic_y,
-            form_magnetic_z=form_magnetic_z
-        )
+        return np.average(
+            [box_intensity(
+                form_results=[modulated_form_array(particle, self.qx_array, self.qy_array) for particle in box.particles], 
+                box_volume= box.volume, 
+                qx=self.qx_array, 
+                qy=self.qy_array, 
+                rescale_factor=scattering_simulation.scale_factor, 
+                polarization=self.polarization, 
+                field_direction=self.field_direction
+                ) for box in scattering_simulation.box_list],
+            axis = 0
+            )
 
 
 def numerical_form_array(sld_arr: np.ndarray, vector_space: VectorSpace, qx_array: np.ndarray, qy_array: np.ndarray, xy_axis: int = 2) -> np.ndarray:

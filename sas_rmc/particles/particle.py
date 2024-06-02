@@ -31,14 +31,6 @@ class FormResult:
     form_magnetic_y: np.ndarray
     form_magnetic_z: np.ndarray
 
-    def modulate_form_result(self, position: Vector, qx_array: np.ndarray, qy_array: np.ndarray) -> FormResult:
-        modulating_array = np.exp(1j * dot(position.to_tuple(), [qx_array, qy_array]))
-        return FormResult(
-            form_nuclear=self.form_nuclear * modulating_array,
-            form_magnetic_x=self.form_magnetic_x * modulating_array,
-            form_magnetic_y=self.form_magnetic_y * modulating_array,
-            form_magnetic_z=self.form_magnetic_z * modulating_array
-        )
 
 
 @dataclass
