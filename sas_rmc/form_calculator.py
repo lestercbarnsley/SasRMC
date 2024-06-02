@@ -47,7 +47,7 @@ def get_form_magnetic_z(form_result: FormResult) -> np.ndarray:
     return form_result.form_magnetic_z
 
 def magnetic_amplitude(form_results: list[FormResult], qx: np.ndarray, qy: np.ndarray) -> list[np.ndarray]:
-    fm_x, fm_y, fm_z = [sum_array_list([getter_func(form_result) for form_result in form_results]) for getter_func in [get_form_magnetic_x, get_form_magnetic_y, get_form_magnetic_z]]
+    fm_x, fm_y, fm_z = [sum_array_list([getter_func(form_result) for form_result in form_results]) for getter_func in (get_form_magnetic_x, get_form_magnetic_y, get_form_magnetic_z)]
     q = [qx, qy, 0]
     q_square = q_squared(qx, qy)
     mqm = cross(q, cross([fm_x, fm_y, fm_z], q))

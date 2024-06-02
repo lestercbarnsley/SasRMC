@@ -337,6 +337,7 @@ class DetectorImage: # Major refactor needed for detector image, as it shouldn't
         pass_config_on = np.sum(all_sigma_para**2) == 0 and np.sum(all_sigma_perp**2) == 0
         return cls.gen_from_data(data_dict=data_dict, detector_config=detector_config if pass_config_on else None)
 
+
 @array_cache
 def make_smearing_function(pixel_list: Iterable[DetectorPixel], qx_matrix: np.ndarray, qy_matrix: np.ndarray, slicing_range: int | None = None) -> Callable[[np.ndarray], np.ndarray]:
     pixel_stuff = [(pixel.get_slicing_func(qx_matrix, qy_matrix, slicing_range), pixel.resolution_function(qx_matrix, qy_matrix)) for pixel in pixel_list]
@@ -347,8 +348,6 @@ def make_smearing_function(pixel_list: Iterable[DetectorPixel], qx_matrix: np.nd
         return np.sum(big_resolution * big_intensity, axis = (1,2))
     return smear
    
-
-
 
 if __name__ == "__main__":
     pass

@@ -50,15 +50,17 @@ class Evaluator2DSmearing(Evaluator):
         uncertainty = self.experimental_detector.intensity_err
         return np.sum((experimental_intensity - simulated_intensity)**2 / uncertainty**2)
     
-    def set_document(self, acceptance_scheme: AcceptanceScheme, evaluation: bool) -> None:
+    def set_document(self, acceptance_scheme: AcceptanceScheme, evaluation: bool, md: dict | None = None) -> None:
+        md = md if md is not None else {}
         self.current_document = {
             "Evaluator" : type(self).__name__,
             "Current goodness of fit" : self.current_chi_squared,
             "Acceptance" : evaluation
-        } | acceptance_scheme.get_loggable_data()
+        } | acceptance_scheme.get_loggable_data() | md
 
     def evaluate(self, simulation_state: ScatteringSimulation, acceptance_scheme: AcceptanceScheme) -> bool:
         if not simulation_state.get_physical_acceptance():
+            self.set_document(acceptance_scheme, False, {"Physical acceptance" : False})
             return False
         intensity_result = self.result_calculator.intensity_result(simulation_state)
         if self.smearing_function is None:
@@ -67,7 +69,9 @@ class Evaluator2DSmearing(Evaluator):
         new_goodness_of_fit = self.calculate_goodness_of_fit(simulated_intensity)
         if acceptance_scheme.is_acceptable(old_goodness_of_fit=self.current_chi_squared):
             self.current_chi_squared = new_goodness_of_fit
+            self.set_document(acceptance_scheme, True)
             return True
+        self.set_document(acceptance_scheme, False)
         return False
 
 
