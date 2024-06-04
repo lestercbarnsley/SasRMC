@@ -41,6 +41,14 @@ class SimulationParam:
         """
         low_bound, high_bound = np.min(self.bounds), np.max(self.bounds)
         return low_bound <= self.value <= high_bound
+    
+    def get_loggable_data(self) -> dict:
+        return {
+            "Param name" : self.name,
+            "Value" : self.value,
+            "Bound lower" : self.bounds[0],
+            "Bound upper" : self.bounds[1]
+        }
 
 
 @dataclass
@@ -50,6 +58,9 @@ class SimulationConstant(SimulationParam):
 
     def get_physical_acceptance(self) -> bool:
         return True
+    
+    def get_loggable_data(self) -> dict:
+        return super().get_loggable_data()
 
 
 @dataclass

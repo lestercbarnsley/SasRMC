@@ -1,3 +1,4 @@
+from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -7,19 +8,19 @@ from typing import ParamSpec, TypeVar
 import numpy as np
 
 from sas_rmc.particles import Particle
-from sas_rmc.scattering_simulation import ScatteringSimulation
+from sas_rmc.scattering_simulation import ScatteringSimulation, SimulationParam
 from sas_rmc import Vector
 
 # execute should be a pure function, so I get rid of the instance of rng
 
-def small_angle_change(vector: Vector, angle_change: float, reference_vector: Vector = None) -> Vector:
-    ref_vec = reference_vector if reference_vector is not None else Vector.null_vector()
-    delta_vector = vector - ref_vec
+def small_angle_change(vector: Vector, angle_change: float, reference_vector: Vector | None = None) -> Vector:
+    reference_vector = reference_vector if reference_vector is not None else Vector.null_vector()
+    delta_vector = vector - reference_vector
     angle = np.arctan2(delta_vector.y, delta_vector.x)
-    mag = np.sqrt(delta_vector.x**2 + delta_vector.y**2 )
+    mag = Vector(x = delta_vector.x, y = delta_vector.y, z = 0).mag
     new_angle = angle + angle_change
     new_vector = Vector(x = mag * np.cos(new_angle), y = mag * np.sin(new_angle), z = delta_vector.z)
-    return new_vector + ref_vec
+    return new_vector + reference_vector
 
 
 @dataclass
@@ -44,11 +45,23 @@ class ParticleCommand(Command):
 
     def get_particle(self, scattering_simulation: ScatteringSimulation) -> Particle:
         return scattering_simulation.get_particle(self.box_index, self.particle_index)
+    
+    def document_from_command(self, command: ParticleCommand, scattering_simulation: ScatteringSimulation) -> ScatteringSimulation:
+        new_scattering_simulation = command.execute(scattering_simulation)
+        self.document = command.get_document()
+        return new_scattering_simulation
 
+    @abstractmethod
     def execute(self, scattering_simulation: ScatteringSimulation) -> ScatteringSimulation:
         if scattering_simulation is None:
             raise ValueError("scattering_simulation is not optional for this class")
+        particle = self.get_particle(scattering_simulation)
+        self.document = {
+            "Action" : type(self).__name__,
+            "Box index" : self.box_index,
+            "Particle index" : self.particle_index } | particle.get_loggable_data()
         return scattering_simulation
+
 
 
 R = TypeVar("R")
@@ -75,57 +88,56 @@ def generate_document(func: Callable[P, R]) -> Callable[P, R]:
 class SetParticleState(ParticleCommand):
     new_particle: Particle
 
-    @generate_document
     def execute(self, scattering_simulation: ScatteringSimulation) -> ScatteringSimulation:
-        scattering_simulation = super().execute(scattering_simulation)
-        return scattering_simulation.change_particle(self.box_index, self.particle_index, self.new_particle)
+        new_scattering_simulation = scattering_simulation.change_particle(self.box_index, self.particle_index, self.new_particle)
+        new_scattering_simulation = super().execute(new_scattering_simulation)
+        return new_scattering_simulation
 
 
 @dataclass
 class MoveParticleTo(ParticleCommand):
     position_new: Vector
 
-    @generate_document
     def execute(self, scattering_simulation: ScatteringSimulation) -> ScatteringSimulation:
         particle = self.get_particle(scattering_simulation)
         new_particle = particle.change_position(self.position_new)
-        return SetParticleState(self.box_index, self.particle_index, new_particle).execute(scattering_simulation)
+        command = SetParticleState(self.box_index, self.particle_index, new_particle)
+        return self.document_from_command(command, scattering_simulation)
 
 
 @dataclass
 class MoveParticleBy(ParticleCommand):
     position_delta: Vector
 
-    @generate_document
     def execute(self, scattering_simulation: ScatteringSimulation) -> ScatteringSimulation:
         particle = self.get_particle(scattering_simulation)
         position_new = particle.get_position() + self.position_delta
-        return MoveParticleTo(self.box_index, self.particle_index, position_new).execute(scattering_simulation)
-
+        command = MoveParticleTo(self.box_index, self.particle_index, position_new)
+        return self.document_from_command(command, scattering_simulation)
 
 @dataclass
 class JumpParticleTo(ParticleCommand):
     reference_particle_index: int
 
-    def execute(self) -> None:
+    def execute(self, scattering_simulation: ScatteringSimulation) -> ScatteringSimulation:
         MAX_MOVE = 1.00000005
-        particle = self.particle
-        reference_particle = self.box[self.reference_particle_index]
+        particle = self.get_particle(scattering_simulation)
+        reference_particle = scattering_simulation.get_particle(self.box_index, self.reference_particle_index)
         jump_vector = Vector(np.inf, np.inf, np.inf)
-        pointing_vector = reference_particle.closest_surface_position(particle.position)
-        for shape in particle.shapes:
-            for shape_2 in reference_particle.shapes:
-                pointing_vector = shape_2.closest_surface_position(shape.central_position)
-                reference_particle_dimension = (pointing_vector - shape_2.central_position).mag
-                reverse_pointing_vector = shape.closest_surface_position(shape_2.central_position)
-                particle_dimension = (reverse_pointing_vector - shape.central_position).mag
+        pointing_vector = reference_particle.get_position() - particle.get_position()
+        for shape in particle.get_shapes():
+            for shape_2 in reference_particle.get_shapes():
+                pointing_vector = shape_2.closest_surface_position(shape.get_position())
+                reference_particle_dimension = (pointing_vector - shape_2.get_position()).mag
+                reverse_pointing_vector = shape.closest_surface_position(shape_2.get_position())
+                particle_dimension = (reverse_pointing_vector - shape.get_position()).mag
                 gap_distance = MAX_MOVE * (reference_particle_dimension + particle_dimension)
-                absolute_pointing_vector = shape_2.central_position - shape.central_position
-                target_position = shape_2.central_position - gap_distance * (absolute_pointing_vector.unit_vector)
-                jump_vector_new = target_position - shape.central_position
+                absolute_pointing_vector = shape_2.get_position() - shape.get_position()
+                target_position = shape_2.get_position() - gap_distance * (absolute_pointing_vector.unit_vector)
+                jump_vector_new = target_position - shape.get_position()
                 jump_vector = jump_vector if jump_vector.mag < jump_vector_new.mag else jump_vector_new
-        particle_move_command = MoveParticleBy(self.box, self.particle_index, position_delta=jump_vector)
-        particle_move_command.execute()
+        particle_move_command = MoveParticleBy(self.box_index, self.particle_index, position_delta=jump_vector)
+        return self.document_from_command(particle_move_command, scattering_simulation)
 
 
 def jump_by_vector(position_1: Vector, position_2: Vector, fixed_distance: float) -> Vector:
@@ -162,157 +174,98 @@ class FormLattice(ParticleCommand):
 class OrbitParticle(ParticleCommand):
     relative_angle: float
 
-    def execute(self) -> None:
-        particle = self.particle
-        reference_particle = self.box.get_nearest_particle(particle)
-        position_new = small_angle_change(particle.position, self.relative_angle, reference_particle.position)
-        MoveParticleTo(self.box, self.particle_index, position_new).execute()
+    @generate_document
+    def execute(self, scattering_simulation: ScatteringSimulation) -> ScatteringSimulation:
+        particle = self.get_particle(scattering_simulation)
+        reference_particle = scattering_simulation.box_list[self.box_index].get_nearest_particle(particle.get_position())
+        position_new = small_angle_change(particle.get_position(), self.relative_angle, reference_particle.get_position())
+        return MoveParticleTo(self.box_index, self.box_index, position_new).execute(scattering_simulation)
 
 
 @dataclass
 class ReorientateParticle(ParticleCommand):
     orientation_new: Vector
 
-    def execute(self) -> None:
-        particle = self.particle
-        particle = self.particle
-        SetParticleState(self.box, self.particle_index, particle.set_orientation(self.orientation_new)).execute()
-        
+    @generate_document
+    def execute(self, scattering_simulation: ScatteringSimulation) -> ScatteringSimulation:
+        particle = self.get_particle(scattering_simulation)
+        new_particle = particle.change_orientation(self.orientation_new)
+        return SetParticleState(self.box_index, self.particle_index, new_particle).execute(scattering_simulation)        
         
 
 @dataclass
 class RotateParticle(ParticleCommand):
     relative_angle: float
-
-    def execute(self) -> None:
-        orientation_old = self.particle.orientation
+    
+    @generate_document
+    def execute(self, scattering_simulation: ScatteringSimulation) -> ScatteringSimulation:
+        particle = self.get_particle(scattering_simulation)
+        orientation_old = particle.get_orientation()
         orientation_new = small_angle_change(orientation_old, self.relative_angle)
-        ReorientateParticle(self.box, self.particle_index, orientation_new).execute()
+        new_particle = particle.change_orientation(orientation_new)
+        return ReorientateParticle(self.box_index, self.particle_index, new_particle).execute(scattering_simulation)
+
 
 @dataclass
 class MagnetizeParticle(ParticleCommand):
     magnetization: Vector
 
-    def execute(self) -> None:
-        particle = self.particle
-        SetParticleState(self.box, self.particle_index, particle.set_magnetization(self.magnetization)).execute()
+    @generate_document
+    def execute(self, scattering_simulation: ScatteringSimulation) -> ScatteringSimulation:
+        particle = self.get_particle(scattering_simulation)
+        new_particle = particle.change_magnetization(self.magnetization)
+        return SetParticleState(self.box_index, self.particle_index, new_particle).execute(scattering_simulation)
         
-
 
 @dataclass
 class RotateMagnetization(ParticleCommand):
     relative_angle: float
 
-    def execute(self) -> None:
-        magnetization_old = self.particle.magnetization
-        magnetization_new = small_angle_change(magnetization_old, self.relative_angle)
-        MagnetizeParticle(self.box, self.particle_index, magnetization_new).execute()
+    @generate_document
+    def execute(self, scattering_simulation: ScatteringSimulation) -> ScatteringSimulation:
+        particle = self.get_particle(scattering_simulation)
+        magnetization = particle.get_magnetization()
+        magnetization_new = small_angle_change(magnetization, self.relative_angle)
+        return MagnetizeParticle(self.box_index, self.particle_index, magnetization_new).execute(scattering_simulation)
 
 @dataclass
 class FlipMagnetization(ParticleCommand):
-    def execute(self) -> None:
-        magnetization_old = self.particle.magnetization
-        magnetization_new = -1 * magnetization_old
-        MagnetizeParticle(self.box, self.particle_index, magnetization_new).execute()
 
-@dataclass
-class CompressShell(ParticleCommand):
-    change_by_factor: float
-    reference_particle_index: int
-    jump_to_particle: bool = True
-
-    def execute(self) -> None:
-        particle = self.particle
-        if not isinstance(particle, CoreShellParticle):
-            raise TypeError("This command can only be used with CoreShellParticle")
-        core_radius = particle.core_sphere.radius
-        new_thickness = self.change_by_factor * particle.shell_thickness
-        old_scattering_length = particle.shell_sld * (particle.shell_sphere.volume - particle.core_sphere.volume)
-        new_sld = old_scattering_length / (Sphere(radius = (core_radius + new_thickness)).volume - particle.core_sphere.volume)
-        new_particle = CoreShellParticle.gen_from_parameters(
-            position = particle.position,
-            magnetization=particle.magnetization,
-            core_radius=particle.core_sphere.radius,
-            thickness=new_thickness,
-            core_sld=particle.core_sld,
-            shell_sld = new_sld,
-            solvent_sld=particle.solvent_sld
-        )
-        SetParticleState(self.box, self.particle_index, new_particle).execute()
-        if self.jump_to_particle:
-            JumpParticleTo(self.box, self.particle_index, self.reference_particle_index).execute()
-
-
-@dataclass
-class CompressAllShells(ParticleCommand):
-    change_by_factor: float
-
-    def execute(self) -> None:
-        for particle_index, _ in enumerate(self.box.particles):
-            compress_particle_shell = CompressShell(
-                box = self.box, 
-                particle_index=particle_index, 
-                change_by_factor=self.change_by_factor,
-                reference_particle_index=-1,
-                jump_to_particle=False)
-            compress_particle_shell.execute()
-
-
-@dataclass
-class RescaleMagnetization(ParticleCommand):
-    change_by_factor: float = 1
-
-    def execute(self) -> None:
-        magnetization_old = self.particle.magnetization
-        magnetization_new = (self.change_by_factor * magnetization_old.mag) * magnetization_old.unit_vector
-        MagnetizeParticle(self.box, self.particle_index, magnetization_new).execute()
-
+    @generate_document
+    def execute(self, scattering_simulation: ScatteringSimulation) -> ScatteringSimulation:
+        particle = self.get_particle(scattering_simulation)
+        magnetization = particle.get_magnetization()
+        magnetization_new = -1 * magnetization
+        return MagnetizeParticle(self.box_index, self.particle_index, magnetization_new).execute(scattering_simulation)
 
 @dataclass
 class ScaleCommand(Command):
-    simulation_params: SimulationParams
+    scale_factor: float
 
-    @abstractmethod
-    def execute(self) -> None:
-        return super().execute()
-
-    def _cls_specific_loggable_data(self) -> dict:
-        return {
-            "Particle Index": -1,
-            "Action": type(self).__name__,
-            **self.simulation_params.to_value_dict()
-
-        }
-
-    def physical_acceptance_weak(self) -> bool:
-        return self.simulation_params.get_physical_acceptance()
-
+    def execute(self, scattering_simulation: ScatteringSimulation) -> ScatteringSimulation:
+        self.set_document()
+        return scattering_simulation.set_scale_factor(self.scale_factor)
+    
+    def set_document(self):
+        self.document = {
+            "Action" : type(self).__name__,
+            "Box index" : -1,
+            "Particle index" : -1,
+            "Scale factor" : self.scale_factor,
+            }
 
 @dataclass
-class NuclearScale(ScaleCommand):
-    change_to_factor: float
-
-    def execute(self) -> None:
-        self.simulation_params.set_value(key = constants.NUCLEAR_RESCALE, value = self.change_to_factor)
-
-
-@dataclass
-class MagneticScale(ScaleCommand):
-    change_to_factor: float
-
-    def execute(self) -> None:
-        self.simulation_params.set_value(key = constants.MAGNETIC_RESCALE, value = self.change_to_factor)
-
-
-@dataclass
-class NuclearRescale(ScaleCommand):
+class RelativeRescale(ScaleCommand):
     change_by_factor: float = 1
 
-    def execute(self) -> None:
-        nuclear_rescale = self.simulation_params.get_value(key = constants.NUCLEAR_RESCALE)
-        new_scale = nuclear_rescale * self.change_by_factor
-        NuclearScale(self.simulation_params, change_to_factor=new_scale).execute()
-        
+    def execute(self, scattering_simulation: ScatteringSimulation) -> ScatteringSimulation:
+        current_scale_factor = scattering_simulation.scale_factor.value
+        new_scale_factor = self.change_by_factor * current_scale_factor
+        scale_command = ScaleCommand(new_scale_factor)
+        res = scale_command.execute(scattering_simulation)
+        self.document = scale_command.document
+        return res
+
 
 @dataclass
 class MagneticRescale(ScaleCommand):

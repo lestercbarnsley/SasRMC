@@ -44,6 +44,7 @@ class Simulator:
         for command, acceptance_scheme in self.controller.ledger:
             new_state = command.execute(self.state)
             command_document = command.get_document()
+            new_state, command_document = command.execute_and_get_document(self.state)
             evaluation = self.evaluator.evaluate(new_state, acceptance_scheme)
             evaluation_document = self.evaluator.get_document()
             if evaluation:
