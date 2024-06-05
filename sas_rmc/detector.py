@@ -239,6 +239,9 @@ class DetectorImage: # Major refactor needed for detector image, as it shouldn't
     @property
     def shadow_factor(self) -> np.ndarray:
         return self.array_from_pixels(lambda pixel: pixel.shadow_factor)
+    
+    def get_loggable_data(self) -> list[dict]:
+        return [pixel.to_dict() for pixel in self.detector_pixels]
 
     @classmethod
     def gen_from_data(cls, data_dict: dict, detector_config: DetectorConfig = None):

@@ -101,7 +101,8 @@ class ScatteringSimulation:
                 f'box_{i}' : box.get_loggable_data() 
                 for i, box 
                 in enumerate(self.box_list)
-                }
+                },
+            'scale_factor' : self.scale_factor.get_loggable_data()
         }
 
 

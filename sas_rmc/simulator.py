@@ -34,7 +34,7 @@ class Simulator:
 
     def start(self) -> None:
         starting_state = self.state
-        self.log_callback.start(starting_state.get_loggable_data() | self.evaluator.get_loggable_data())
+        self.log_callback.start(starting_state.get_loggable_data() | self.evaluator.get_loggable_data(starting_state))
 
     def __enter__(self):
         self.start()
@@ -42,18 +42,15 @@ class Simulator:
 
     def simulate(self) -> None:
         for command, acceptance_scheme in self.controller.ledger:
-            new_state = command.execute(self.state)
-            command_document = command.get_document()
             new_state, command_document = command.execute_and_get_document(self.state)
-            evaluation = self.evaluator.evaluate(new_state, acceptance_scheme)
-            evaluation_document = self.evaluator.get_document()
+            evaluation, evaluation_document = self.evaluator.evaluate_and_get_document(new_state, acceptance_scheme)
             if evaluation:
                 self.state = new_state
             self.log_callback.event(command_document | evaluation_document)
 
     def stop(self) -> None:
-        ending_stage = self.state
-        self.log_callback.stop(ending_stage.get_loggable_data() | self.evaluator.get_loggable_data())
+        ending_state = self.state
+        self.log_callback.stop(ending_state.get_loggable_data() | self.evaluator.get_loggable_data(ending_state))
     
     def __exit__(self, exception_type, exception_value, exception_traceback):
         self.stop()

@@ -1,5 +1,6 @@
 #%%
 from sas_rmc.vector import Vector
+from sas_rmc.particles.particle import Particle
 '''
 from sas_rmc.shapes import shapes
 from sas_rmc.particles import particle

@@ -5,7 +5,6 @@ from sas_rmc.commands import Command
 from sas_rmc.acceptance_scheme import AcceptanceScheme
 
 
-
 @dataclass
 class Controller:
     commands: list[Command]
