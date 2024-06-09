@@ -29,7 +29,6 @@ class Evaluator2DSmearing(Evaluator):
     result_calculator: AnalyticalCalculator
     experimental_detector: DetectorImage
     smearing_function: Callable[[np.ndarray], np.ndarray] | None = None
-    current_document: dict | None = None
 
     def create_smearing_function(self) -> Callable[[np.ndarray], np.ndarray]:
         return make_smearing_function(
@@ -41,7 +40,7 @@ class Evaluator2DSmearing(Evaluator):
     def calculate_goodness_of_fit(self, simulated_intensity: np.ndarray) -> float:
         experimental_intensity = self.experimental_detector.intensity
         uncertainty = self.experimental_detector.intensity_err
-        return np.sum((experimental_intensity - simulated_intensity)**2 / uncertainty**2)
+        return ((experimental_intensity - simulated_intensity)**2 / uncertainty**2)[self.experimental_detector.shadow_factor].mean()
     
     def simulate_intensity(self, simulation_state: ScatteringSimulation) -> np.ndarray:
         intensity_result = self.result_calculator.intensity_result(simulation_state)
@@ -77,6 +76,31 @@ class Evaluator2DSmearing(Evaluator):
             'simulated_intensity' : [intensity for intensity in simulated_intensity],
             'Smearing' : True
             }
+    
+@dataclass
+class Evaluator2DMultiple(Evaluator):
+    evaluators: list[Evaluator2DSmearing]
+    current_chi_squared: float
+
+    def get_document(self, acceptance_scheme: AcceptanceScheme, evaluation: bool) -> dict:
+        return {
+            "Evaluator" : type(self).__name__,
+            "Current goodness of fit" : self.current_chi_squared,
+            "Acceptance" : evaluation
+        } | acceptance_scheme.get_loggable_data()
+
+    def evaluate_and_get_document(self, simulation_state: ScatteringSimulation, acceptance_scheme: AcceptanceScheme) -> tuple[bool, dict]:
+        if not simulation_state.get_physical_acceptance():
+            return False, self.get_document(acceptance_scheme, False) | {"Physical acceptance" : False}
+        md = {"Physical acceptance" : True}
+        new_goodness_of_fit = np.sum([evaluator.calculate_goodness_of_fit(evaluator.simulate_intensity(simulation_state)) for evaluator in self.evaluators])
+        if acceptance_scheme.is_acceptable(old_goodness_of_fit=self.current_chi_squared):
+            self.current_chi_squared = new_goodness_of_fit
+            return True, self.get_document(acceptance_scheme, True) | md
+        return False, self.get_document(acceptance_scheme, False) | md
+
+    def get_loggable_data(self, simulation_state: ScatteringSimulation) -> dict:
+        return {f'evaluator_{i}' : evaluator.get_loggable_data(simulation_state) for i, evaluator in enumerate(self.evaluators)}    
 
 
 

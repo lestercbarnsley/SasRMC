@@ -18,6 +18,16 @@ truth_dict = {
     'false' : False
 } # I'm sure I haven't come close to fully covering all the wild and creative ways users could say "True" or "False"
 
+def truth_function(truth: str) -> bool: # raises ValueError
+    for truthy in ['On', 'True', 'Yes']:
+        if truth.lower() == truthy.lower():
+            return True
+    for falsy in ['Off', 'False', 'No']:
+        if truth.lower == falsy.lower():
+            return False
+    raise ValueError("this is neither truthy nor falsy")
+
+
 def is_bool_in_truth_dict(s: str) -> bool:
     return s in truth_dict     
 

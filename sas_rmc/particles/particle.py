@@ -7,7 +7,6 @@ import numpy as np
 
 from sas_rmc.shapes import Shape, collision_detected
 from sas_rmc import Vector, constants
-from sas_rmc.vector import dot
 
 
 PI = constants.PI
