@@ -1,6 +1,5 @@
 #%%
 from __future__ import annotations
-from functools import reduce
 from typing import Callable, Iterator, Type
 from dataclasses import dataclass
 
@@ -33,9 +32,7 @@ def broadcast_to_numpy_array(object_array: np.ndarray, getter_function: Callable
     array_function = broadcast_array_function(getter_function=getter_function, output_dtype=output_dtype)
     return array_function(object_array)
 
-def composite_function(*func):
-    compose = lambda f, g : lambda x : f(g(x))
-    return reduce(compose, func, lambda x: x)
+
 
 
 @dataclass
