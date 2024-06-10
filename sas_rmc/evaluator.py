@@ -1,4 +1,5 @@
 #%%
+from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -21,6 +22,15 @@ class Evaluator(ABC):
     @abstractmethod
     def get_loggable_data(self, simulation_state: ScatteringSimulation) -> dict:
         pass
+
+
+def get_evaluation_document(evaluator_name: str, current_goodness_of_fit: float, evaluation: bool, md: dict | None = None) -> dict:
+    md = md if md is not None else {}
+    return {
+        "Evaluator" : evaluator_name,
+        "Current goodness of fit" : current_goodness_of_fit,
+        "Acceptance" : evaluation
+    } | md
 
 
 @dataclass
@@ -48,23 +58,37 @@ class Evaluator2DSmearing(Evaluator):
             self.smearing_function = self.create_smearing_function()
         return self.smearing_function(intensity_result)
     
-    def get_document(self, acceptance_scheme: AcceptanceScheme, evaluation: bool) -> dict:
-        return {
-            "Evaluator" : type(self).__name__,
-            "Current goodness of fit" : self.current_chi_squared,
-            "Acceptance" : evaluation
-        } | acceptance_scheme.get_loggable_data()
+    def simulate_intensity_and_calculate_goodness_of_fit(self, simulation_state: ScatteringSimulation) -> float:
+        simulated_intensity = self.simulate_intensity(simulation_state)
+        return self.calculate_goodness_of_fit(simulated_intensity)
 
     def evaluate_and_get_document(self, simulation_state: ScatteringSimulation, acceptance_scheme: AcceptanceScheme) -> tuple[bool, dict]:
         if not simulation_state.get_physical_acceptance():
-            return False, self.get_document(acceptance_scheme, False) | {"Physical acceptance" : False}
+            document = get_evaluation_document(
+                evaluator_name=type(self).__name__,
+                current_goodness_of_fit=self.current_chi_squared,
+                evaluation=False,
+                md = acceptance_scheme.get_loggable_data() | {"Physical acceptance" : False}
+            )
+            return False, document
         md = {"Physical acceptance" : True}
-        simulated_intensity = self.simulate_intensity(simulation_state)
-        new_goodness_of_fit = self.calculate_goodness_of_fit(simulated_intensity)
-        if acceptance_scheme.is_acceptable(old_goodness_of_fit=self.current_chi_squared):
+        new_goodness_of_fit = self.simulate_intensity_and_calculate_goodness_of_fit(simulation_state)
+        if acceptance_scheme.is_acceptable(self.current_chi_squared, new_goodness_of_fit):
             self.current_chi_squared = new_goodness_of_fit
-            return True, self.get_document(acceptance_scheme, True) | md
-        return False, self.get_document(acceptance_scheme, False) | md
+            document = get_evaluation_document(
+                evaluator_name=type(self).__name__,
+                current_goodness_of_fit=new_goodness_of_fit,
+                evaluation=True,
+                md = acceptance_scheme.get_loggable_data() | md
+            )
+            return True, document
+        document = get_evaluation_document(
+            evaluator_name=type(self).__name__,
+            current_goodness_of_fit=new_goodness_of_fit,
+            evaluation=False,
+            md = acceptance_scheme.get_loggable_data() | md
+        )
+        return False, document
     
     def get_loggable_data(self, simulation_state: ScatteringSimulation) -> dict:
         simulated_intensity = self.simulate_intensity(simulation_state)
@@ -81,23 +105,37 @@ class Evaluator2DSmearing(Evaluator):
 class Evaluator2DMultiple(Evaluator):
     evaluators: list[Evaluator2DSmearing]
     current_chi_squared: float
-
-    def get_document(self, acceptance_scheme: AcceptanceScheme, evaluation: bool) -> dict:
-        return {
-            "Evaluator" : type(self).__name__,
-            "Current goodness of fit" : self.current_chi_squared,
-            "Acceptance" : evaluation
-        } | acceptance_scheme.get_loggable_data()
+    
+    def simulate_intensity_and_calculate_goodness_of_fit(self,simulation_state: ScatteringSimulation) -> float:
+        return np.sum([evaluator.simulate_intensity_and_calculate_goodness_of_fit(simulation_state) for evaluator in self.evaluators])
 
     def evaluate_and_get_document(self, simulation_state: ScatteringSimulation, acceptance_scheme: AcceptanceScheme) -> tuple[bool, dict]:
         if not simulation_state.get_physical_acceptance():
-            return False, self.get_document(acceptance_scheme, False) | {"Physical acceptance" : False}
+            document = get_evaluation_document(
+                evaluator_name=type(self).__name__,
+                current_goodness_of_fit=self.current_chi_squared,
+                evaluation=False,
+                md = acceptance_scheme.get_loggable_data() | {"Physical acceptance" : False}
+            )
+            return False, document
         md = {"Physical acceptance" : True}
-        new_goodness_of_fit = np.sum([evaluator.calculate_goodness_of_fit(evaluator.simulate_intensity(simulation_state)) for evaluator in self.evaluators])
-        if acceptance_scheme.is_acceptable(old_goodness_of_fit=self.current_chi_squared):
+        new_goodness_of_fit = self.simulate_intensity_and_calculate_goodness_of_fit(simulation_state)
+        if acceptance_scheme.is_acceptable(self.current_chi_squared, new_goodness_of_fit):
             self.current_chi_squared = new_goodness_of_fit
-            return True, self.get_document(acceptance_scheme, True) | md
-        return False, self.get_document(acceptance_scheme, False) | md
+            document = get_evaluation_document(
+                evaluator_name=type(self).__name__,
+                current_goodness_of_fit=new_goodness_of_fit,
+                evaluation=True,
+                md = acceptance_scheme.get_loggable_data() | md
+            )
+            return True, document
+        document = get_evaluation_document(
+            evaluator_name=type(self).__name__,
+            current_goodness_of_fit=new_goodness_of_fit,
+            evaluation=False,
+            md = acceptance_scheme.get_loggable_data() | md
+        )
+        return False, document
 
     def get_loggable_data(self, simulation_state: ScatteringSimulation) -> dict:
         return {f'evaluator_{i}' : evaluator.get_loggable_data(simulation_state) for i, evaluator in enumerate(self.evaluators)}    
