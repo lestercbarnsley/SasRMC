@@ -34,8 +34,19 @@ def get_evaluation_document(evaluator_name: str, current_goodness_of_fit: float,
 
 
 @dataclass
-class Evaluator2DSmearing(Evaluator):
-    current_chi_squared: float
+class Fitter(ABC):
+
+    @abstractmethod
+    def calculate_goodness_of_fit(self, simulation_state: ScatteringSimulation) -> float:
+        pass
+
+    @abstractmethod
+    def get_loggable_data(self) -> dict:
+        pass
+
+
+@dataclass
+class Smearing2DFitter(Fitter):
     result_calculator: AnalyticalCalculator
     experimental_detector: DetectorImage
     smearing_function: Callable[[np.ndarray], np.ndarray] | None = None
@@ -46,21 +57,32 @@ class Evaluator2DSmearing(Evaluator):
             qx_matrix=self.result_calculator.qx_array,
             qy_matrix=self.result_calculator.qy_array
         )
-
-    def calculate_goodness_of_fit(self, simulated_intensity: np.ndarray) -> float:
-        experimental_intensity = self.experimental_detector.intensity
-        uncertainty = self.experimental_detector.intensity_err
-        return ((experimental_intensity - simulated_intensity)**2 / uncertainty**2)[self.experimental_detector.shadow_factor].mean()
     
     def simulate_intensity(self, simulation_state: ScatteringSimulation) -> np.ndarray:
         intensity_result = self.result_calculator.intensity_result(simulation_state)
         if self.smearing_function is None:
             self.smearing_function = self.create_smearing_function()
         return self.smearing_function(intensity_result)
-    
-    def simulate_intensity_and_calculate_goodness_of_fit(self, simulation_state: ScatteringSimulation) -> float:
+
+    def calculate_goodness_of_fit(self, simulation_state: ScatteringSimulation) -> float:
         simulated_intensity = self.simulate_intensity(simulation_state)
-        return self.calculate_goodness_of_fit(simulated_intensity)
+        experimental_intensity = self.experimental_detector.intensity
+        uncertainty = self.experimental_detector.intensity_err
+        return ((experimental_intensity - simulated_intensity)**2 / uncertainty**2)[self.experimental_detector.shadow_factor].mean()
+    
+
+@dataclass
+class Smearing2dFitterMultiple(Fitter):
+    fitter_list: list[Smearing2DFitter]
+
+    def calculate_goodness_of_fit(self, simulation_state: ScatteringSimulation) -> float:
+        return np.sum([fitter.calculate_goodness_of_fit(simulation_state) for fitter in self.fitter_list])
+
+
+@dataclass
+class EvaluatorWithFitter(Evaluator):
+    current_chi_squared: float
+    fitter: Fitter
 
     def evaluate_and_get_document(self, simulation_state: ScatteringSimulation, acceptance_scheme: AcceptanceScheme) -> tuple[bool, dict]:
         if not simulation_state.get_physical_acceptance():
@@ -72,7 +94,7 @@ class Evaluator2DSmearing(Evaluator):
             )
             return False, document
         md = {"Physical acceptance" : True}
-        new_goodness_of_fit = self.simulate_intensity_and_calculate_goodness_of_fit(simulation_state)
+        new_goodness_of_fit = self.fitter.calculate_goodness_of_fit(simulation_state)
         if acceptance_scheme.is_acceptable(self.current_chi_squared, new_goodness_of_fit):
             self.current_chi_squared = new_goodness_of_fit
             document = get_evaluation_document(
