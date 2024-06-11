@@ -5,7 +5,6 @@ from enum import Enum
 import numpy as np
 
 from sas_rmc.array_cache import array_cache
-from sas_rmc.box_simulation import Box
 from sas_rmc.detector import Polarization
 from sas_rmc.vector import cross
 from sas_rmc.particles import FormResult

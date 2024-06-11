@@ -45,19 +45,6 @@ def create_box_3(particle_number: int, nominal_concentration: float, particle_fa
     return [box.force_inside_box() for box in create_box_iterator(particle_factory, particle_number, nominal_concentration, dimensions)]
 
 
-'''
-def gen_list_factory_from_dict(d: dict) -> list[Box]:
-    nominal_concentration = d.get("nominal_concentration", 0.0)
-    particle_number = d.get("particle_number", 0)
-    box_number = d.get("box_number", 0)
-    
-    if particle_number == 0:
-        return create_box(box_number=box_number, nominal_concentration=nominal_concentration)
-    if box_number == 0:
-        return BoxListParticleNumberConcentration(particle_number=particle_number, nominal_concentration=nominal_concentration)
-    return BoxListParticleNumberBoxNumber(particle_number=particle_number, box_number=box_number)
-'''
-
 if __name__ == "__main__":
     print(Vector(0,1))
 

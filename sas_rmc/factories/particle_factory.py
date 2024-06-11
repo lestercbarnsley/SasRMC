@@ -1,9 +1,7 @@
 #%%
 
-from sas_rmc import Vector
+from sas_rmc import Vector, constants
 from sas_rmc.particles import CoreShellParticle
-
-from .. import constants
 
 rng = constants.RNG
 

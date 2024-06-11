@@ -41,7 +41,7 @@ class Fitter(ABC):
         pass
 
     @abstractmethod
-    def get_loggable_data(self) -> dict:
+    def get_loggable_data(self, simulation_state: ScatteringSimulation) -> dict:
         pass
 
 
@@ -70,6 +70,13 @@ class Smearing2DFitter(Fitter):
         uncertainty = self.experimental_detector.intensity_err
         return ((experimental_intensity - simulated_intensity)**2 / uncertainty**2)[self.experimental_detector.shadow_factor].mean()
     
+    def get_loggable_data(self, simulation_state: ScatteringSimulation) -> dict:
+        return {
+            "Result calculator" : type(self.result_calculator).__name__,
+            "Detector data" : self.experimental_detector.get_loggable_data(),
+            "Simulated intensity" : [intensity for intensity in self.simulate_intensity(simulation_state)],
+            "Smearing" : True
+        }
 
 @dataclass
 class Smearing2dFitterMultiple(Fitter):
@@ -78,6 +85,10 @@ class Smearing2dFitterMultiple(Fitter):
     def calculate_goodness_of_fit(self, simulation_state: ScatteringSimulation) -> float:
         return np.sum([fitter.calculate_goodness_of_fit(simulation_state) for fitter in self.fitter_list])
 
+    def get_loggable_data(self, simulation_state: ScatteringSimulation) -> dict:
+        return {f"Fitter {i}" : fitter.get_loggable_data(simulation_state) 
+                for i, fitter 
+                in enumerate(self.fitter_list)}
 
 @dataclass
 class EvaluatorWithFitter(Evaluator):
@@ -113,55 +124,15 @@ class EvaluatorWithFitter(Evaluator):
         return False, document
     
     def get_loggable_data(self, simulation_state: ScatteringSimulation) -> dict:
-        simulated_intensity = self.simulate_intensity(simulation_state)
         return {
             "Evaluator" : type(self).__name__,
             "Current goodness of fit" : self.current_chi_squared,
-            "Result calculator" : type(self.result_calculator).__name__,
-            'experimental_detector' : self.experimental_detector.get_loggable_data(),
-            'simulated_intensity' : [intensity for intensity in simulated_intensity],
-            'Smearing' : True
+            "Fitter" : self.fitter.get_loggable_data(simulation_state)
             }
-    
-@dataclass
-class Evaluator2DMultiple(Evaluator):
-    evaluators: list[Evaluator2DSmearing]
-    current_chi_squared: float
-    
-    def simulate_intensity_and_calculate_goodness_of_fit(self,simulation_state: ScatteringSimulation) -> float:
-        return np.sum([evaluator.simulate_intensity_and_calculate_goodness_of_fit(simulation_state) for evaluator in self.evaluators])
 
-    def evaluate_and_get_document(self, simulation_state: ScatteringSimulation, acceptance_scheme: AcceptanceScheme) -> tuple[bool, dict]:
-        if not simulation_state.get_physical_acceptance():
-            document = get_evaluation_document(
-                evaluator_name=type(self).__name__,
-                current_goodness_of_fit=self.current_chi_squared,
-                evaluation=False,
-                md = acceptance_scheme.get_loggable_data() | {"Physical acceptance" : False}
-            )
-            return False, document
-        md = {"Physical acceptance" : True}
-        new_goodness_of_fit = self.simulate_intensity_and_calculate_goodness_of_fit(simulation_state)
-        if acceptance_scheme.is_acceptable(self.current_chi_squared, new_goodness_of_fit):
-            self.current_chi_squared = new_goodness_of_fit
-            document = get_evaluation_document(
-                evaluator_name=type(self).__name__,
-                current_goodness_of_fit=new_goodness_of_fit,
-                evaluation=True,
-                md = acceptance_scheme.get_loggable_data() | md
-            )
-            return True, document
-        document = get_evaluation_document(
-            evaluator_name=type(self).__name__,
-            current_goodness_of_fit=new_goodness_of_fit,
-            evaluation=False,
-            md = acceptance_scheme.get_loggable_data() | md
-        )
-        return False, document
 
-    def get_loggable_data(self, simulation_state: ScatteringSimulation) -> dict:
-        return {f'evaluator_{i}' : evaluator.get_loggable_data(simulation_state) for i, evaluator in enumerate(self.evaluators)}    
-
+if __name__ == "__main__":
+    pass
 
 
 # %%

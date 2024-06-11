@@ -184,6 +184,17 @@ class MagnetizeParticle(ParticleCommand):
         
 
 @dataclass
+class RescaleMagnetization(ParticleCommand):
+    rescale_factor: float
+
+    def execute(self, scattering_simulation: ScatteringSimulation) -> ScatteringSimulation:
+        particle = self.get_particle(scattering_simulation)
+        magnetization = particle.get_magnetization()
+        new_magnetization = self.rescale_factor * magnetization
+        return MagnetizeParticle(self.box_index, self.particle_index, new_magnetization).execute(scattering_simulation)
+
+
+@dataclass
 class RotateMagnetization(ParticleCommand):
     relative_angle: float
 
@@ -206,10 +217,10 @@ class FlipMagnetization(ParticleCommand):
 
 @dataclass
 class ScaleCommand(Command):
-    scale_factor: float
 
+    @abstractmethod
     def execute(self, scattering_simulation: ScatteringSimulation) -> ScatteringSimulation:
-        return scattering_simulation.set_scale_factor(self.scale_factor)
+        pass
     
     def get_document_from_scattering_simulation(self, scattering_simulation: ScatteringSimulation) -> dict:
         scale_factor = scattering_simulation.scale_factor
@@ -225,6 +236,14 @@ class ScaleCommand(Command):
         new_simulation = self.execute(scattering_simulation)
         document = self.get_document_from_scattering_simulation(new_simulation)
         return new_simulation, document
+
+
+@dataclass
+class RescaleCommand(ScaleCommand):
+    scale_factor: float
+
+    def execute(self, scattering_simulation: ScatteringSimulation) -> ScatteringSimulation:
+        return scattering_simulation.set_scale_factor(self.scale_factor)
     
 
 @dataclass
@@ -233,7 +252,7 @@ class RelativeRescale(ScaleCommand):
 
     def execute(self, scattering_simulation: ScatteringSimulation) -> ScatteringSimulation:
         scale_factor = scattering_simulation.scale_factor.value
-        return ScaleCommand(scale_factor=self.change_by_factor*scale_factor).execute(scattering_simulation)
+        return RescaleCommand(scale_factor=self.change_by_factor*scale_factor).execute(scattering_simulation)
 
 
 #%%
