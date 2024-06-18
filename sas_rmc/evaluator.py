@@ -92,8 +92,8 @@ class Smearing2dFitterMultiple(Fitter):
 
 @dataclass
 class EvaluatorWithFitter(Evaluator):
-    current_chi_squared: float
     fitter: Fitter
+    current_chi_squared: float = np.inf
 
     def evaluate_and_get_document(self, simulation_state: ScatteringSimulation, acceptance_scheme: AcceptanceScheme) -> tuple[bool, dict]:
         if not simulation_state.get_physical_acceptance():

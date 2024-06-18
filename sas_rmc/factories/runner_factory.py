@@ -117,10 +117,10 @@ from typing import Iterator, Any
 
 import pandas as pd
 
-from sas_rmc import Vector, constants
+from sas_rmc import Vector, constants, evaluator
 from sas_rmc.rmc_runner import RmcRunner
 from sas_rmc.particles import CoreShellParticle
-from sas_rmc.factories import parse_data
+from sas_rmc.factories import parse_data, box_factory, particle_factory
 from sas_rmc.simulator import Simulator
 
 
@@ -142,9 +142,6 @@ class CoreShellRunner:
     shell_sld: float
     solvent_sld: float
     core_magnetization: float
-    nominal_concentration: float
-    particle_number: int
-    box_number: int
     total_cycles: int
     annealing_type: str
     anneal_start_temp: float
@@ -153,21 +150,28 @@ class CoreShellRunner:
     detector_smearing: bool
     field_direction: str
     force_log_file: bool
+    nominal_concentration: float = 0
+    particle_number: int = 0
+    box_number: int = 0
+    box_dimension_1: float = 0
+    box_dimension_2: float = 0
+    box_dimension_3: float = 0
 
     def create_particle(self) -> CoreShellParticle:
-        return CoreShellParticle.gen_from_parameters(
-            position=Vector.null_vector(),
-            magnetization=self.core_magnetization * Vector.random_vector(),
-            core_radius=polydisperse_parameter(self.core_radius, polyd=self.core_polydispersity),
-            thickness=polydisperse_parameter(self.shell_thickness, polyd=self.shell_polydispersity),
-            core_sld=self.core_sld,
+        return particle_factory.create_core_shell_particle(
+            core_radius=self.core_radius,
+            core_polydispersity=self.core_polydispersity,
+            shell_thickness=self.shell_thickness,
+            shell_polydispersity=self.shell_polydispersity,
             shell_sld=self.shell_sld,
-            solvent_sld=self.solvent_sld
+            solvent_sld=self.solvent_sld,
+            core_magnetization=self.core_magnetization
         )
     
     def create_simulation_state(self) -> ScatteringSimulation:
         return ScatteringSimulation(
-            scale_factor=self.nominal_concentration
+            scale_factor=self.nominal_concentration if self.nominal_concentration else 1,
+            box_list=box_factory.create_box_list(self.create_particle, [self.box_dimension_1, self.box_dimension_2, self.box_dimension_3], self.particle_number, self.box_number, self.nominal_concentration )
         )
     
     def create_runner(self) -> RmcRunner:
@@ -176,6 +180,15 @@ class CoreShellRunner:
                 controller=Controller(
                     commands=[],
                     acceptance_scheme=[]
+                ),
+                state = self.create_simulation_state(),
+                evaluator=evaluator.EvaluatorWithFitter(
+                    fitter=evaluator.Smearing2dFitterMultiple(
+                        fitter_list=[
+                            evaluator.Smearing2DFitter()
+                        ]
+                    )
+                )
                 )
 
             )

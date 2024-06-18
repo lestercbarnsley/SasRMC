@@ -15,7 +15,7 @@ def create_cube(dimensions: tuple[float]) -> Cube:
         dimension_2=dimensions[2]
     )
 
-def create_box(box_number: int, particle_number: int, particle_factory: Callable[[], Particle], dimensions: tuple[float]):
+def create_box_list_without_concentration(box_number: int, particle_number: int, particle_factory: Callable[[], Particle], dimensions: tuple[float]):
     return [Box(
         particles = [particle_factory() for _ in range(particle_number)], 
         cube=create_cube(dimensions),
@@ -28,7 +28,7 @@ def create_particle_iterator(particle_factory: Callable[[], Particle], nominal_c
         current_volume = current_volume + particle.get_volume()
         yield particle
 
-def create_box_2(box_number: int, nominal_concentration: float, particle_factory: Callable[[], Particle], dimensions: tuple[float]) -> list[Box]:
+def create_box_list_without_particle_number(box_number: int, nominal_concentration: float, particle_factory: Callable[[], Particle], dimensions: tuple[float]) -> list[Box]:
     return [Box(
         particles = [particle for particle in create_particle_iterator(particle_factory=particle_factory, nominal_concentration=nominal_concentration, dimensions=dimensions)], 
         cube = create_cube(dimensions)).force_inside_box() for _ in box_number]
@@ -41,9 +41,23 @@ def create_box_iterator(particle_factory: Callable[[], Particle], particle_numbe
         yield Box(particles, cube = create_cube(dimensions)).force_inside_box()
         
 
-def create_box_3(particle_number: int, nominal_concentration: float, particle_factory: Callable[[], Particle], dimensions: tuple[float]) -> list[Box]:
+def create_box_list_without_box_number(particle_number: int, nominal_concentration: float, particle_factory: Callable[[], Particle], dimensions: tuple[float]) -> list[Box]:
     return [box.force_inside_box() for box in create_box_iterator(particle_factory, particle_number, nominal_concentration, dimensions)]
 
+def create_box_list(particle_factory: Callable[[], Particle], dimensions: tuple[float], particle_number: int | None = None, box_number: int | None = None, nominal_concentration: float | None = None) -> list[Box]:
+    if not particle_number:
+        if not nominal_concentration:
+            raise TypeError("Nominal concentration is missing")
+        if not box_number:
+            raise TypeError("Box number is missing")
+        return create_box_list_without_particle_number(box_number, nominal_concentration, particle_factory, dimensions)
+    if not box_number:
+        if not nominal_concentration:
+            raise TypeError("Nominal concentration is missing")
+        if not particle_number:
+            raise TypeError("Particle number is missing")
+        return create_box_list_without_box_number(particle_number, nominal_concentration, particle_factory, dimensions)
+    return create_box_list_without_concentration(box_number, particle_number, particle_factory, dimensions)
 
 if __name__ == "__main__":
     print(Vector(0,1))
