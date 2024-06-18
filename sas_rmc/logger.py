@@ -6,24 +6,6 @@ from typing import Callable, List, Optional, Protocol, Tuple
 from pathlib import Path
 from datetime import datetime
 
-import pandas as pd
-import numpy as np
-from matplotlib import pyplot as plt
-from matplotlib import colors as mcolors
-
-from .simulator import Simulator
-from .commands import AcceptableCommand, ScaleCommand
-from .controller import Controller, CommandProtocol
-from .detector import DetectorImage, SimulatedDetectorImage
-from .box_simulation import Box
-from .command_writer import BoxWriter, CommandWriter, Loggable
-from . import constants
-
-PI = constants.PI
-
-
-class LoggableCommandProtocol(CommandProtocol, Loggable, Protocol):
-    pass # combine the commandprotocol with loggable, only in this context
 
 
 
@@ -72,7 +54,7 @@ class LogEventBus(LogCallback):
         for callback in self.log_callbacks:
             callback.stop(document)
 
-
+'''
 def box_writer(box: Box) -> pd.DataFrame:
     box_df = pd.DataFrame([p.get_loggable_data() for p in box.particles])
     return box_df
@@ -308,7 +290,7 @@ class Logger:
         self.after_event()
 
 
-
+'''
 
 if __name__ == "__main__":
     pass
