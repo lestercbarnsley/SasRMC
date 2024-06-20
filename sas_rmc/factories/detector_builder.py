@@ -46,38 +46,6 @@ class AnalyticalResultMakerFactory(ResultMakerFactory):
         return analytical_calculator_maker
 
 
-@dataclass
-class NumericalResultMakerFactory(ResultMakerFactory):
-    particle_factory: particle_factory.ParticleFactory
-    numerical_range_factor: float = 1.05
-    range_factor: float = 1.2
-    resolution_factor: float = 1.0
-
-    def create_result_maker(self) -> Callable[[DetectorImage], ResultCalculator]:
-        numerical_range_factor = self.numerical_range_factor
-        range_factor = self.range_factor
-        resolution_factor = self.resolution_factor
-
-        def numerical_calculator_maker(detector: DetectorImage) -> NumericalCalculator:
-            biggest_dimension_0, biggest_dimension_1, biggest_dimension_2 = 0, 0, 0
-            for _ in range(100_000):
-                particle = self.particle_factory.create_particle()
-                for shape in particle.shapes:
-                    d_0, d_1, d_2 = shape.dimensions
-                    biggest_dimension_0 = np.max(numerical_range_factor *  d_0, biggest_dimension_0)
-                    biggest_dimension_1 = np.max(numerical_range_factor *  d_1, biggest_dimension_1)
-                    biggest_dimension_2 = np.max(numerical_range_factor *  d_2, biggest_dimension_2)
-            vector_space_resolution = PI / np.max(detector.q)
-            vector_space = VectorSpace.gen_from_bounds(
-                x_min = -biggest_dimension_0 / 2, x_max = biggest_dimension_0 / 2, x_num = int(biggest_dimension_0 / vector_space_resolution),
-                y_min = -biggest_dimension_1 / 2, y_max = biggest_dimension_1 / 2, y_num = int(biggest_dimension_1 / vector_space_resolution),
-                z_min = -biggest_dimension_2 / 2, z_max = biggest_dimension_2 / 2, z_num = int(biggest_dimension_2 / vector_space_resolution)
-                )
-            qx, qy = qxqy_from_detector(detector, range_factor, resolution_factor)
-            return NumericalCalculator(qx, qy, vector_space=vector_space)
-
-        return numerical_calculator_maker
-
 
 @dataclass
 class DetectorImageFactory(ABC):

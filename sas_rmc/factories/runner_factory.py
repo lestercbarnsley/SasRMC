@@ -283,13 +283,21 @@ def create_runner(input_config_path: Path) -> RmcRunner:
 
 
 if __name__ == "__main__":
-    data_params = create_runner(r"E:\Programming\SasRMC\data\CoreShell_F20_pol.xlsx")
+    #data_params = create_runner(r"E:\Programming\SasRMC\data\CoreShell_F20_pol.xlsx")
 
     assert type(False) == type(bool(False))
 
     a = [1,2,3,4]
     print(rng.permutation(a))
     print(a)
+    dataframes = pd.read_excel(
+        r"E:\Programming\SasRMC\data\CoreShell_F20_pol.xlsx",
+        dtype = str,
+        sheet_name = None,
+        keep_default_na=False,
+        )
+    
+    explore = list(dataframes.values())[2]
 
 
 

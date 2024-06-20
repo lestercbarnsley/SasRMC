@@ -182,7 +182,6 @@ class DetectorPixel:
         sigma_para = data_row.get(SIGMA_PARA, 0) if detector_config is None else detector_config.get_sigma_parallel(qx_i, qy_i)
         sigma_perp = data_row.get(SIGMA_PERP, 0) if detector_config is None else detector_config.get_sigma_geometric()
         shadow_factor = bool(data_row.get(SHADOW_FACTOR,bool(intensity)))
-        simulated_intensity = data_row.get(SIMULATED_INTENSITY, 0)
         return cls(
             qX=qx_i,
             qY=qy_i,
@@ -191,8 +190,7 @@ class DetectorPixel:
             qZ=qZ,
             sigma_para=sigma_para,
             sigma_perp=sigma_perp,
-            shadow_factor=shadow_factor,
-            simulated_intensity=simulated_intensity,
+            shadow_factor=shadow_factor
             )
 
 
@@ -312,34 +310,11 @@ class DetectorImage: # Major refactor needed for detector image, as it shouldn't
         return cls.gen_from_data(data_dict=data_dict, detector_config=detector_config)
 
     @classmethod
-    def gen_from_pandas(cls, dataframe: pd.DataFrame, detector_config: DetectorConfig = None):
-        all_qx = dataframe[QX].astype(np.float64)
-        all_qy = dataframe[QY].astype(np.float64)
-        all_intensity = dataframe[INTENSITY].astype(np.float64)
-        filter_optional_column = lambda col_title: dataframe.get(col_title, np.zeros(all_intensity.size)).astype(np.float64)
-        all_intensity_error = filter_optional_column(INTENSITY_ERROR)
-        all_qz = filter_optional_column(QZ)
-        all_sigma_para = filter_optional_column(SIGMA_PARA)
-        all_sigma_perp = filter_optional_column(SIGMA_PERP)
-        all_shadow_factor = filter_optional_column(SHADOW_FACTOR)
-        all_simulated_intensity = filter_optional_column(SIMULATED_INTENSITY)
-        if not np.sum(all_shadow_factor**2):
-            all_shadow_factor = all_intensity != 0
-        data_dict = {
-            QX : all_qx,
-            QY : all_qy,
-            INTENSITY : all_intensity,
-            INTENSITY_ERROR : all_intensity_error,
-            QZ : all_qz,
-            SIGMA_PARA : all_sigma_para,
-            SIGMA_PERP : all_sigma_perp,
-            SHADOW_FACTOR : all_shadow_factor,
-            SIMULATED_INTENSITY : all_simulated_intensity,
-            POLARIZATION : dataframe.iloc[0].get(POLARIZATION, Polarization.UNPOLARIZED.value)
-        }
-        pass_config_on = np.sum(all_sigma_para**2) == 0 and np.sum(all_sigma_perp**2) == 0
-        return cls.gen_from_data(data_dict=data_dict, detector_config=detector_config if pass_config_on else None)
-
+    def gen_from_pandas(cls, dataframe: pd.DataFrame, detector_config: DetectorConfig | None = None):
+        return DetectorImage(
+            detector_pixels=np.array([DetectorPixel.row_to_pixel(row.to_dict(), detector_config) for _, row in dataframe.iterrows()]),
+            polarization=detector_config.polarization
+        )
 
 @array_cache
 def make_smearing_function(pixel_list: Iterable[DetectorPixel], qx_matrix: np.ndarray, qy_matrix: np.ndarray, slicing_range: int | None = None) -> Callable[[np.ndarray], np.ndarray]:
