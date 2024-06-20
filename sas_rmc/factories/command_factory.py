@@ -1,5 +1,7 @@
 #%%
+from collections.abc import Callable
 import random
+from typing import ParamSpec, TypeVar
 
 from sas_rmc import commands, Vector, constants
 from sas_rmc.shapes.cube import Cube
@@ -73,6 +75,7 @@ def create_command(
     return random.choice(possible_commands)
 
 
+
 if __name__ == "__main__":
-    print(different_random_int(1,0))
+    print(different_random_int(100,0))
 # %%

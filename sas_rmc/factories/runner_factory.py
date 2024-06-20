@@ -4,13 +4,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 from datetime import datetime
+import random
 
 import pandas as pd
 import yaml
 
+from sas_rmc import acceptance_scheme, commands, constants
 from sas_rmc.controller import Controller
 from sas_rmc.particles.particle_core_shell_spherical import CoreShellParticle
 from sas_rmc.scattering_simulation import ScatteringSimulation
+
+
+rng = constants.RNG
 '''
 from .acceptable_command_factory import MetropolisAcceptanceFactory
 from . import box_factory, particle_factory, particle_factory_spherical, simulation_factory, controller_factory, simulator_factory, detector_builder, parse_data
@@ -113,14 +118,14 @@ def load_config(config_file: str) -> Runner:
     return runner_factory.create_runner(input_config_source = input_config_path, output_path=output_path)
 '''
 from pathlib import Path
-from typing import Iterator, Any
+from typing import Iterator, Any, ParamSpec, TypeVar
 
 import pandas as pd
 
 from sas_rmc import Vector, constants, evaluator
 from sas_rmc.rmc_runner import RmcRunner
 from sas_rmc.particles import CoreShellParticle
-from sas_rmc.factories import parse_data, box_factory, particle_factory
+from sas_rmc.factories import parse_data, box_factory, particle_factory, command_factory, acceptable_command_factory
 from sas_rmc.simulator import Simulator
 
 
@@ -130,6 +135,38 @@ rng = constants.RNG
 def polydisperse_parameter(loc: float, polyd: float) -> float:
     return rng.normal(loc = loc, scale = loc * polyd)
 
+
+P = ParamSpec('P')
+R = TypeVar('R')
+
+def create_command_if_acceptable_command(command_factory: Callable[P, R], command_types: list[type]) -> Callable[P, R]:
+
+    def new_command_factory(*args: P.args, **kwargs: P.kwargs) -> R:
+        for _ in range(2_000_000):
+            command = command_factory(*args, **kwargs)
+            if type(command) in command_types:
+                return command
+        raise TypeError(f"Factory function {command_factory.__name__} is incompatible with command_types")
+    return new_command_factory
+
+
+core_shell_commands = {
+    commands.MoveParticleBy,
+    commands.MoveParticleTo,
+    commands.JumpParticleTo,
+    commands.OrbitParticle,
+    commands.MagnetizeParticle,
+    commands.RescaleMagnetization,
+    commands.RotateMagnetization,
+    commands.RescaleCommand
+}
+
+create_core_shell_command = create_command_if_acceptable_command(command_factory.create_command, core_shell_commands)
+
+def particle_box_index_iterator(simulation_state: ScatteringSimulation) -> Iterator[tuple[int, int]]:
+    for box_index, box in enumerate(simulation_state.box_list):
+        for particle_index, _ in enumerate(box.particles):
+            yield box_index, particle_index
 
 
 @dataclass
@@ -146,10 +183,10 @@ class CoreShellRunner:
     annealing_type: str
     anneal_start_temp: float
     anneal_fall_rate: float
-    annealing_stop_cycle_number: int
     detector_smearing: bool
     field_direction: str
     force_log_file: bool
+    annealing_stop_cycle_number: int = -1
     nominal_concentration: float = 0
     particle_number: int = 0
     box_number: int = 0
@@ -173,26 +210,51 @@ class CoreShellRunner:
             scale_factor=self.nominal_concentration if self.nominal_concentration else 1,
             box_list=box_factory.create_box_list(self.create_particle, [self.box_dimension_1, self.box_dimension_2, self.box_dimension_3], self.particle_number, self.box_number, self.nominal_concentration )
         )
+
+    def create_commands(self, simulation_state: ScatteringSimulation) -> Iterator[commands.Command]:
+        for _ in range(self.total_cycles):
+            particle_box_indices = list(particle_box_index_iterator(simulation_state))
+            for particle_index, box_index in random.sample(particle_box_indices, len(particle_box_indices)):
+                box = simulation_state.box_list[box_index]
+                yield create_core_shell_command(
+                    box_index = box_index,
+                    particle_index=particle_index,
+                    move_by_distance=self.core_radius,
+                    cube = box.cube,
+                    total_particle_number=len(box.particles),
+                    nominal_magnetization=self.core_magnetization
+                )
+
+    def create_acceptance_scheme(self, simulation_state: ScatteringSimulation) -> Iterator[acceptance_scheme.AcceptanceScheme]:
+        annealing_stop_cycle = self.annealing_stop_cycle_number if self.annealing_stop_cycle_number < 0 else int(self.total_cycles / 2)
+        temperature = self.anneal_start_temp
+        if self.annealing_type.lower() == "greedy".lower():
+            temperature = 0
+        for cycle in range(self.total_cycles):
+            if cycle > annealing_stop_cycle:
+                temperature = 0
+            for step, _ in enumerate(particle_box_index_iterator(simulation_state)):
+                yield acceptable_command_factory.create_metropolis_acceptance(temperature, cycle, step)
+            temperature = temperature * (1- self.anneal_fall_rate)
+            if "very".lower() not in self.annealing_type.lower():
+                temperature = self.anneal_start_temp / (1 + cycle)
+            
+
     
-    def create_runner(self) -> RmcRunner:
+    def create_runner(self, evaluator: evaluator.Evaluator) -> RmcRunner:
+        state = self.create_simulation_state()
         return RmcRunner(
             simulator=Simulator(
                 controller=Controller(
-                    commands=[],
-                    acceptance_scheme=[]
+                    commands=[c for c in self.create_commands(state)],
+                    acceptance_scheme=[a for a in self.create_acceptance_scheme(state)]
                 ),
-                state = self.create_simulation_state(),
-                evaluator=evaluator.EvaluatorWithFitter(
-                    fitter=evaluator.Smearing2dFitterMultiple(
-                        fitter_list=[
-                            evaluator.Smearing2DFitter()
-                        ]
-                    )
-                )
+                state = state,
+                evaluator=evaluator,
                 )
 
             )
-        )
+        
     
     @classmethod
     def create_from_dict(cls, d: dict):
@@ -201,24 +263,9 @@ class CoreShellRunner:
             for k, v in d.items() 
             if k in cls.__dataclass_fields__
         }
-        if 'annealing_stop_cycle_number' not in d_validated:
-            d_validated['annealing_stop_cycle_number'] = int(d_validated['total_cycles'] / 2)
         return cls(**d_validated)
 
-def parse_value_frame(value_frame: pd.DataFrame) -> Iterator[tuple[str, Any]]:
-    for _, row in value_frame.iterrows():
-        param_name = row.iloc[0]
-        param_value = row.iloc[1]
-        if not param_name.strip():
-            continue
-        if '#' in param_name.strip():
-            continue
-        v = param_value.strip()
-        if not v:
-            continue
-        if v.lower() in parse_data.truth_dict:
-            v = parse_data.truth_dict[v.lower()]
-        yield param_name.strip(), v
+
 
 
 
@@ -231,12 +278,18 @@ def create_runner(input_config_path: Path) -> RmcRunner:
         sheet_name = None,
         keep_default_na=False,
         )
-    dataframe = list(dataframes.values())[0]
-    d = {k : v for k, v in parse_value_frame(dataframe)}
-    return CoreShellRunner.create_from_dict(d)
+    value_frame = list(dataframes.values())[0]
+    return CoreShellRunner.create_from_dict(value_frame)
 
 
 if __name__ == "__main__":
-    r = create_runner(r"E:\Programming\SasRMC\data\CoreShell_F20_pol.xlsx")
+    data_params = create_runner(r"E:\Programming\SasRMC\data\CoreShell_F20_pol.xlsx")
 
     assert type(False) == type(bool(False))
+
+    a = [1,2,3,4]
+    print(rng.permutation(a))
+    print(a)
+
+
+

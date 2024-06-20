@@ -21,8 +21,7 @@ def small_angle_change(vector: Vector, angle_change: float, reference_vector: Ve
 
 @dataclass
 class Command(ABC):
-    document: dict | None = field(default_factory=lambda : None, repr=False, init=False)
-
+    
     @abstractmethod
     def execute(self, scattering_simulation: ScatteringSimulation | None = None) -> ScatteringSimulation:
         pass
