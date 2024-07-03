@@ -1,5 +1,9 @@
 #%%
 
+from collections.abc import Callable
+import functools
+from typing import ParamSpec, Type, TypeVar
+
 import numpy as np
 from scipy import constants as scipy_constants
 
@@ -20,4 +24,29 @@ def non_zero_list(ls: list) -> bool:
 # string names
 NUCLEAR_RESCALE = "Nuclear rescale"
 MAGNETIC_RESCALE = "Magnetic rescale"
+
+T = TypeVar('T')
+
+def validate_fields(cls: Type[T], data: dict) -> T:
+    if hasattr(cls, '__iter__'):
+        return cls(validate_fields(cls.__args__[0], d) for d in data)
+    if not hasattr(cls, '__dataclass_fields__'):
+        return cls(data)
+    if not isinstance(data, dict):
+        return validate_fields(cls, data.__dict__)
+    d = {k : validate_fields(v.type, data[k])
+            for k, v in cls.__dataclass_fields__.items()
+            if k in data}
+    return cls(**d)
+
+P = ParamSpec('P')
+R = TypeVar('R')
+
+def validate_decorator(func: Callable[P, R]) -> Callable[P, R]:
+    @functools.wraps(func)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        res = func(*args, **kwargs)
+        return validate_fields(type(res), res.__dict__)
+    return wrapper
+
 

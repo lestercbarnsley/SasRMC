@@ -172,6 +172,7 @@ class DetectorPixel:
             SHADOW_FACTOR : int(self.shadow_factor)
         }
 
+    @constants.validate_decorator
     @classmethod
     def row_to_pixel(cls, data_row: dict, detector_config: DetectorConfig = None):
         qx_i = data_row[QX]
@@ -200,7 +201,7 @@ class DetectorImage: # Major refactor needed for detector image, as it shouldn't
     polarization: Polarization = Polarization.UNPOLARIZED
 
     def array_from_pixels(self, pixel_func: Callable[[DetectorPixel], Any]) -> np.ndarray:
-        return np.frompyfunc(pixel_func)(self.detector_pixels)
+        return np.frompyfunc(pixel_func, nin = 1, nout=1)(self.detector_pixels)
 
     @property
     def qX(self) -> np.ndarray:
@@ -313,7 +314,7 @@ class DetectorImage: # Major refactor needed for detector image, as it shouldn't
     def gen_from_pandas(cls, dataframe: pd.DataFrame, detector_config: DetectorConfig | None = None):
         return DetectorImage(
             detector_pixels=np.array([DetectorPixel.row_to_pixel(row.to_dict(), detector_config) for _, row in dataframe.iterrows()]),
-            polarization=detector_config.polarization
+            polarization=detector_config.polarization if detector_config is not None else Polarization.UNPOLARIZED
         )
 
 @array_cache

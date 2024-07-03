@@ -285,11 +285,6 @@ def create_runner(input_config_path: Path) -> RmcRunner:
 if __name__ == "__main__":
     #data_params = create_runner(r"E:\Programming\SasRMC\data\CoreShell_F20_pol.xlsx")
 
-    assert type(False) == type(bool(False))
-
-    a = [1,2,3,4]
-    print(rng.permutation(a))
-    print(a)
     dataframes = pd.read_excel(
         r"E:\Programming\SasRMC\data\CoreShell_F20_pol.xlsx",
         dtype = str,
@@ -299,5 +294,19 @@ if __name__ == "__main__":
     
     explore = list(dataframes.values())[2]
 
+    from sas_rmc.detector import DetectorImage, DetectorPixel
+
+    d = DetectorImage.gen_from_pandas(dataframes['M3-polDown-20m'])
+
+    print(DetectorPixel.__dataclass_fields__)
+
+    from dataclasses import Field
+
+    
 
 
+
+
+
+
+# %%
