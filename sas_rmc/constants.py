@@ -42,7 +42,7 @@ def validate_fields(cls: Type[T], data: dict) -> T:
 P = ParamSpec('P')
 R = TypeVar('R')
 
-def validate_decorator(func: Callable[P, R]) -> Callable[P, R]:
+def validation_decorator(func: Callable[P, R]) -> Callable[P, R]:
     @functools.wraps(func)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         res = func(*args, **kwargs)

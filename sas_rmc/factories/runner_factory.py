@@ -255,15 +255,10 @@ class CoreShellRunner:
 
             )
         
-    
     @classmethod
+    @constants.validation_decorator
     def create_from_dict(cls, d: dict):
-        d_validated = {
-            k : cls.__dataclass_fields__[k].type(v)
-            for k, v in d.items() 
-            if k in cls.__dataclass_fields__
-        }
-        return cls(**d_validated)
+        return cls(**d)
 
 
 
@@ -279,7 +274,9 @@ def create_runner(input_config_path: Path) -> RmcRunner:
         keep_default_na=False,
         )
     value_frame = list(dataframes.values())[0]
-    return CoreShellRunner.create_from_dict(value_frame)
+    runner_factory = CoreShellRunner.create_from_dict(value_frame)
+    
+    return CoreShellRunner.create_from_dict(value_frame).create_runner()
 
 
 if __name__ == "__main__":
@@ -297,12 +294,6 @@ if __name__ == "__main__":
     from sas_rmc.detector import DetectorImage, DetectorPixel
 
     d = DetectorImage.gen_from_pandas(dataframes['M3-polDown-20m'])
-
-    print(DetectorPixel.__dataclass_fields__)
-
-    from dataclasses import Field
-
-    
 
 
 

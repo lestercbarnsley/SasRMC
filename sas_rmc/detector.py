@@ -116,6 +116,13 @@ class DetectorConfig:
         q = np.sqrt(qx**2 + qy**2)
         sigma_para = np.sqrt((q * (self.wavelength_spread / 2))**2 + sigma_geom**2)
         return sigma_para
+    
+    @classmethod
+    def gen_from_dict(cls, d: dict):
+        polarization = Polarization(d.get(POLARIZATION))
+        data = d | {POLARIZATION : polarization}
+        return constants.validate_fields(cls, data)
+
 
 
 def orthogonal_xy(x: float, y: float) -> tuple[float, float]: # If I find I need this function a lot, I'll make it a method in the Vector class, but for now I'm happy for it to be a helper function
@@ -172,7 +179,6 @@ class DetectorPixel:
             SHADOW_FACTOR : int(self.shadow_factor)
         }
 
-    @constants.validate_decorator
     @classmethod
     def row_to_pixel(cls, data_row: dict, detector_config: DetectorConfig = None):
         qx_i = data_row[QX]
@@ -183,16 +189,16 @@ class DetectorPixel:
         sigma_para = data_row.get(SIGMA_PARA, 0) if detector_config is None else detector_config.get_sigma_parallel(qx_i, qy_i)
         sigma_perp = data_row.get(SIGMA_PERP, 0) if detector_config is None else detector_config.get_sigma_geometric()
         shadow_factor = bool(data_row.get(SHADOW_FACTOR,bool(intensity)))
-        return cls(
-            qX=qx_i,
-            qY=qy_i,
-            intensity=intensity,
-            intensity_err=intensity_error,
-            qZ=qZ,
-            sigma_para=sigma_para,
-            sigma_perp=sigma_perp,
-            shadow_factor=shadow_factor
-            )
+        return constants.validate_fields(cls,  {
+            QX : qx_i,
+            QY : qy_i,
+            INTENSITY : intensity,
+            INTENSITY_ERROR : intensity_error,
+            QZ : qZ,
+            SIGMA_PARA : sigma_para,
+            SIGMA_PERP : sigma_perp,
+            SHADOW_FACTOR : shadow_factor
+            })
 
 
 @dataclass
@@ -329,6 +335,6 @@ def make_smearing_function(pixel_list: Iterable[DetectorPixel], qx_matrix: np.nd
    
 
 if __name__ == "__main__":
-    pass
+    p = Polarization("spin_down")
 
 #%%
