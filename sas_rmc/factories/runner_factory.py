@@ -291,12 +291,12 @@ if __name__ == "__main__":
     
     explore = list(dataframes.values())[2]
 
-    from sas_rmc.detector import DetectorImage, DetectorPixel
+    from sas_rmc.detector import DetectorImage
 
     d = DetectorImage.gen_from_pandas(dataframes['M3-polDown-20m'])
 
 
-
+    
 
 
 

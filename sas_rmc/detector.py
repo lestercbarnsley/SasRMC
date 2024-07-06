@@ -201,21 +201,77 @@ class DetectorPixel:
             })
 
 
+def get_pixel_qX(pixel: DetectorPixel) -> float:
+    return pixel.qX
+
+def get_pixel_qY(pixel: DetectorPixel) -> float:
+    return pixel.qY
+
+def get_pixel_intensity(pixel: DetectorPixel) -> float:
+    return pixel.intensity
+
+def get_pixel_intensity_err(pixel: DetectorPixel) -> float:
+    return pixel.intensity_err
+
+def get_pixel_qZ(pixel: DetectorPixel) -> float:
+    return pixel.qZ
+
+def get_pixel_sigma_para(pixel: DetectorPixel) -> float:
+    return pixel.sigma_para
+
+def get_pixel_sigma_perp(pixel: DetectorPixel) -> float:
+    return pixel.sigma_perp
+
+def get_pixel_shadow_factor(pixel: DetectorPixel) -> bool:
+    return pixel.shadow_factor
+
+def get_nearest_pixel(qx: float, qy: float, pixels: Iterable[DetectorPixel]) -> DetectorPixel:
+    return min(pixels, key = lambda p : (qx - p.qX)**2 + (qy - p.qY)**2)
+
+def subtract_nearest_pixel(pixel: DetectorPixel, pixels: Iterable[DetectorPixel]) -> DetectorPixel:
+    qX = pixel.qX
+    qY = pixel.qY
+    nearest_pixel = get_nearest_pixel(qX, qY, pixels)
+    return DetectorPixel(
+        qX = qX,
+        qY = qY,
+        intensity = pixel.intensity - nearest_pixel.intensity,
+        intensity_err = np.sqrt(pixel.intensity_err**2 + nearest_pixel.intensity_err**2),
+        qZ = pixel.qZ,
+        sigma_para=pixel.sigma_para,
+        sigma_perp=pixel.sigma_perp,
+        shadow_factor=pixel.shadow_factor and nearest_pixel.shadow_factor
+    )
+
+def subtract_background(pixel: DetectorPixel, background: float) -> DetectorPixel:
+    return DetectorPixel(
+        qX = pixel.qX,
+        qY = pixel.qY,
+        intensity = pixel.intensity - background,
+        intensity_err = pixel.intensity_err,
+        qZ = pixel.qZ,
+        sigma_para=pixel.sigma_para,
+        sigma_perp=pixel.sigma_perp,
+        shadow_factor=pixel.shadow_factor
+    )
+
+
 @dataclass
 class DetectorImage: # Major refactor needed for detector image, as it shouldn't be responsible for how it's plotted
-    detector_pixels: np.ndarray
+    detector_pixels: list[DetectorPixel]
     polarization: Polarization = Polarization.UNPOLARIZED
 
+    @method_array_cache
     def array_from_pixels(self, pixel_func: Callable[[DetectorPixel], Any]) -> np.ndarray:
-        return np.frompyfunc(pixel_func, nin = 1, nout=1)(self.detector_pixels)
+        return np.array([pixel_func(pixel) for pixel in self.detector_pixels])
 
     @property
     def qX(self) -> np.ndarray:
-        return self.array_from_pixels(lambda pixel: pixel.qX)
+        return self.array_from_pixels(get_pixel_qX)
 
     @property
     def qY(self) -> np.ndarray:
-        return self.array_from_pixels(lambda pixel: pixel.qY)
+        return self.array_from_pixels(get_pixel_qY)
 
     @property
     def q(self) -> np.ndarray:
@@ -223,30 +279,32 @@ class DetectorImage: # Major refactor needed for detector image, as it shouldn't
 
     @property
     def intensity(self) -> np.ndarray:
-        return self.array_from_pixels(lambda pixel: pixel.intensity)
+        return self.array_from_pixels(get_pixel_intensity)
 
     @property
     def intensity_err(self) -> np.ndarray:
-        return self.array_from_pixels(lambda pixel: pixel.intensity_err)
+        return self.array_from_pixels(get_pixel_intensity_err)
 
     @property
     def qZ(self) -> np.ndarray:
-        return self.array_from_pixels(lambda pixel: pixel.qZ)
+        return self.array_from_pixels(get_pixel_qZ)
 
     @property
     def sigma_para(self) -> np.ndarray:
-        return self.array_from_pixels(lambda pixel: pixel.sigma_para)
+        return self.array_from_pixels(get_pixel_sigma_para)
 
     @property
     def sigma_perp(self) -> np.ndarray:
-        return self.array_from_pixels(lambda pixel: pixel.sigma_perp)
+        return self.array_from_pixels(get_pixel_sigma_perp)
 
     @property
     def shadow_factor(self) -> np.ndarray:
-        return self.array_from_pixels(lambda pixel: pixel.shadow_factor)
+        return self.array_from_pixels(get_pixel_shadow_factor)
     
     def get_loggable_data(self) -> list[dict]:
         return [pixel.to_dict() for pixel in self.detector_pixels]
+    
+    
 
     @classmethod
     def gen_from_data(cls, data_dict: dict, detector_config: DetectorConfig = None):
@@ -319,7 +377,7 @@ class DetectorImage: # Major refactor needed for detector image, as it shouldn't
     @classmethod
     def gen_from_pandas(cls, dataframe: pd.DataFrame, detector_config: DetectorConfig | None = None):
         return DetectorImage(
-            detector_pixels=np.array([DetectorPixel.row_to_pixel(row.to_dict(), detector_config) for _, row in dataframe.iterrows()]),
+            detector_pixels=[DetectorPixel.row_to_pixel(row.to_dict(), detector_config) for _, row in dataframe.iterrows()],
             polarization=detector_config.polarization if detector_config is not None else Polarization.UNPOLARIZED
         )
 
@@ -332,7 +390,23 @@ def make_smearing_function(pixel_list: Iterable[DetectorPixel], qx_matrix: np.nd
         big_intensity = np.array([slicing_func(intensity) for slicing_func in slicing_functions])
         return np.sum(big_resolution * big_intensity, axis = (1,2))
     return smear
-   
+
+def subtract_detectors(detector_image: DetectorImage, subtraction: DetectorImage | float) -> DetectorImage:
+    if isinstance(detector_image, float):
+        return DetectorImage(
+            detector_pixels=[
+                subtract_background(pixel, detector_image)
+                for pixel in self.detector_pixels
+            ],
+            polarization=self.polarization
+        )
+    return DetectorImage(
+        detector_pixels=[
+            subtract_nearest_pixel(pixel, detector_image.detector_pixels)
+            for pixel in self.detector_pixels
+        ],
+        polarization=self.polarization
+    )
 
 if __name__ == "__main__":
     p = Polarization("spin_down")
