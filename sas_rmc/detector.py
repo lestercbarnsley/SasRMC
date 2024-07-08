@@ -6,6 +6,7 @@ from typing import Any, Callable, Iterable
 import numpy as np
 import pandas as pd
 
+from sas_rmc import vector
 from sas_rmc.array_cache import array_cache, method_array_cache
 from sas_rmc.vector import Vector
 from sas_rmc import constants
@@ -30,7 +31,7 @@ POLARIZATION = "Polarization"
 def get_slicing_func_from_gaussian(gaussian: np.ndarray, slicing_range: int | None = None) -> Callable[[np.ndarray], np.ndarray]:
     i_of_max, j_of_max = np.where(gaussian == np.amax(gaussian))
     i_of_max, j_of_max = i_of_max[0], j_of_max[0]
-    slicing_range = slicing_range if slicing_range is not None else int(np.max(gaussian.shape) / DEFAULT_SLICING_FRACTION_DENOM)
+    slicing_range = slicing_range if slicing_range is not None else int(max(gaussian.shape) / DEFAULT_SLICING_FRACTION_DENOM)
     i_min = max(i_of_max - int(slicing_range / 2), 0)
     i_max = min(i_min + slicing_range, gaussian.shape[0] - 1)
     i_min = i_max - slicing_range
@@ -152,12 +153,12 @@ class DetectorPixel:
     def resolution_function(self, qx_array: np.ndarray, qy_array: np.ndarray) -> np.ndarray:
         qx_offset = qx_array - self.qX
         qy_offset = qy_array - self.qY
-        q_offset = (qx_offset, qy_offset, 0)
+        q_offset = (qx_offset, qy_offset, np.array([0.0]))
         q_vec = Vector(self.qX, self.qY)
         q_para = q_vec.unit_vector
         q_perp = Vector(*orthogonal_xy(q_para.x, q_para.y))
-        q_para_arr = q_para.unit_vector * q_offset
-        q_perp_arr = q_perp.unit_vector * q_offset
+        q_para_arr = vector.dot(q_para.unit_vector.to_tuple() , q_offset)
+        q_perp_arr = vector.dot(q_perp.unit_vector.to_tuple(),  q_offset)
         gaussian = np.exp(-(1/2) * ((q_para_arr / self.sigma_para)**2 + (q_perp_arr / self.sigma_perp)**2) )
 
         return gaussian / np.sum(gaussian)
@@ -180,7 +181,7 @@ class DetectorPixel:
         }
 
     @classmethod
-    def row_to_pixel(cls, data_row: dict, detector_config: DetectorConfig = None):
+    def row_to_pixel(cls, data_row: dict, detector_config: DetectorConfig | None = None):
         qx_i = data_row[QX]
         qy_i = data_row[QY]
         intensity = data_row[INTENSITY]
@@ -391,22 +392,27 @@ def make_smearing_function(pixel_list: Iterable[DetectorPixel], qx_matrix: np.nd
         return np.sum(big_resolution * big_intensity, axis = (1,2))
     return smear
 
-def subtract_detectors(detector_image: DetectorImage, subtraction: DetectorImage | float) -> DetectorImage:
-    if isinstance(detector_image, float):
-        return DetectorImage(
-            detector_pixels=[
-                subtract_background(pixel, detector_image)
-                for pixel in self.detector_pixels
-            ],
-            polarization=self.polarization
-        )
+def subtract_two_detectors(detector_image_1: DetectorImage, detector_image_2: DetectorImage) ->  DetectorImage:
     return DetectorImage(
         detector_pixels=[
-            subtract_nearest_pixel(pixel, detector_image.detector_pixels)
-            for pixel in self.detector_pixels
-        ],
-        polarization=self.polarization
+            subtract_nearest_pixel(pixel, detector_image_2.detector_pixels)
+                         for pixel in detector_image_1.detector_pixels
+                         ],
+        polarization=detector_image_1.polarization
     )
+
+def subtract_flat_background(detector_image: DetectorImage, background: float) -> DetectorImage:
+    return DetectorImage(
+        detector_pixels=[
+            subtract_background(pixel, background) for pixel in detector_image.detector_pixels
+        ],
+        polarization=detector_image.polarization
+    )
+
+def subtract_detectors(detector_image: DetectorImage, subtraction: DetectorImage | float) -> DetectorImage:
+    if isinstance(subtraction, DetectorImage):
+        return subtract_two_detectors(detector_image, subtraction)
+    return subtract_flat_background(detector_image, subtraction)
 
 if __name__ == "__main__":
     p = Polarization("spin_down")

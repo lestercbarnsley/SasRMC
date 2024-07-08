@@ -1,6 +1,6 @@
 #%%
 from __future__ import annotations
-from typing import Callable, Iterator, Type
+from typing import Callable, Iterator, Type, overload
 from dataclasses import dataclass
 
 import numpy as np
@@ -9,7 +9,14 @@ from sas_rmc import constants
 PI = constants.PI
 rng = constants.RNG
 
-def cross(a: tuple[float, float, float], b: tuple[float, float, float]) -> tuple[float, float, float]:
+
+@overload
+def cross(a: tuple[float, ...], b: tuple[float, ...]) -> tuple[float, ...]: ...
+
+@overload
+def cross(a: tuple[np.ndarray | float, ...], b: tuple[np.ndarray | float, ...]) -> tuple[np.ndarray, ...]: ...
+
+def cross(a: tuple[np.ndarray | float, ...], b: tuple[np.ndarray | float, ...]) -> tuple[np.ndarray | float, ...]:
     ax, ay, az = a[0], a[1], a[2]
     bx, by, bz = b[0], b[1], b[2]
     cx = ay*bz-az*by
@@ -17,7 +24,14 @@ def cross(a: tuple[float, float, float], b: tuple[float, float, float]) -> tuple
     cz = ax*by-ay*bx
     return cx, cy, cz
 
-def dot(a: tuple[float], b: tuple[float]) -> float:
+
+@overload
+def dot(a: tuple[float, ...], b: tuple[float, ...]) -> float: ...
+
+@overload
+def dot(a: tuple[np.ndarray | float, ...], b: tuple[np.ndarray | float, ...]) -> np.ndarray: ...
+
+def dot(a: tuple[float | np.ndarray, ...], b: tuple[float | np.ndarray, ...]) -> float | np.ndarray:
     ax, ay = a[:2]
     az = a[2] if len(a) > 2 else 0
     bx, by = b[:2]
@@ -31,8 +45,6 @@ def broadcast_array_function(getter_function: Callable[[object], object], output
 def broadcast_to_numpy_array(object_array: np.ndarray, getter_function: Callable[[object], object], output_dtype: Type = np.float64) -> np.ndarray:
     array_function = broadcast_array_function(getter_function=getter_function, output_dtype=output_dtype)
     return array_function(object_array)
-
-
 
 
 @dataclass
@@ -56,23 +68,29 @@ class Vector:
     def to_numpy(self) -> np.ndarray:
         return np.array(self.to_list())
 
-    def to_tuple(self) -> tuple[float, float, float]:
+    def to_tuple(self) -> tuple[float, ...]:
         return tuple(self.itercomps())
 
     def __len__(self) -> int:
         return 3
 
     @classmethod
-    def null_vector(cls):
+    def null_vector(cls) -> Vector:
         return cls(0,0,0)
 
-    def __add__(self, vector2: Vector):
+    def __add__(self, vector2: Vector) -> Vector:
         x = self.x + vector2.x
         y = self.y + vector2.y
         z = self.z + vector2.z
         return type(self)(x = x, y = y, z = z)
+    
+    @overload
+    def __mul__(self, vector_or_scalar: float) -> Vector: ...
 
-    def __mul__(self, vector_or_scalar: float | Vector) -> float | Vector:
+    @overload
+    def __mul__(self, vector_or_scalar: Vector) -> float: ...
+
+    def __mul__(self, vector_or_scalar: float | Vector ) -> float | Vector:
         if isinstance(vector_or_scalar, Vector):
             return dot(self.to_tuple(), vector_or_scalar.to_tuple())
         return type(self)(
@@ -84,7 +102,7 @@ class Vector:
     def __rmul__(self, scalar: float) -> Vector:
         return self * scalar
 
-    def __sub__(self, vector2) -> Vector:
+    def __sub__(self, vector2: Vector) -> Vector:
         return self + (-1 * vector2)
 
     def __truediv__(self, divisor: float) -> Vector:
@@ -146,7 +164,7 @@ class Vector:
         return length * (cls.from_numpy(random_numbers).unit_vector)
 
     @classmethod
-    def xy_from_angle(cls, length = 1, angle = 0):
+    def xy_from_angle(cls, length: float = 1, angle: float = 0):
         return cls(x = length * np.cos(angle), y = length * np.sin(angle))
 
     @classmethod

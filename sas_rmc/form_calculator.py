@@ -47,9 +47,9 @@ def get_form_magnetic_z(form_result: FormResult) -> np.ndarray:
 
 def magnetic_amplitude(form_results: list[FormResult], qx: np.ndarray, qy: np.ndarray) -> list[np.ndarray]:
     fm_x, fm_y, fm_z = [sum_array_list([getter_func(form_result) for form_result in form_results]) for getter_func in (get_form_magnetic_x, get_form_magnetic_y, get_form_magnetic_z)]
-    q = [qx, qy, 0]
+    q = (qx, qy, 0)
     q_square = q_squared(qx, qy)
-    mqm = cross(q, cross([fm_x, fm_y, fm_z], q))
+    mqm = cross(q, cross((fm_x, fm_y, fm_z), q))
     return [mq_comp / q_square for mq_comp in mqm]
 
 def minus_minus(fn: np.ndarray, fm_para: np.ndarray, fm_perp_1: np.ndarray, fm_perp_2: np.ndarray) -> np.ndarray:
@@ -100,7 +100,7 @@ def box_intensity(form_results: list[FormResult], box_volume: float, qx: np.ndar
 
 
 if __name__ == "__main__":
-    print(sum_array_list([np.ones(3,3)]))
+    print(sum_array_list([np.ones((3,3))]))
         
 #%%
         

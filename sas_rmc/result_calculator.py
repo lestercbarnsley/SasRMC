@@ -10,8 +10,7 @@ from sas_rmc.detector import Polarization
 from sas_rmc.form_calculator import box_intensity, FieldDirection
 from sas_rmc.particles.particle import FormResult, Particle
 from sas_rmc.scattering_simulation import ScatteringSimulation
-from sas_rmc import constants
-from sas_rmc.vector import dot
+from sas_rmc import constants, vector
 
 PI = constants.PI
 j0_bessel = special.j0
@@ -28,7 +27,7 @@ class ResultCalculator(ABC):
 def modulated_form_array(particle: Particle, qx_array: np.ndarray, qy_array: np.ndarray) -> FormResult:
     form_result = particle.form_result(qx_array, qy_array)
     position = particle.get_position()
-    modulation = np.exp(1j * dot(position.to_tuple(), [qx_array, qy_array]))
+    modulation = np.exp(1j * vector.dot(position.to_tuple(), (qx_array, qy_array)))
     return FormResult(
         form_nuclear=form_result.form_nuclear * modulation,
         form_magnetic_x=form_result.form_magnetic_x * modulation,
