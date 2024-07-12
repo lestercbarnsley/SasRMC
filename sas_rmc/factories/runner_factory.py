@@ -1,18 +1,18 @@
 #%%
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 from datetime import datetime
 import random
 
+import numpy as np
 import pandas as pd
 import yaml
+from pydantic.dataclasses import dataclass
 
 from sas_rmc import acceptance_scheme, commands, constants
 from sas_rmc.controller import Controller
 from sas_rmc.particles.particle_core_shell_spherical import CoreShellParticle
-from sas_rmc.scattering_simulation import ScatteringSimulation
+from sas_rmc.scattering_simulation import ScatteringSimulation, SimulationParam
 
 
 rng = constants.RNG
@@ -187,17 +187,18 @@ class CoreShellRunner:
     field_direction: str
     force_log_file: bool
     annealing_stop_cycle_number: int = -1
-    nominal_concentration: float = 0
+    nominal_concentration: float = 0.0
     particle_number: int = 0
     box_number: int = 0
-    box_dimension_1: float = 0
-    box_dimension_2: float = 0
-    box_dimension_3: float = 0
+    box_dimension_1: float = 0.0
+    box_dimension_2: float = 0.0
+    box_dimension_3: float = 0.0
 
     def create_particle(self) -> CoreShellParticle:
         return particle_factory.create_core_shell_particle(
             core_radius=self.core_radius,
             core_polydispersity=self.core_polydispersity,
+            core_sld=self.core_sld,
             shell_thickness=self.shell_thickness,
             shell_polydispersity=self.shell_polydispersity,
             shell_sld=self.shell_sld,
@@ -207,7 +208,7 @@ class CoreShellRunner:
     
     def create_simulation_state(self) -> ScatteringSimulation:
         return ScatteringSimulation(
-            scale_factor=self.nominal_concentration if self.nominal_concentration else 1,
+            scale_factor=SimulationParam(self.nominal_concentration if self.nominal_concentration else 1.0, name = "scale_factor", bounds = (0, np.inf)),
             box_list=box_factory.create_box_list(self.create_particle, [self.box_dimension_1, self.box_dimension_2, self.box_dimension_3], self.particle_number, self.box_number, self.nominal_concentration )
         )
 
@@ -254,15 +255,11 @@ class CoreShellRunner:
                 )
 
             )
-        
+    
     @classmethod
-    @constants.validation_decorator
-    def create_from_dict(cls, d: dict):
+    def create_from_dataframe(cls, dataframe: pd.DataFrame):
+        d = {k : v for k, v in parse_data.parse_value_frame(dataframe)}
         return cls(**d)
-
-
-
-
 
 def create_runner(input_config_path: Path) -> RmcRunner:
 
@@ -274,16 +271,16 @@ def create_runner(input_config_path: Path) -> RmcRunner:
         keep_default_na=False,
         )
     value_frame = list(dataframes.values())[0]
-    runner_factory = CoreShellRunner.create_from_dict(value_frame)
+    runner_factory = CoreShellRunner.create_from_dataframe(value_frame)
     
-    return CoreShellRunner.create_from_dict(value_frame).create_runner()
+    return runner_factory.create_runner()
 
 
 if __name__ == "__main__":
     #data_params = create_runner(r"E:\Programming\SasRMC\data\CoreShell_F20_pol.xlsx")
-
+    spreadsheet = Path(__file__).parent.parent.parent / Path("data") / Path("CoreShell_F20_pol.xlsx")
     dataframes = pd.read_excel(
-        r"E:\Programming\SasRMC\data\CoreShell_F20_pol.xlsx",
+        spreadsheet,
         dtype = str,
         sheet_name = None,
         keep_default_na=False,
@@ -292,8 +289,9 @@ if __name__ == "__main__":
     explore = list(dataframes.values())[2]
 
     from sas_rmc.detector import DetectorImage
+    create_runner(spreadsheet)
 
-    d = DetectorImage.gen_from_pandas(dataframes['M3-polDown-20m'])
+    #d = DetectorImage.gen_from_pandas(dataframes['M3-polDown-20m'])
 
 
     

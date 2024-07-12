@@ -173,7 +173,7 @@ class Vector:
         return cls.xy_from_angle(length = length, angle = random_angle)
 
     @classmethod
-    def random_normal_vector(cls, step_size=1):
+    def random_normal_vector(cls, step_size:float = 1.0):
         random_numbers = rng.normal(loc = 0, scale = step_size, size = 3)
         return cls.from_numpy(random_numbers)
 

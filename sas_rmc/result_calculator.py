@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 from scipy import special
 
-from sas_rmc.array_cache import array_cache, method_array_cache
+from sas_rmc.array_cache import method_array_cache
 from sas_rmc.detector import Polarization
 from sas_rmc.form_calculator import box_intensity, FieldDirection
 from sas_rmc.particles.particle import FormResult, Particle
@@ -58,7 +58,7 @@ class AnalyticalCalculator(ResultCalculator):
                 box_volume= box.volume, 
                 qx=self.qx_array, 
                 qy=self.qy_array, 
-                rescale_factor=scattering_simulation.scale_factor, 
+                rescale_factor=scattering_simulation.scale_factor.value, 
                 polarization=self.polarization, 
                 field_direction=self.field_direction
                 ) for box in scattering_simulation.box_list],
