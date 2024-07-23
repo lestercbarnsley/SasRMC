@@ -258,8 +258,9 @@ class CoreShellRunner:
     
     @classmethod
     def create_from_dataframe(cls, dataframe: pd.DataFrame):
-        d = {k : v for k, v in parse_data.parse_value_frame(dataframe)}
+        d = parse_data.parse_value_frame(dataframe)
         return cls(**d)
+
 
 def create_runner(input_config_path: Path) -> RmcRunner:
 
@@ -277,6 +278,7 @@ def create_runner(input_config_path: Path) -> RmcRunner:
 
 
 if __name__ == "__main__":
+    from sas_rmc.factories.detector_builder import create_detector_image
     #data_params = create_runner(r"E:\Programming\SasRMC\data\CoreShell_F20_pol.xlsx")
     spreadsheet = Path(__file__).parent.parent.parent / Path("data") / Path("CoreShell_F20_pol.xlsx")
     dataframes = pd.read_excel(
@@ -289,7 +291,9 @@ if __name__ == "__main__":
     explore = list(dataframes.values())[2]
 
     from sas_rmc.detector import DetectorImage
-    create_runner(spreadsheet)
+    #create_runner(spreadsheet)
+    df = dataframes['Data parameters']
+    d = create_detector_image(dataframes['M3-polDown-20m'],{k : v for k, v in dataframes['Data parameters'].iloc[0].items()})
 
     #d = DetectorImage.gen_from_pandas(dataframes['M3-polDown-20m'])
 

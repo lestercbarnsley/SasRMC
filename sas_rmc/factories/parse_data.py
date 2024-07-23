@@ -19,7 +19,8 @@ truth_dict = {
     'false' : False
 } # I'm sure I haven't come close to fully covering all the wild and creative ways users could say "True" or "False"
 
-def parse_value_frame(value_frame: pd.DataFrame) -> Iterator[tuple[str, str | bool]]:
+def parse_value_frame(value_frame: pd.DataFrame) -> dict:
+    d = {}
     for _, row in value_frame.iterrows():
         param_name = row.iloc[0]
         param_value = row.iloc[1]
@@ -30,5 +31,7 @@ def parse_value_frame(value_frame: pd.DataFrame) -> Iterator[tuple[str, str | bo
         v = param_value.strip()
         if v.lower() in truth_dict:
             v = truth_dict[v.lower()]
-        yield param_name.strip(), v
+        d[param_name.strip()] = v
+    return d
+
 

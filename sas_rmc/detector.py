@@ -118,12 +118,6 @@ class DetectorConfig:
         sigma_para = np.sqrt((q * (self.wavelength_spread / 2))**2 + sigma_geom**2)
         return sigma_para
     
-    @classmethod
-    def gen_from_dict(cls, d: dict):
-        polarization = Polarization(d.get(POLARIZATION))
-        data = d | {POLARIZATION : polarization}
-        return constants.validate_fields(cls, data)
-
 
 
 def orthogonal_xy(x: float, y: float) -> tuple[float, float]: # If I find I need this function a lot, I'll make it a method in the Vector class, but for now I'm happy for it to be a helper function
@@ -180,26 +174,6 @@ class DetectorPixel:
             SHADOW_FACTOR : int(self.shadow_factor)
         }
 
-    @classmethod
-    def row_to_pixel(cls, data_row: dict, detector_config: DetectorConfig | None = None):
-        qx_i = data_row[QX]
-        qy_i = data_row[QY]
-        intensity = data_row[INTENSITY]
-        intensity_error = data_row.get(INTENSITY_ERROR, 0)
-        qZ = data_row.get(QZ, 0)
-        sigma_para = data_row.get(SIGMA_PARA, 0) if detector_config is None else detector_config.get_sigma_parallel(qx_i, qy_i)
-        sigma_perp = data_row.get(SIGMA_PERP, 0) if detector_config is None else detector_config.get_sigma_geometric()
-        shadow_factor = bool(data_row.get(SHADOW_FACTOR,bool(intensity)))
-        return constants.validate_fields(cls,  {
-            QX : qx_i,
-            QY : qy_i,
-            INTENSITY : intensity,
-            INTENSITY_ERROR : intensity_error,
-            QZ : qZ,
-            SIGMA_PARA : sigma_para,
-            SIGMA_PERP : sigma_perp,
-            SHADOW_FACTOR : shadow_factor
-            })
 
 
 def get_pixel_qX(pixel: DetectorPixel) -> float:
@@ -375,12 +349,6 @@ class DetectorImage: # Major refactor needed for detector image, as it shouldn't
         }
         return cls.gen_from_data(data_dict=data_dict, detector_config=detector_config)
 
-    @classmethod
-    def gen_from_pandas(cls, dataframe: pd.DataFrame, detector_config: DetectorConfig | None = None):
-        return DetectorImage(
-            detector_pixels=[DetectorPixel.row_to_pixel(row.to_dict(), detector_config) for _, row in dataframe.iterrows()],
-            polarization=detector_config.polarization if detector_config is not None else Polarization.UNPOLARIZED
-        )
 
 @array_cache
 def make_smearing_function(pixel_list: Iterable[DetectorPixel], qx_matrix: np.ndarray, qy_matrix: np.ndarray, slicing_range: int | None = None) -> Callable[[np.ndarray], np.ndarray]:
