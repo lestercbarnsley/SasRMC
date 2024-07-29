@@ -1,7 +1,7 @@
-from __future__ import annotations
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 
+from typing_extensions import Self
 
 from sas_rmc.vector import Vector
 
@@ -69,7 +69,7 @@ class Shape(ABC):
         """
         pass
 
-    def collision_detected(self, shape: Shape) -> bool:
+    def collision_detected(self, shape: Self) -> bool:
         """Tests whether another shape has collided with or impinged with this shape.
 
         Parameters
@@ -102,11 +102,11 @@ class Shape(ABC):
         pass
 
     @abstractmethod
-    def change_position(self, position: Vector) -> Shape:
+    def change_position(self, position: Vector) -> Self:
         pass
 
     @abstractmethod
-    def change_orientation(self, orientation: Vector) -> Shape:
+    def change_orientation(self, orientation: Vector) -> Self:
         pass
 
 

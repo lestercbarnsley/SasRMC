@@ -1,8 +1,8 @@
 #%%
-from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
+from typing_extensions import Self
 
 from sas_rmc import Vector
 from sas_rmc.particles.particle import FormResult
@@ -55,7 +55,7 @@ class SphericalParticle(Particle):
     def get_volume(self) -> float:
         return self.core_sphere.get_volume()
     
-    def magnetic_form_array(self, qx_array: np.ndarray, qy_array: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def magnetic_form_array(self, qx_array: np.ndarray, qy_array: np.ndarray) -> list[np.ndarray]:
         q = np.sqrt(qx_array**2 + qy_array**2)
         if not self.is_magnetic():
             return [np.zeros(q.shape) for _ in range(3)]
@@ -78,19 +78,19 @@ class SphericalParticle(Particle):
     def get_scattering_length(self) -> float:
         return self.get_volume() * self.get_delta_sld()
     
-    def change_position(self, position: Vector) -> SphericalParticle:
-        return SphericalParticle(
+    def change_position(self, position: Vector) -> Self:
+        return type(self)(
             core_sphere=self.core_sphere.change_position(position),
             sphere_sld=self.sphere_sld,
             solvent_sld=self.solvent_sld,
             magnetization=self.magnetization
         )
     
-    def change_orientation(self, orientation: Vector) -> SphericalParticle:
+    def change_orientation(self, orientation: Vector) -> Self:
         return self
     
-    def change_magnetization(self, magnetization: Vector) -> SphericalParticle:
-        return SphericalParticle(
+    def change_magnetization(self, magnetization: Vector) -> Self:
+        return type(self)(
             core_sphere=self.core_sphere,
             sphere_sld=self.sphere_sld,
             solvent_sld=self.solvent_sld,
@@ -113,4 +113,5 @@ class SphericalParticle(Particle):
 if __name__ == "__main__":
     test = SphericalParticle.gen_from_parameters(
         position=Vector(0, 0, 1))
+    
   #%%

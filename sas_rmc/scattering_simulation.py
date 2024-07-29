@@ -1,8 +1,8 @@
 #%%
-from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
+from typing_extensions import Self
 
 from sas_rmc.box_simulation import Box
 from sas_rmc.particles.particle import Particle
@@ -26,8 +26,8 @@ class SimulationParam:
     name: str
     bounds: tuple[float, float] = (-np.inf, np.inf)
 
-    def set_value(self, new_value: float) -> SimulationParam:
-        return SimulationParam(value = new_value, name = self.name, bounds=self.bounds)
+    def set_value(self, new_value: float) -> Self:
+        return type(self)(value = new_value, name = self.name, bounds=self.bounds)
 
     def get_physical_acceptance(self) -> bool:
         """Determines if a SimulationParam is acceptable.
@@ -73,8 +73,8 @@ class ScatteringSimulation:
             return False
         return not any(box.collision_test() for box in self.box_list)
     
-    def set_scale_factor(self, new_scale_factor: float) -> ScatteringSimulation:
-        return ScatteringSimulation(
+    def set_scale_factor(self, new_scale_factor: float) -> Self:
+        return type(self)(
             scale_factor=self.scale_factor.set_value(new_scale_factor),
             box_list = self.box_list
         )
@@ -82,8 +82,8 @@ class ScatteringSimulation:
     def get_particle(self, box_index: int, particle_index: int) -> Particle:
         return self.box_list[box_index].particles[particle_index]
     
-    def change_particle(self, box_index: int, particle_index: int, new_particle: Particle) -> ScatteringSimulation:
-        return ScatteringSimulation(
+    def change_particle(self, box_index: int, particle_index: int, new_particle: Particle) -> Self:
+        return type(self)(
             scale_factor=self.scale_factor,
             box_list=[Box(
                 particles = [new_particle if j == particle_index else particle

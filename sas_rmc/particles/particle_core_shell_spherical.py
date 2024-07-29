@@ -1,8 +1,9 @@
 #%%
-from __future__ import annotations
+
 from dataclasses import dataclass
 
 import numpy as np
+from typing_extensions import Self
 
 from sas_rmc.particles import FormResult, Particle
 from sas_rmc.particles.particle_spherical import SphericalParticle
@@ -102,8 +103,8 @@ class CoreShellParticle(Particle):
     def get_scattering_length(self) -> float:
         return (self.core_sld - self.shell_sld) * self.core_sphere.get_volume() + self.shell_sld * self.shell_sphere.get_volume()
 
-    def change_position(self, position: Vector) -> CoreShellParticle:
-        return CoreShellParticle.gen_from_parameters(
+    def change_position(self, position: Vector) -> Self:
+        return type(self).gen_from_parameters(
             position=position,
             magnetization=self.magnetization,
             core_radius=self.core_radius,
@@ -113,11 +114,11 @@ class CoreShellParticle(Particle):
             solvent_sld=self.solvent_sld
         )
     
-    def change_orientation(self, orientation: Vector) -> CoreShellParticle:
+    def change_orientation(self, orientation: Vector) -> Self:
         return self
 
-    def change_magnetization(self, magnetization: Vector) -> CoreShellParticle:
-        return CoreShellParticle.gen_from_parameters(
+    def change_magnetization(self, magnetization: Vector) -> Self:
+        return type(self).gen_from_parameters(
             position=self.get_position(),
             magnetization=magnetization,
             core_radius=self.core_radius,

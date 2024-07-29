@@ -1,7 +1,8 @@
-from __future__ import annotations
+
 from dataclasses import dataclass
 
 import numpy as np
+from typing_extensions import Self
 
 from sas_rmc.shapes import Shape, Interface
 from sas_rmc import Vector
@@ -48,8 +49,8 @@ class Cube(Shape):
         basis_c, basis_a, basis_b = self.orientation.rotated_basis()
         return self.central_position + a * basis_a + b * basis_b + c * basis_c
     
-    def change_position(self, position: Vector) -> Cube:
-        return Cube(
+    def change_position(self, position: Vector) -> Self:
+        return type(self)(
             central_position=position,
             orientation=self.orientation,
             dimension_0=self.dimension_0,
@@ -57,8 +58,8 @@ class Cube(Shape):
             dimension_2=self.dimension_2
         )
 
-    def change_orientation(self, orientation: Vector) -> Cube:
-        return Cube(
+    def change_orientation(self, orientation: Vector) -> Self:
+        return type(self)(
             central_position=self.central_position,
             orientation=orientation,
             dimension_0=self.dimension_0,
@@ -66,8 +67,8 @@ class Cube(Shape):
             dimension_2=self.dimension_2
         )
     
-    def change_dimensions(self, dimension_0: float, dimension_1: float, dimension_2: float) -> Cube:
-        return Cube(
+    def change_dimensions(self, dimension_0: float, dimension_1: float, dimension_2: float) -> Self:
+        return type(self)(
             central_position=self.central_position,
             orientation=self.orientation,
             dimension_0=dimension_0,

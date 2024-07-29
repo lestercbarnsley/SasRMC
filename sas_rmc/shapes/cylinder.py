@@ -1,7 +1,7 @@
-from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
+from typing_extensions import Self
 
 from sas_rmc.shapes import Shape, Interface
 from sas_rmc import Vector, constants
@@ -70,32 +70,32 @@ class Cylinder(Shape):
         para_vec, radial_vec_1, radial_vec_2 = self.orientation.rotated_basis()
         return self.central_position + z * para_vec + r * (np.cos(phi) * radial_vec_1 + np.sin(phi) * radial_vec_2)
 
-    def change_position(self, position: Vector) -> Cylinder:
-        return Cylinder(
+    def change_position(self, position: Vector) -> Self:
+        return type(self)(
             central_position=position,
             orientation=self.orientation,
             radius=self.radius,
             height=self.height
         )
 
-    def change_orientation(self, orientation: Vector) -> Cylinder:
-        return Cylinder(
+    def change_orientation(self, orientation: Vector) -> Self:
+        return type(self)(
             central_position=self.central_position,
             orientation=orientation,
             radius=self.radius,
             height=self.height
         )
 
-    def change_radius(self, radius: float) -> Cylinder:
-        return Cylinder(
+    def change_radius(self, radius: float) -> Self:
+        return type(self)(
             central_position=self.central_position,
             orientation=self.orientation,
             radius = radius,
             height= self.height
         )
     
-    def change_height(self, height: float) -> Cylinder:
-        return Cylinder(
+    def change_height(self, height: float) -> Self:
+        return type(self)(
             central_position=self.central_position,
             orientation=self.orientation,
             radius=self.radius,

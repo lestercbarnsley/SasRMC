@@ -1,8 +1,8 @@
-from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 import numpy as np
+from typing_extensions import Self
 
 from sas_rmc.scattering_simulation import ScatteringSimulation
 from sas_rmc import Vector, Particle
@@ -168,8 +168,7 @@ class RotateParticle(ParticleCommand):
         particle = self.get_particle(scattering_simulation)
         orientation_old = particle.get_orientation()
         orientation_new = small_angle_change(orientation_old, self.relative_angle)
-        new_particle = particle.change_orientation(orientation_new)
-        return ReorientateParticle(self.box_index, self.particle_index, new_particle).execute(scattering_simulation)
+        return ReorientateParticle(self.box_index, self.particle_index, orientation_new).execute(scattering_simulation)
 
 
 @dataclass

@@ -1,9 +1,9 @@
 #%%
-from __future__ import annotations
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 
 import numpy as np
+from typing_extensions import Self
 
 from sas_rmc.shapes import Shape, collision_detected
 from sas_rmc import Vector, constants
@@ -68,7 +68,7 @@ class Particle(ABC):
     def is_inside(self, position: Vector) -> bool:
         return any(shape.is_inside(position) for shape in self.get_shapes())
 
-    def collision_detected(self, other_particle: Particle) -> bool:
+    def collision_detected(self, other_particle: Self) -> bool:
         return collision_detected(self.get_shapes(), other_particle.get_shapes())
 
     @abstractmethod
@@ -79,15 +79,15 @@ class Particle(ABC):
         return self.get_magnetization().mag != 0
 
     @abstractmethod
-    def change_position(self, position: Vector) -> Particle:
+    def change_position(self, position: Vector) -> Self:
         pass
 
     @abstractmethod
-    def change_orientation(self, orientation: Vector) -> Particle:
+    def change_orientation(self, orientation: Vector) -> Self:
         pass
 
     @abstractmethod
-    def change_magnetization(self, magnetization: Vector) -> Particle:
+    def change_magnetization(self, magnetization: Vector) -> Self:
         pass
     
     @abstractmethod

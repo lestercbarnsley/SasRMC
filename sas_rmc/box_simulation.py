@@ -1,6 +1,7 @@
 #%%
-from __future__ import annotations
 from dataclasses import dataclass
+
+from typing_extensions import Self
 
 from sas_rmc import Vector, constants
 from sas_rmc.particles import Particle
@@ -39,9 +40,9 @@ class Box:
             return True
         return any(particle.collision_detected(particle_j) for particle_j in self.particles)
     
-    def move_inside_box(self, i: int) -> Box:
+    def move_inside_box(self, i: int) -> Self:
         new_position = self.cube.random_position_inside()
-        return Box(
+        return type(self)(
             particles=[particle if j!=i else particle.change_position(new_position) for j, particle in enumerate(self.particles)],
             cube=self.cube
         )
@@ -51,7 +52,7 @@ class Box:
             return True
         return any(particle_i.collision_detected(particle_j) for i, particle_i in enumerate(self.particles) for j, particle_j in enumerate(self.particles) if i > j)
     
-    def force_inside_box(self) -> Box:
+    def force_inside_box(self) -> Self:
         box = self
         l = len(box)
         for i in range(10_000_000):
