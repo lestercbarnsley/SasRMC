@@ -282,7 +282,7 @@ class DetectorImage: # Major refactor needed for detector image, as it shouldn't
     
 
     @classmethod
-    def gen_from_data(cls, data_dict: dict, detector_config: DetectorConfig = None):
+    def gen_from_data(cls, data_dict: dict, detector_config: DetectorConfig | None = None):
         qX_data = data_dict[QX]
         qY_data = data_dict[QY]
         qX_1d = fuzzy_unique(qX_data, lambda a: a[np.abs(qY_data) < 0.025 * np.max(qY_data)])#.tolist() Ultimately, this should be a strategy somehow

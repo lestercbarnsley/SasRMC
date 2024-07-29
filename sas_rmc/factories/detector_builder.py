@@ -1,19 +1,16 @@
 #%%
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import List, Callable, Tuple, Union
-from pathlib import Path
-
-import numpy as np
-
-from sas_rmc import constants
-from sas_rmc.detector import DetectorConfig, DetectorImage, DetectorPixel, Polarization
-
-PI = constants.PI
 
 
 import pandas as pd
 from pydantic.dataclasses import dataclass
+
+from sas_rmc import constants
+from sas_rmc.detector import DetectorConfig, DetectorImage, DetectorPixel, Polarization, subtract_two_detectors
+from sas_rmc.factories import parse_data
+
+PI = constants.PI
+
+
 
 
 @dataclass
@@ -44,7 +41,6 @@ class DetectorPixelFactory:
         }
         return cls(**d)
         
-
 
 @dataclass
 class DetectorConfigFactory:
@@ -92,9 +88,17 @@ def create_detector_images(dataframes: dict[str, pd.DataFrame]) -> list[Detector
     value_dict = {k : v for k, v in parse_data.parse_value_frame(value_frame)}
     if value_dict.get("Data Source"):
         data_dict = dataframes[value_dict.get("Data Source")]
+        detector = create_detector_image(data_dict, value_dict)
         buffer_source = value_dict.get("Buffer Source")
         if buffer_source:
             buffer_dict = dataframes[value_dict.get("Buffer Source")]
+            buffer = create_detector_image(buffer_dict, value_dict)
+            return [subtract_two_detectors(detector, buffer)]
+        return [detector]
+    
+    
+if __name__ == "__main__":
+    pass
 
 
 # %%
