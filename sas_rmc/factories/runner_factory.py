@@ -11,6 +11,7 @@ from pydantic.dataclasses import dataclass
 
 from sas_rmc import acceptance_scheme, commands, constants
 from sas_rmc.controller import Controller
+from sas_rmc.factories.detector_builder import create_detector_images
 from sas_rmc.particles.particle_core_shell_spherical import CoreShellParticle
 from sas_rmc.scattering_simulation import ScatteringSimulation, SimulationParam
 
@@ -293,8 +294,8 @@ if __name__ == "__main__":
     from sas_rmc.detector import DetectorImage
     #create_runner(spreadsheet)
     df = dataframes['Data parameters']
-    d = create_detector_image(dataframes['M3-polDown-20m'],{k : v for k, v in dataframes['Data parameters'].iloc[0].items()})
-
+    #d = create_detector_image(dataframes['M3-polDown-20m'],{k : v for k, v in dataframes['Data parameters'].iloc[0].items()})
+    d_list = create_detector_images(dataframes)
     #d = DetectorImage.gen_from_pandas(dataframes['M3-polDown-20m'])
 
 

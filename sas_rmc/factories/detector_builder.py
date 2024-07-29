@@ -5,7 +5,7 @@ import pandas as pd
 from pydantic.dataclasses import dataclass
 
 from sas_rmc import constants
-from sas_rmc.detector import DetectorConfig, DetectorImage, DetectorPixel, Polarization, subtract_two_detectors
+from sas_rmc.detector import DetectorConfig, DetectorImage, DetectorPixel, Polarization, subtract_two_detectors, subtract_flat_background
 from sas_rmc.factories import parse_data
 
 PI = constants.PI
@@ -77,24 +77,36 @@ class DetectorConfigFactory:
         return cls(**d)
     
 
-def create_detector_image(dataframe: pd.DataFrame, value_dict: dict) -> DetectorImage:
+def create_detector_image(dataframes: dict[str, pd.DataFrame], value_dict: dict) -> DetectorImage:
     detector_config = DetectorConfigFactory.gen_from_config(value_dict).create_detector_config()
-    pixels = [DetectorPixelFactory.gen_from_row({k : v for k, v in row.items()}).create_pixel(detector_config) for _, row in dataframe.iterrows()]
-    return DetectorImage(pixels, polarization=detector_config.polarization)
+    detector_df = dataframes[value_dict["Data Source"]] # raises KeyError
+    pixels = [DetectorPixelFactory.gen_from_row({k : v for k, v in row.items()}).create_pixel(detector_config) for _, row in detector_df.iterrows()]
+    detector_image = DetectorImage(pixels, polarization=detector_config.polarization)
+    buffer_source = value_dict.get("Buffer Source")
+    if not buffer_source:
+        return detector_image
+    if isinstance(buffer_source, float):
+        return subtract_flat_background(detector_image, buffer_source)
+    if buffer_source in dataframes:
+        buffer_df = dataframes[buffer_source]
+        buffer_pixels = [DetectorPixelFactory.gen_from_row({k : v for k, v in row.items()}).create_pixel(detector_config) for _, row in buffer_df.iterrows()]
+        buffer_image = DetectorImage(buffer_pixels, polarization=Polarization.UNPOLARIZED) # Buffer should never be polarized
+        return subtract_two_detectors(detector_image, buffer_image)
+    raise KeyError("Could not find buffer source")
+    
 
 
 def create_detector_images(dataframes: dict[str, pd.DataFrame]) -> list[DetectorImage]:
     value_frame = list(dataframes.values())[0]
-    value_dict = {k : v for k, v in parse_data.parse_value_frame(value_frame)}
+    value_dict = parse_data.parse_value_frame(value_frame)
     if value_dict.get("Data Source"):
-        data_dict = dataframes[value_dict.get("Data Source")]
-        detector = create_detector_image(data_dict, value_dict)
-        buffer_source = value_dict.get("Buffer Source")
-        if buffer_source:
-            buffer_dict = dataframes[value_dict.get("Buffer Source")]
-            buffer = create_detector_image(buffer_dict, value_dict)
-            return [subtract_two_detectors(detector, buffer)]
-        return [detector]
+        create_detector_image(dataframes, value_dict)
+    df = dataframes['Data parameters']
+    return [create_detector_image(
+        dataframes=dataframes,
+        value_dict={k : v for k, v in row.items()}
+    ) for _, row in df.iterrows()]
+        
     
     
 if __name__ == "__main__":
