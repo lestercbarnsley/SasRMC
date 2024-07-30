@@ -1,10 +1,7 @@
 
 
 from abc import abstractmethod
-from dataclasses import dataclass, field
-from typing import Callable, List, Optional, Protocol, Tuple
-from pathlib import Path
-from datetime import datetime
+from dataclasses import dataclass
 
 
 
@@ -36,6 +33,19 @@ class NoLogCallback(LogCallback):
 
     def stop(self, document: dict | None = None) -> None:
         pass
+
+
+@dataclass
+class PrintLogCallback(LogCallback):
+
+    def start(self, document: dict | None = None) -> None:
+        print('start', document)
+
+    def event(self, document: dict | None = None) -> None:
+        print('event', document)
+
+    def stop(self, document: dict | None = None) -> None:
+        print('event', document)
 
 
 @dataclass

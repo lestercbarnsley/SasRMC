@@ -2,27 +2,17 @@
 SasRMC is a Python library for numerical modelling of small-angle scattering data. 
 
 ## Setup
-**SasRMC will use Python 3.11 after the next push to main. Upgrade your virtual environment today!**
+**SasRMC will use Python 3.11 after the next push to main. Upgrade your Python installation today!**
 SasRMC is compatible with Python 3.10 and newer. An upgrade to Python 3.11 is planned for very soon.
-SaSRMC is dropping support **conda**. Dependency management using **poetry** will be the preferred way going forward. Find out more here: https://python-poetry.org/
+SaSRMC is dropping support for **conda**. Dependency management using **poetry** will be the preferred way going forward. Find out more here: https://python-poetry.org/
 
 1. Download source files from https://github.com/lestercbarnsley/SasRMC -> `Code` -> `Download ZIP`
-2. If you have an existing virtual environment or conda environment you wish to use, activate it in the usual way and jump to step 9.
-3. If you wish to create a new Python virtual environment, follow steps 4 and 5. If you wish to create a new conda environment follow steps 6-8.
-4. Navigate to where you wish to create a **venv** virtual environment and create it with
-    `$ python -m venv .myvenv`
-where `myvenv` is the name of your **venv**
-5. Activate the virtual environment with 
-    `$ .\.myvenv\Scripts\activate`
-6. I recommend **conda** for scientists using Windows who are new to Python. Please consult with your local Pythonista for their advice. Installation instructions for conda can be found online: https://docs.conda.io/projects/conda/en/latest/user-guide/install/download.html
-7. After installing conda, in a terminal, create an environment with
-    `$ conda create -n myenv python=3.x --channel=conda-forge`
-where `myenv` is the name of your conda environment and `3.x` is the Python version you wish to use. (Please use 3.10 or greater).
-8. Activate the conda environment with
-    `$ conda activate myenv`
-9. In the terminal, navigate to the directory containing `setup.py`
-10. Install all dependencies with
-    `(myenv)$ pip install -e .`
+2. Install **poetry**. Check the virtual environment and/or base Python installation version with 
+    `$ poetry env info`
+If the version is not compatible with the required Python version (currently 3.10 and newer) you will need to upgrade your virtual environment and/or base Python.
+3. Navigate to the folder that contains `pyproject.toml`. Run
+    `$ poetry install`
+    
 
 ## Usage
 Most configuration for SasRMC is done using Excel spreadsheets. You can use SasRMC without needing to edit any Python code.

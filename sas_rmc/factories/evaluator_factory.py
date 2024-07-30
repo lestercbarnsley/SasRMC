@@ -2,9 +2,10 @@ import pandas as pd
 import numpy as np
 
 from sas_rmc.detector import DetectorImage
-from sas_rmc.evaluator import EvaluatorWithFitter, Smearing2dFitterMultiple, Smearing2DFitter
+from sas_rmc.evaluator import EvaluatorWithFitter, FitterMultiple, Smearing2DFitter, NoSmearing2DFitter
 from sas_rmc.form_calculator import FieldDirection
 from sas_rmc.result_calculator import AnalyticalCalculator
+from sas_rmc.factories import detector_builder
 
 def analytical_calculator_from_experimental_detector(detector: DetectorImage, density_factor: float, field_direction: FieldDirection = FieldDirection.Y) -> AnalyticalCalculator:
     qXs = np.unique(detector.qX)
@@ -22,11 +23,25 @@ def analytical_calculator_from_experimental_detector(detector: DetectorImage, de
     )
 
 def create_evaluator_with_smearing(dataframes: dict[str, pd.DataFrame]) -> EvaluatorWithFitter:
-    
+    detector_list = detector_builder.create_detector_images(dataframes)
     return EvaluatorWithFitter(
-        fitter=Smearing2dFitterMultiple(
-            fitter_list=Smearing2DFitter(
-                result_calculator=AnalyticalCalculator()
-            )
-        )
+        fitter=FitterMultiple(
+            fitter_list=[Smearing2DFitter(
+                result_calculator=analytical_calculator_from_experimental_detector(detector, 2.0),
+                experimental_detector=detector
+            ) for detector in detector_list],
+            weight=[detector.shadow_factor.sum() for detector in detector_list]
+        ),
+    )
+
+def create_evaluator_no_smearing(dataframes: dict[str, pd.DataFrame]) -> EvaluatorWithFitter:
+    detector_list = detector_builder.create_detector_images(dataframes)
+    return EvaluatorWithFitter(
+        fitter=FitterMultiple(
+            fitter_list=[NoSmearing2DFitter(
+                result_calculator=AnalyticalCalculator(detector.qX, detector.qY, detector.polarization),
+                experimental_detector=detector
+            ) for detector in detector_list],
+            weight=[detector.shadow_factor.sum() for detector in detector_list]
+        ),
     )

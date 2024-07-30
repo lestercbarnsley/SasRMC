@@ -5,6 +5,7 @@ from typing import Any, Callable, Iterable
 
 import numpy as np
 import pandas as pd
+from typing_extensions import Self
 
 from sas_rmc import vector
 from sas_rmc.array_cache import array_cache, method_array_cache
@@ -173,6 +174,20 @@ class DetectorPixel:
             SIGMA_PERP: self.sigma_perp,
             SHADOW_FACTOR : int(self.shadow_factor)
         }
+    
+    def subtract(self, pixel_2: Self) -> Self:
+        if (self.qX != pixel_2.qX) or (self.qY != pixel_2.qY):
+            raise ValueError("Cannot subtract two pixels that have different Q values")
+        return type(self)(
+            qX = self.qX,
+            qY = self.qY,
+            intensity = self.intensity - pixel_2.intensity,
+            intensity_err= np.sqrt(self.intensity_err**2 + pixel_2.intensity_err**2),
+            qZ = self.qZ,
+            sigma_para=self.sigma_para,
+            sigma_perp=self.sigma_perp,
+            shadow_factor=self.shadow_factor
+        )
 
 
 
@@ -361,11 +376,10 @@ def make_smearing_function(pixel_list: Iterable[DetectorPixel], qx_matrix: np.nd
     return smear
 
 def subtract_two_detectors(detector_image_1: DetectorImage, detector_image_2: DetectorImage) ->  DetectorImage:
+    if np.any(detector_image_1.qX != detector_image_2.qX) or np.any(detector_image_1.qY != detector_image_2.qY):
+        raise ValueError("Subtraction not possible on two detectors with different q values")
     return DetectorImage(
-        detector_pixels=[
-            subtract_nearest_pixel(pixel, detector_image_2.detector_pixels)
-                         for pixel in detector_image_1.detector_pixels
-                         ],
+        detector_pixels=[pixel_1.subtract(pixel_2) for pixel_1, pixel_2 in zip(detector_image_1.detector_pixels, detector_image_2.detector_pixels)],
         polarization=detector_image_1.polarization
     )
 

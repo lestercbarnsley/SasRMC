@@ -44,6 +44,12 @@ class Fitter(ABC):
         pass
 
 
+def calculate_goodness_of_fit(simulated_intensity: np.ndarray, experimental_detector: DetectorImage) -> float:
+    experimental_intensity = experimental_detector.intensity
+    uncertainty = experimental_detector.intensity_err
+    return ((experimental_intensity - simulated_intensity)**2 / uncertainty**2)[experimental_detector.shadow_factor].mean()
+    
+    
 @dataclass
 class Smearing2DFitter(Fitter):
     result_calculator: AnalyticalCalculator
@@ -65,10 +71,8 @@ class Smearing2DFitter(Fitter):
 
     def calculate_goodness_of_fit(self, simulation_state: ScatteringSimulation) -> float:
         simulated_intensity = self.simulate_intensity(simulation_state)
-        experimental_intensity = self.experimental_detector.intensity
-        uncertainty = self.experimental_detector.intensity_err
-        return ((experimental_intensity - simulated_intensity)**2 / uncertainty**2)[self.experimental_detector.shadow_factor].mean()
-    
+        return calculate_goodness_of_fit(simulated_intensity, self.experimental_detector)
+
     def get_loggable_data(self, simulation_state: ScatteringSimulation) -> dict:
         return {
             "Result calculator" : type(self.result_calculator).__name__,
@@ -76,13 +80,35 @@ class Smearing2DFitter(Fitter):
             "Simulated intensity" : [intensity for intensity in self.simulate_intensity(simulation_state)],
             "Smearing" : True
         }
-
+    
 @dataclass
-class Smearing2dFitterMultiple(Fitter):
-    fitter_list: list[Smearing2DFitter]
+class NoSmearing2DFitter(Fitter):
+    result_calculator: AnalyticalCalculator
+    experimental_detector: DetectorImage
+
+    def simulate_intensity(self, simulation_state: ScatteringSimulation) -> np.ndarray:
+        intensity_result = self.result_calculator.intensity_result(simulation_state)
+        return intensity_result
 
     def calculate_goodness_of_fit(self, simulation_state: ScatteringSimulation) -> float:
-        return np.sum([fitter.calculate_goodness_of_fit(simulation_state) for fitter in self.fitter_list])
+        simulated_intensity = self.simulate_intensity(simulation_state)
+        return calculate_goodness_of_fit(simulated_intensity, self.experimental_detector)
+
+    def get_loggable_data(self, simulation_state: ScatteringSimulation) -> dict:
+        return {
+            "Result calculator" : type(self.result_calculator).__name__,
+            "Detector data" : self.experimental_detector.get_loggable_data(),
+            "Simulated intensity" : [intensity for intensity in self.simulate_intensity(simulation_state)],
+            "Smearing" : False
+        }
+
+@dataclass
+class FitterMultiple(Fitter):
+    fitter_list: list[Fitter]
+    weight: list[float] | None = None
+
+    def calculate_goodness_of_fit(self, simulation_state: ScatteringSimulation) -> float:
+        return float(np.average([fitter.calculate_goodness_of_fit(simulation_state) for fitter in self.fitter_list], weights=self.weight))
 
     def get_loggable_data(self, simulation_state: ScatteringSimulation) -> dict:
         return {f"Fitter {i}" : fitter.get_loggable_data(simulation_state) 
