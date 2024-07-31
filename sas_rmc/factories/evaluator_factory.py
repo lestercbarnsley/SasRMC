@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 
 from sas_rmc.detector import DetectorImage
-from sas_rmc.evaluator import EvaluatorWithFitter, FitterMultiple, Smearing2DFitter, NoSmearing2DFitter
+from sas_rmc.evaluator import EvaluatorWithFitter, FitterMultiple, Smearing2DFitter, NoSmearing2DFitter, qXqY_delta
 from sas_rmc.form_calculator import FieldDirection
 from sas_rmc.result_calculator import AnalyticalCalculator
 from sas_rmc.factories import detector_builder
@@ -10,8 +10,7 @@ from sas_rmc.factories import detector_builder
 def analytical_calculator_from_experimental_detector(detector: DetectorImage, density_factor: float, field_direction: FieldDirection = FieldDirection.Y) -> AnalyticalCalculator:
     qXs = np.unique(detector.qX)
     qYs = np.unique(detector.qY)
-    qX_diff = np.max(np.gradient(qXs))
-    qY_diff = np.max(np.gradient(qYs))
+    qX_diff, qY_diff = qXqY_delta(detector)
     qX_lin = np.arange(start = qXs.min(), stop = qXs.max(), step=qX_diff / density_factor)
     qY_lin = np.arange(start = qYs.min(), stop = qYs.max(), step=qY_diff / density_factor)
     qX_arr, qY_arr = np.meshgrid(qX_lin, qY_lin)

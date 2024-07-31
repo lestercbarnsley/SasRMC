@@ -5,10 +5,14 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from sas_rmc import constants
 from sas_rmc.acceptance_scheme import AcceptanceScheme
 from sas_rmc.detector import DetectorImage, make_smearing_function
 from sas_rmc.result_calculator import AnalyticalCalculator
 from sas_rmc.scattering_simulation import ScatteringSimulation
+
+
+PI = constants.PI
 
 
 @dataclass
@@ -56,7 +60,13 @@ def calculate_goodness_of_fit(simulated_intensity: np.ndarray, experimental_dete
     experimental_intensity = experimental_detector.intensity
     uncertainty = experimental_detector.intensity_err
     return ((experimental_intensity - simulated_intensity)**2 / uncertainty**2)[experimental_detector.shadow_factor].mean()
-    
+
+def qXqY_delta(detector: DetectorImage) -> tuple[float, float]:
+    qXs = np.unique(detector.qX)
+    qYs = np.unique(detector.qY)
+    qX_diff = np.max(np.gradient(qXs))
+    qY_diff = np.max(np.gradient(qYs))
+    return qX_diff, qY_diff
     
 @dataclass
 class Smearing2DFitter(Fitter):
@@ -70,6 +80,11 @@ class Smearing2DFitter(Fitter):
             qx_matrix=self.result_calculator.qx_array,
             qy_matrix=self.result_calculator.qy_array
         )
+    
+    def default_box_dimensions(self) -> list[float]:
+        qX_diff, qY_diff = qXqY_delta(self.experimental_detector)
+        return [2 * PI / qX_diff, 2 * PI / qY_diff, 2 * PI / qX_diff]
+        
     
     def simulate_intensity(self, simulation_state: ScatteringSimulation) -> np.ndarray:
         intensity_result = self.result_calculator.intensity_result(simulation_state)
@@ -99,7 +114,8 @@ class NoSmearing2DFitter(Fitter):
         return intensity_result
 
     def default_box_dimensions(self) -> list[float]:
-        
+        qX_diff, qY_diff = qXqY_delta(self.experimental_detector)
+        return [2 * PI / qX_diff, 2 * PI / qY_diff, 2 * PI / qX_diff]
 
     def calculate_goodness_of_fit(self, simulation_state: ScatteringSimulation) -> float:
         simulated_intensity = self.simulate_intensity(simulation_state)
@@ -122,7 +138,7 @@ class FitterMultiple(Fitter):
         return float(np.average([fitter.calculate_goodness_of_fit(simulation_state) for fitter in self.fitter_list], weights=self.weight))
 
     def default_box_dimensions(self) -> list[float]:
-        return max([fitter.default_box_dimensions() for fitter in fitter_list], key=lambda box_dimension : np.prod(box_dimension))
+        return max([fitter.default_box_dimensions() for fitter in self.fitter_list], key=lambda box_dimension : np.prod(box_dimension))
 
     def get_loggable_data(self, simulation_state: ScatteringSimulation) -> dict:
         return {f"Fitter {i}" : fitter.get_loggable_data(simulation_state) 
@@ -161,6 +177,9 @@ class EvaluatorWithFitter(Evaluator):
             md = acceptance_scheme.get_loggable_data() | md
         )
         return False, document
+    
+    def default_box_dimensions(self) -> list[float]:
+        return self.fitter.default_box_dimensions()
     
     def get_loggable_data(self, simulation_state: ScatteringSimulation) -> dict:
         return {

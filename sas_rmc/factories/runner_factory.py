@@ -95,16 +95,21 @@ class CoreShellRunner:
             core_magnetization=self.core_magnetization
         )
     
-    def create_simulation_state(self) -> ScatteringSimulation:
+    def create_simulation_state(self, default_box_dimensions: list[float] | None = None) -> ScatteringSimulation:
+        box_dimensions = [self.box_dimension_1, self.box_dimension_2, self.box_dimension_3]
+        if np.prod(box_dimensions) == 0:
+            box_dimensions = default_box_dimensions
+        if box_dimensions is None:
+            raise ValueError("Box dimensions are missing.")
         return ScatteringSimulation(
             scale_factor=SimulationParam(self.nominal_concentration if self.nominal_concentration else 1.0, name = "scale_factor", bounds = (0, np.inf)),
-            box_list=box_factory.create_box_list(self.create_particle, [self.box_dimension_1, self.box_dimension_2, self.box_dimension_3], self.particle_number, self.box_number, self.nominal_concentration )
+            box_list=box_factory.create_box_list(self.create_particle, box_dimensions, self.particle_number, self.box_number, self.nominal_concentration )
         )
 
     def create_commands(self, simulation_state: ScatteringSimulation) -> Iterator[commands.Command]:
         for _ in range(self.total_cycles):
             particle_box_indices = list(particle_box_index_iterator(simulation_state))
-            for particle_index, box_index in random.sample(particle_box_indices, len(particle_box_indices)):
+            for box_index, particle_index in random.sample(particle_box_indices, len(particle_box_indices)):
                 box = simulation_state.box_list[box_index]
                 yield create_core_shell_command(
                     box_index = box_index,
@@ -132,7 +137,7 @@ class CoreShellRunner:
 
     
     def create_runner(self, evaluator: Evaluator) -> RmcRunner:
-        state = self.create_simulation_state()
+        state = self.create_simulation_state(default_box_dimensions=evaluator.default_box_dimensions())
         return RmcRunner(
             simulator=Simulator(
                 controller=Controller(
@@ -176,7 +181,7 @@ if __name__ == "__main__":
     spreadsheet = Path(__file__).parent.parent.parent / Path("data") / Path("CoreShell_F20_pol.xlsx")
     
     runner = create_runner(spreadsheet)
-    #runner.run()
+    runner.run()
 
 
     
