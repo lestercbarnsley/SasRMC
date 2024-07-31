@@ -19,6 +19,10 @@ class Evaluator(ABC):
         pass
 
     @abstractmethod
+    def default_box_dimensions(self) -> list[float]:
+        pass
+
+    @abstractmethod
     def get_loggable_data(self, simulation_state: ScatteringSimulation) -> dict:
         pass
 
@@ -37,6 +41,10 @@ class Fitter(ABC):
 
     @abstractmethod
     def calculate_goodness_of_fit(self, simulation_state: ScatteringSimulation) -> float:
+        pass
+
+    @abstractmethod
+    def default_box_dimensions(self) -> list[float]:
         pass
 
     @abstractmethod
@@ -90,6 +98,9 @@ class NoSmearing2DFitter(Fitter):
         intensity_result = self.result_calculator.intensity_result(simulation_state)
         return intensity_result
 
+    def default_box_dimensions(self) -> list[float]:
+        
+
     def calculate_goodness_of_fit(self, simulation_state: ScatteringSimulation) -> float:
         simulated_intensity = self.simulate_intensity(simulation_state)
         return calculate_goodness_of_fit(simulated_intensity, self.experimental_detector)
@@ -109,6 +120,9 @@ class FitterMultiple(Fitter):
 
     def calculate_goodness_of_fit(self, simulation_state: ScatteringSimulation) -> float:
         return float(np.average([fitter.calculate_goodness_of_fit(simulation_state) for fitter in self.fitter_list], weights=self.weight))
+
+    def default_box_dimensions(self) -> list[float]:
+        return max([fitter.default_box_dimensions() for fitter in fitter_list], key=lambda box_dimension : np.prod(box_dimension))
 
     def get_loggable_data(self, simulation_state: ScatteringSimulation) -> dict:
         return {f"Fitter {i}" : fitter.get_loggable_data(simulation_state) 

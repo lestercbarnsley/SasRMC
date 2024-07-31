@@ -174,17 +174,9 @@ if __name__ == "__main__":
     from sas_rmc.factories.detector_builder import create_detector_image
     #data_params = create_runner(r"E:\Programming\SasRMC\data\CoreShell_F20_pol.xlsx")
     spreadsheet = Path(__file__).parent.parent.parent / Path("data") / Path("CoreShell_F20_pol.xlsx")
-    dataframes = pd.read_excel(
-        spreadsheet,
-        dtype = str,
-        sheet_name = None,
-        keep_default_na=False,
-        )
     
-    explore = list(dataframes.values())[2]
-
     runner = create_runner(spreadsheet)
-    runner.run()
+    #runner.run()
 
 
     
