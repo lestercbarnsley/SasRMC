@@ -71,6 +71,9 @@ class Vector:
 
     def to_tuple(self) -> tuple[float, ...]:
         return tuple(self.itercomps())
+    
+    def __iter__(self) -> Iterator[float]:
+        return self.itercomps()
 
     def __len__(self) -> int:
         return 3

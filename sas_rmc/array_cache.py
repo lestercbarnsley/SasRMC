@@ -2,7 +2,8 @@
 
 from functools import wraps
 from enum import Enum
-from typing import Callable, ParamSpec, TypeVar
+from typing import Callable, ParamSpec, TypeVar, MutableMapping, Hashable, Iterable, Any, overload
+import string
 
 import numpy as np
 
@@ -13,21 +14,31 @@ MAX_SIZE = 50
 
 immutable_types = (str, float, int, Enum, np.float64)
 
-def create_arg_key(arg: tuple) -> tuple:
-    if any(isinstance(arg, t) for t in immutable_types):
-        return arg
-    if any(isinstance(arg, t) for t in [tuple, list, set]):
-        return tuple(create_arg_key(a) for a in arg)
-    if isinstance(arg, dict):
+T = TypeVar("T")
+
+
+@overload
+def create_arg_key(arg: Iterable) -> tuple: ...
+
+@overload
+def create_arg_key(arg: MutableMapping) -> tuple: ...
+
+def create_arg_key(arg: Any) -> Hashable:
+    if isinstance(arg, MutableMapping):
         return tuple((create_arg_key(k), create_arg_key(v)) for k, v in arg.items())
-    if isinstance(arg, Vector):
-        return tuple(create_arg_key(c) for c in arg.itercomps())
     if isinstance(arg, np.ndarray):
         if arg.flags.writeable:
             arg.flags.writeable = False
+        return id(arg)
+    if isinstance(arg, str):
+        return arg
+    if isinstance(arg, Iterable):
+        return tuple(create_arg_key(a) for a in arg)
+    if isinstance(arg, Hashable):
+        return arg
     return id(arg)
 
-def create_function_cache_key(*args, **kwargs) -> tuple:
+def create_function_cache_key(*args, **kwargs) -> Hashable:
     return () + create_arg_key(args) + create_arg_key(kwargs)
 
 R = TypeVar("R")
@@ -58,7 +69,7 @@ def array_cache(func: Callable[P, R] | None = None, max_size: int | None = None)
         return _array_cache(func)
     return _array_cache
 
-key_cache_avoider = ''.join(np.random.choice(['dsfa','ewrf','werfj','gjowq','glks','fjkds','jtks','dsaa','jgkda','ewiq']) for _ in range(10))
+key_cache_avoider = ''.join(np.random.choice([c for c in string.ascii_letters + string.digits]) for _ in range(40))
 
 def method_array_cache(func: Callable[P, R] | None = None, max_size: int = CLASS_MAX_SIZE, cache_holder_index: int = 0) -> Callable[P, R]:
     def _method_array_cache(func: Callable[P, R]) -> Callable[P, R]:
@@ -92,6 +103,10 @@ def method_array_cache(func: Callable[P, R] | None = None, max_size: int = CLASS
 
 
 if __name__ == "__main__":
-    pass
+    key_cache_avoider = ''.join(np.random.choice([c for c in string.ascii_letters + string.digits]) for _ in range(40))
 
-#%%
+    
+
+
+
+ #%%
