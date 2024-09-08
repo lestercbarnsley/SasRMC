@@ -54,7 +54,7 @@ class AnalyticalCalculator(ResultCalculator):
     def intensity_result(self, scattering_simulation: ScatteringSimulation) -> np.ndarray:
         return np.average(
             [box_intensity(
-                form_results=[modulated_form_array(particle, self.qx_array, self.qy_array) for particle in box.particles], 
+                form_results=[self.modulated_form_array(particle) for particle in box.particles], 
                 box_volume= box.volume, 
                 qx=self.qx_array, 
                 qy=self.qy_array, 

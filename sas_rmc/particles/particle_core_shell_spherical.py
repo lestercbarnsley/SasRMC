@@ -10,6 +10,10 @@ from sas_rmc.particles.particle_spherical import SphericalParticle
 from sas_rmc import Vector
 from sas_rmc.shapes import Shape, Sphere, collision_detected
 
+
+def change_shape_positions(shape_list: list[Shape], position: Vector) -> list[Shape]:
+    return [shape.change_position(position) for shape in shape_list]
+
 @dataclass
 class CoreShellParticle(Particle):
     core_sphere: Sphere
@@ -104,26 +108,27 @@ class CoreShellParticle(Particle):
         return (self.core_sld - self.shell_sld) * self.core_sphere.get_volume() + self.shell_sld * self.shell_sphere.get_volume()
 
     def change_position(self, position: Vector) -> Self:
-        return type(self).gen_from_parameters(
-            position=position,
-            magnetization=self.magnetization,
-            core_radius=self.core_radius,
-            thickness=self.thickness,
+        core_sphere, shell_sphere = change_shape_positions([self.core_sphere, self.shell_sphere], position)
+        return type(self)(
+            core_sphere=core_sphere,
+            shell_sphere=shell_sphere,
             core_sld=self.core_sld,
             shell_sld=self.shell_sld,
-            solvent_sld=self.solvent_sld
+            solvent_sld=self.solvent_sld,
+            magnetization=self.magnetization
         )
     
     def change_orientation(self, orientation: Vector) -> Self:
         return self
 
     def change_magnetization(self, magnetization: Vector) -> Self:
-        return type(self).gen_from_parameters(
-            position=self.get_position(),
-            magnetization=magnetization,
-            core_radius=self.core_radius,
+        return type(self)(
+            core_sphere=self.core_sphere,
+            shell_sphere=self.shell_sphere,
+            core_sld=self.core_sld,
             shell_sld=self.shell_sld,
-            solvent_sld=self.solvent_sld
+            solvent_sld=self.solvent_sld,
+            magnetization=magnetization
         )
     
     def get_loggable_data(self) -> dict:

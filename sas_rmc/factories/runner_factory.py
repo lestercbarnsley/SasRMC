@@ -176,7 +176,6 @@ def create_runner(input_config_path: Path) -> RmcRunner:
 
 
 if __name__ == "__main__":
-    from sas_rmc.factories.detector_builder import create_detector_image
     #data_params = create_runner(r"E:\Programming\SasRMC\data\CoreShell_F20_pol.xlsx")
     spreadsheet = Path(__file__).parent.parent.parent / Path("data") / Path("CoreShell_F20_pol.xlsx")
     

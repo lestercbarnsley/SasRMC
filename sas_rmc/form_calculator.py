@@ -23,7 +23,7 @@ class FieldDirection(Enum):
 
 @array_cache(max_size=5_000)
 def sum_array_list(array_list: list[np.ndarray]) -> np.ndarray:
-    if len(array_list) < 3:
+    if len(array_list) < 4:
         return np.sum(array_list, axis = 0)
     divisions = 2
     return sum_array_list([sum_array_list(array_list[i::divisions]) for i in range(divisions)])
