@@ -24,8 +24,4 @@ def non_zero_list(ls: list) -> bool:
 NUCLEAR_RESCALE = "Nuclear rescale"
 MAGNETIC_RESCALE = "Magnetic rescale"
 
-T = TypeVar('T')
-
-P = ParamSpec('P')
-R = TypeVar('R')
 

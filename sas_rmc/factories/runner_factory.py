@@ -47,7 +47,8 @@ core_shell_commands = {
     commands.MagnetizeParticle,
     commands.RescaleMagnetization,
     commands.RotateMagnetization,
-    commands.RescaleCommand
+    commands.RescaleCommand,
+    commands.RelativeRescale,
 }
 
 create_core_shell_command = create_command_if_acceptable_command(command_factory.create_command, core_shell_commands)
@@ -102,7 +103,7 @@ class CoreShellRunner:
         if box_dimensions is None:
             raise ValueError("Box dimensions are missing.")
         return ScatteringSimulation(
-            scale_factor=SimulationParam(self.nominal_concentration if self.nominal_concentration else 1.0, name = "scale_factor", bounds = (0, np.inf)),
+            scale_factor=SimulationParam( 1.0, name = "scale_factor", bounds = (0, np.inf)),
             box_list=box_factory.create_box_list(self.create_particle, box_dimensions, self.particle_number, self.box_number, self.nominal_concentration )
         )
 

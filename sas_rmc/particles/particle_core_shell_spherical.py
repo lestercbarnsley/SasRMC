@@ -77,7 +77,7 @@ class CoreShellParticle(Particle):
         )
         return core_particle.form_array(qx_array, qy_array) + shell_particle.form_array(qx_array, qy_array)
     
-    def magnetic_form_array(self, qx_array: np.ndarray, qy_array: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def magnetic_form_array(self, qx_array: np.ndarray, qy_array: np.ndarray) -> list[np.ndarray]:
         spherical_magnetic_particle = SphericalParticle(
             core_sphere=self.core_sphere,
             sphere_sld=self.core_sld,
