@@ -36,7 +36,7 @@ class SphericalParticle(Particle):
         )
 
     def get_delta_sld(self) -> float:
-        return (self.solvent_sld - self.solvent_sld) * 1e-6
+        return (self.sphere_sld - self.solvent_sld) * 1e-6
     
     def form_array(self, qx_array: np.ndarray, qy_array: np.ndarray) -> np.ndarray:
         q_array = np.sqrt(qx_array**2 + qy_array**2)
