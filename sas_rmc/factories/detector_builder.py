@@ -20,17 +20,21 @@ class DetectorPixelFactory:
     intensity: float
     intensity_err: float
     qZ: float = 0
+    sigma_para: float | None = None
+    sigma_perp: float | None = None
     shadow_factor: bool = True
 
     def create_pixel(self, detector_config: DetectorConfig) -> DetectorPixel:
+        sigma_para = self.sigma_para if self.sigma_para is not None else detector_config.get_sigma_parallel(qx=self.qX, qy= self.qY)
+        sigma_perp = self.sigma_perp if self.sigma_perp is not None else detector_config.get_sigma_geometric()
         return DetectorPixel(
             qX=self.qX,
             qY=self.qY,
             intensity=self.intensity,
             intensity_err=self.intensity_err,
             qZ=self.qZ,
-            sigma_para=detector_config.get_sigma_parallel(qx=self.qX, qy= self.qY),
-            sigma_perp=detector_config.get_sigma_geometric(),
+            sigma_para=sigma_para,
+            sigma_perp=sigma_perp,
             shadow_factor = self.shadow_factor
         )
     
@@ -61,14 +65,14 @@ class DetectorConfigFactory:
     @classmethod
     def gen_from_config(cls, config: dict):
         d = config | {
-            'detector_distance_in_m' : config['Detector distance'],
-            'collimation_distance_in_m' : config['Collimation distance'],
-            'collimation_aperture_area_in_m2' : config['Collimation aperture'],
-            'sample_aperture_area_in_m2' : config['Sample aperture'],
-            'detector_pixel_size_in_m' : config['Detector pixel'],
-            'wavelength_in_angstrom' : config['Wavelength'],
-            'wavelength_spread' : config['Wavelength Spread'],
-            'polarization' : config['Polarization']
+            'detector_distance_in_m' : config.get('Detector distance', 0),
+            'collimation_distance_in_m' : config.get('Collimation distance', 0),
+            'collimation_aperture_area_in_m2' : config.get('Collimation aperture', 0),
+            'sample_aperture_area_in_m2' : config.get('Sample aperture', 0),
+            'detector_pixel_size_in_m' : config.get('Detector pixel', 0),
+            'wavelength_in_angstrom' : config.get('Wavelength', 0),
+            'wavelength_spread' : config.get('Wavelength Spread', 0.1),
+            'polarization' : config.get('Polarization', Polarization.UNPOLARIZED.value)
         }
         if d['polarization'] == 'down':
             d['polarization'] = 'spin_down'
@@ -100,7 +104,7 @@ def create_detector_images(dataframes: dict[str, pd.DataFrame]) -> list[Detector
     value_frame = list(dataframes.values())[0]
     value_dict = parse_data.parse_value_frame(value_frame)
     if value_dict.get("Data Source"):
-        create_detector_image(dataframes, value_dict)
+        return [create_detector_image(dataframes, value_dict)]
     df = dataframes['Data parameters']
     return [create_detector_image(
         dataframes=dataframes,
