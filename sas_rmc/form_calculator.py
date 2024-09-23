@@ -23,9 +23,9 @@ class FieldDirection(Enum):
 
 @array_cache(max_size=5_000)
 def sum_array_list(array_list: list[np.ndarray]) -> np.ndarray:
-    if len(array_list) < 4:
+    if len(array_list) < 8:
         return np.sum(array_list, axis = 0)
-    divisions = 2
+    divisions = min(2, int(np.sqrt(len(array_list))))
     return sum_array_list([sum_array_list(array_list[i::divisions]) for i in range(divisions)])
     
 def nuclear_amplitude(form_results: list[FormResult]) -> np.ndarray:
