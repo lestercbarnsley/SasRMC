@@ -8,13 +8,13 @@ import pandas as pd
 from typing_extensions import Self
 
 from sas_rmc import vector
-from sas_rmc.array_cache import array_cache, method_array_cache
+from sas_rmc.array_cache import method_array_cache
 from sas_rmc.vector import Vector
 from sas_rmc import constants
 
 
 PI = constants.PI
-DEFAULT_SLICING_FRACTION_DENOM = 4 # This considers 6.25% of the detector (i.e, 1/4^2) per pixel, which is more than sufficient
+DEFAULT_SLICING_FRACTION_DENOM = 6 # It turns out that a very small number of pixels actually contribute to resolution
 
 # name string constants, this is the source of truth for the names of these quantities
 QX = 'qX'#: self.qX,
@@ -29,6 +29,8 @@ SIMULATED_INTENSITY = 'simulated_intensity'#: self.simulated_intensity,
 SIMUATED_INTENSITY_ERR = 'simulated_intensity_err'#: self.simulated_intensity_err,
 POLARIZATION = "Polarization"
 
+#from matplotlib import pyplot as plt
+
 def get_slicing_func_from_gaussian(gaussian: np.ndarray, slicing_range: int | None = None) -> Callable[[np.ndarray], np.ndarray]:
     i_of_max, j_of_max = np.where(gaussian == np.amax(gaussian))
     i_of_max, j_of_max = i_of_max[0], j_of_max[0]
@@ -40,7 +42,9 @@ def get_slicing_func_from_gaussian(gaussian: np.ndarray, slicing_range: int | No
     j_max = min(j_min + slicing_range, gaussian.shape[1] - 1)
     j_min = j_max - slicing_range
     def slicing_func(arr: np.ndarray) -> np.ndarray:
-        return arr[i_min:i_max, j_min:j_max]
+        res = arr[i_min:i_max, j_min:j_max]
+        
+        return res
     return slicing_func
 
 def test_uniques(test_space: np.ndarray, arr: np.ndarray) -> np.ndarray:
