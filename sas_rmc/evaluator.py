@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from sas_rmc import constants
-from sas_rmc.array_cache import array_cache
+from sas_rmc.array_cache import array_cache, method_array_cache
 from sas_rmc.acceptance_scheme import AcceptanceScheme
 from sas_rmc.detector import DetectorImage, make_smearing_function
 from sas_rmc.result_calculator import AnalyticalCalculator
@@ -73,8 +73,9 @@ def qXqY_delta(detector: DetectorImage) -> tuple[float, float]:
 class Smearing2DFitter(Fitter):
     result_calculator: AnalyticalCalculator
     experimental_detector: DetectorImage
-    smearing_function: Callable[[np.ndarray], np.ndarray] | None = None
+    #smearing_function: Callable[[np.ndarray], np.ndarray] | None = None
 
+    @method_array_cache
     def create_smearing_function(self) -> Callable[[np.ndarray], np.ndarray]:
         return make_smearing_function(
             self.experimental_detector.detector_pixels,
@@ -89,9 +90,10 @@ class Smearing2DFitter(Fitter):
     
     def simulate_intensity(self, simulation_state: ScatteringSimulation) -> np.ndarray:
         intensity_result = self.result_calculator.intensity_result(simulation_state)
-        if self.smearing_function is None:
-            self.smearing_function = self.create_smearing_function()
-        return self.smearing_function(intensity_result)
+        #if self.smearing_function is None:
+        #    self.smearing_function = self.create_smearing_function()
+        smearing_function = self.create_smearing_function()
+        return smearing_function(intensity_result)
 
     def calculate_goodness_of_fit(self, simulation_state: ScatteringSimulation) -> float:
         simulated_intensity = self.simulate_intensity(simulation_state)
