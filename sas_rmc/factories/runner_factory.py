@@ -178,12 +178,21 @@ def create_runner(input_config_path: Path) -> RmcRunner:
 
 if __name__ == "__main__":
     #data_params = create_runner(r"E:\Programming\SasRMC\data\CoreShell_F20_pol.xlsx")
-    spreadsheet = Path(__file__).parent.parent.parent / Path("data") / Path("CoreShell Simulation Input - Copy - Copy.xlsx")
-    
+    #spreadsheet = Path(__file__).parent.parent.parent / Path("data") / Path("CoreShell Simulation Input - Copy - Copy.xlsx")
+    spreadsheet = Path(__file__).parent.parent.parent / Path("data") / Path("CoreShell Simulation Input - Copy.xlsx")
     runner = create_runner(spreadsheet)
-    runner.run()
+    #runner.run()
 
+    import cProfile
+    import pstats
 
+    with cProfile.Profile() as pr:
+        runner.run()
+
+    stats = pstats.Stats(pr)
+    stats.sort_stats(pstats.SortKey.TIME)
+    stats.print_stats()
+    #stats.dump_stats(filename='needs_profiling.prof')
     
 
 

@@ -90,7 +90,7 @@ class Smearing2DFitter(Fitter):
     def simulate_intensity(self, simulation_state: ScatteringSimulation) -> np.ndarray:
         intensity_result = self.result_calculator.intensity_result(simulation_state)
         if self.smearing_function is None:
-            self.smearing_function = array_cache(self.create_smearing_function())
+            self.smearing_function = self.create_smearing_function()
         return self.smearing_function(intensity_result)
 
     def calculate_goodness_of_fit(self, simulation_state: ScatteringSimulation) -> float:

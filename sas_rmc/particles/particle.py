@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 from typing_extensions import Self
 
+from sas_rmc.array_cache import method_array_cache
 from sas_rmc.shapes import Shape, collision_detected
 from sas_rmc import Vector, constants
 
@@ -68,6 +69,7 @@ class Particle(ABC):
     def is_inside(self, position: Vector) -> bool:
         return any(shape.is_inside(position) for shape in self.get_shapes())
 
+    @method_array_cache(max_size=500)
     def collision_detected(self, other_particle: Self) -> bool:
         return collision_detected(self.get_shapes(), other_particle.get_shapes())
 

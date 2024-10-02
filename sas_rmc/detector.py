@@ -144,7 +144,7 @@ class DetectorPixel:
     def q_vector(self) -> Vector:
         return Vector(self.qX, self.qY, self.qZ)
     
-    #@method_array_cache
+    @method_array_cache
     def resolution_function(self, qx_array: np.ndarray, qy_array: np.ndarray) -> np.ndarray:
         qx_offset = qx_array - self.qX
         qy_offset = qy_array - self.qY
@@ -158,7 +158,7 @@ class DetectorPixel:
 
         return gaussian / np.sum(gaussian)
     
-    #@method_array_cache
+    @method_array_cache
     def get_slicing_func(self, qx_array: np.ndarray, qy_array: np.ndarray, slicing_range: int | None = None) -> Callable[[np.ndarray], np.ndarray]:
         gaussian = self.resolution_function(qx_array, qy_array)
         return get_slicing_func_from_gaussian(gaussian, slicing_range)
@@ -365,7 +365,7 @@ class DetectorImage: # Major refactor needed for detector image, as it shouldn't
         return cls.gen_from_data(data_dict=data_dict, detector_config=detector_config)
 
 
-@array_cache
+#@array_cache
 def make_smearing_function(pixel_list: Iterable[DetectorPixel], qx_matrix: np.ndarray, qy_matrix: np.ndarray, slicing_range: int | None = None) -> Callable[[np.ndarray], np.ndarray]:
     pixel_stuff = [(pixel.get_slicing_func(qx_matrix, qy_matrix, slicing_range), pixel.resolution_function(qx_matrix, qy_matrix)) for pixel in pixel_list]
     slicing_functions = [slicing_func for slicing_func, _ in pixel_stuff]

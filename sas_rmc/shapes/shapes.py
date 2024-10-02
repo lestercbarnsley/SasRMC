@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 
 from typing_extensions import Self
 
+from sas_rmc.array_cache import array_cache
 from sas_rmc.vector import Vector
 
 
@@ -127,7 +128,7 @@ class Interface:
 
 
 
- 
+#@array_cache(max_size=3000)
 def collision_detected(shapes_1: list[Shape], shape_2: list[Shape]) -> bool:
     """Detect if a collision has occured between two lists of shapes.
 

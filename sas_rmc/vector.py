@@ -1,6 +1,7 @@
 #%%
 from typing import Callable, Iterator, Type, overload
 from dataclasses import dataclass
+import math
 
 import numpy as np
 from typing_extensions import Self
@@ -48,6 +49,11 @@ def broadcast_to_numpy_array(object_array: np.ndarray, getter_function: Callable
     return array_function(object_array)
 
 
+'''@lru_cache
+def vec_mag(x: float, y: float, z: float) -> float:
+    return np.sqrt(x**2 + y**2 + z**2)'''
+
+
 @dataclass
 class Vector:
     x: float
@@ -56,7 +62,7 @@ class Vector:
 
     @property
     def mag(self) -> float:
-        return np.sqrt(self.x**2 + self.y**2 + self.z**2)
+        return math.sqrt(self.x**2 + self.y**2 + self.z**2) # math is slightly faster for this application
 
     def itercomps(self) -> Iterator[float]: 
         yield self.x
