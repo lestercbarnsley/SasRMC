@@ -47,6 +47,13 @@ def get_slicing_func_from_gaussian(gaussian: np.ndarray, slicing_range: int | No
         return res
     return slicing_func
 
+def get_slicing_func_from_gaussian(gaussian: np.ndarray, gaussian_floor: float | None = None) -> Callable[[np.ndarray], np.ndarray]:
+    gaussian_floor = gaussian_floor if gaussian_floor is not None else 1e-8
+    idxs = np.where(gaussian > gaussian.max() * gaussian_floor)
+    def slicing_func(arr: np.ndarray) -> np.ndarray:
+        return arr[idxs]
+    return slicing_func
+
 def test_uniques(test_space: np.ndarray, arr: np.ndarray) -> np.ndarray:
     closest_in_space = lambda v : test_space[np.argmin(np.abs(test_space - v))]
     return np.array([closest_in_space(a) for a in arr]) # I can't use broadcast because the pandas method passes in a data series rather than a numpy array
@@ -373,10 +380,12 @@ class DetectorImage: # Major refactor needed for detector image, as it shouldn't
 def make_smearing_function(pixel_list: Iterable[DetectorPixel], qx_matrix: np.ndarray, qy_matrix: np.ndarray, slicing_range: int | None = None) -> Callable[[np.ndarray], np.ndarray]:
     pixel_stuff = [(pixel.get_slicing_func(qx_matrix, qy_matrix, slicing_range), pixel.resolution_function(qx_matrix, qy_matrix)) for pixel in pixel_list]
     slicing_functions = [slicing_func for slicing_func, _ in pixel_stuff]
-    big_resolution = np.array([slicing_func(resolution) for slicing_func, resolution in pixel_stuff])
+    #big_resolution = np.array([slicing_func(resolution) for slicing_func, resolution in pixel_stuff])
+    big_resolution = [slicing_func(resolution) for slicing_func, resolution in pixel_stuff]
     def smear(intensity: np.ndarray) -> np.ndarray:
-        big_intensity = np.array([slicing_func(intensity) for slicing_func in slicing_functions])
-        return np.sum(big_resolution * big_intensity, axis = (1,2))
+        return np.array([np.sum(big_res * slicing_func(intensity)) for big_res, slicing_func in zip(big_resolution, slicing_functions)])
+        #big_intensity = np.array([slicing_func(intensity) for slicing_func in slicing_functions])
+        #return np.sum(big_resolution * big_intensity, axis = (1,2))
     return smear
 
 def subtract_two_detectors(detector_image_1: DetectorImage, detector_image_2: DetectorImage) ->  DetectorImage:
