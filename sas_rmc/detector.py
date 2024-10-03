@@ -173,6 +173,20 @@ class DetectorPixel:
     def get_slicing_func(self, qx_array: np.ndarray, qy_array: np.ndarray, slicing_range: int | None = None) -> Callable[[np.ndarray], np.ndarray]:
         gaussian = self.resolution_function(qx_array, qy_array)
         return get_slicing_func_from_gaussian(gaussian, slicing_range)
+    
+    @method_array_cache
+    def get_smearing_func(self, qx_array: np.ndarray, qy_array: np.ndarray, gaussian_floor: float | None = None) -> Callable[[np.ndarray], float]:
+        gaussian = self.resolution_function(qx_array, qy_array)
+        gaussian_floor = gaussian_floor if gaussian_floor is not None else 1e-4
+        idxs = np.where(gaussian > gaussian.max() * gaussian_floor)
+        def slicing_func(arr: np.ndarray) -> np.ndarray:
+            return arr[idxs]
+        sliced_gaussian = slicing_func(gaussian)
+        correction_factor = sliced_gaussian.sum()
+        def smearing_func(arr: np.ndarray) -> float:
+            return (slicing_func(arr) * sliced_gaussian).sum() / correction_factor
+        return smearing_func
+
 
     def to_dict(self):
         return {
@@ -376,16 +390,10 @@ class DetectorImage: # Major refactor needed for detector image, as it shouldn't
         return cls.gen_from_data(data_dict=data_dict, detector_config=detector_config)
 
 
-#@array_cache
 def make_smearing_function(pixel_list: Iterable[DetectorPixel], qx_matrix: np.ndarray, qy_matrix: np.ndarray, slicing_range: int | None = None) -> Callable[[np.ndarray], np.ndarray]:
-    pixel_stuff = [(pixel.get_slicing_func(qx_matrix, qy_matrix, slicing_range), pixel.resolution_function(qx_matrix, qy_matrix)) for pixel in pixel_list]
-    slicing_functions = [slicing_func for slicing_func, _ in pixel_stuff]
-    #big_resolution = np.array([slicing_func(resolution) for slicing_func, resolution in pixel_stuff])
-    big_resolution = [slicing_func(resolution) for slicing_func, resolution in pixel_stuff]
+    slicing_funcs = [pixel.get_smearing_func(qx_matrix, qy_matrix) for pixel in pixel_list]
     def smear(intensity: np.ndarray) -> np.ndarray:
-        return np.array([np.sum(big_res * slicing_func(intensity)) for big_res, slicing_func in zip(big_resolution, slicing_functions)])
-        #big_intensity = np.array([slicing_func(intensity) for slicing_func in slicing_functions])
-        #return np.sum(big_resolution * big_intensity, axis = (1,2))
+        return np.array([slicing_func(intensity) for slicing_func in slicing_funcs])
     return smear
 
 def subtract_two_detectors(detector_image_1: DetectorImage, detector_image_2: DetectorImage) ->  DetectorImage:

@@ -26,7 +26,7 @@ def create_evaluator_with_smearing(dataframes: dict[str, pd.DataFrame]) -> Evalu
     return EvaluatorWithFitter(
         fitter=FitterMultiple(
             fitter_list=[Smearing2DFitter(
-                result_calculator=analytical_calculator_from_experimental_detector(detector, 1.0),
+                result_calculator=analytical_calculator_from_experimental_detector(detector, 1.4),
                 experimental_detector=detector
             ) for detector in detector_list],
             weight=[detector.shadow_factor.sum() for detector in detector_list]
