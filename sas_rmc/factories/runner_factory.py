@@ -9,8 +9,7 @@ import pandas as pd
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 import numpy as np
 
-from sas_rmc import constants, Evaluator, commands, acceptance_scheme, Controller
-from sas_rmc.logger import PrintLogCallback
+from sas_rmc import constants, Evaluator, commands, acceptance_scheme, Controller, logger
 from sas_rmc.scattering_simulation import ScatteringSimulation, SimulationParam
 from sas_rmc.rmc_runner import RmcRunner
 from sas_rmc.particles import CoreShellParticle
@@ -122,7 +121,7 @@ class CoreShellRunner:
                 )
 
     def create_acceptance_scheme(self, simulation_state: ScatteringSimulation) -> Iterator[acceptance_scheme.AcceptanceScheme]:
-        annealing_stop_cycle = self.annealing_stop_cycle_number if self.annealing_stop_cycle_number < 0 else int(self.total_cycles / 2)
+        annealing_stop_cycle = self.annealing_stop_cycle_number if self.annealing_stop_cycle_number > 0 else int(self.total_cycles / 2)
         temperature = self.anneal_start_temp
         if self.annealing_type.lower() == "greedy".lower():
             temperature = 0
@@ -147,7 +146,7 @@ class CoreShellRunner:
                 ),
                 state = state,
                 evaluator=evaluator,
-                log_callback=PrintLogCallback()
+                log_callback=logger.QuietLogCallback()
                 )
 
             )
@@ -179,20 +178,10 @@ def create_runner(input_config_path: Path) -> RmcRunner:
 if __name__ == "__main__":
     #data_params = create_runner(r"E:\Programming\SasRMC\data\CoreShell_F20_pol.xlsx")
     #spreadsheet = Path(__file__).parent.parent.parent / Path("data") / Path("CoreShell Simulation Input - Copy - Copy.xlsx")
-    spreadsheet = Path(__file__).parent.parent.parent / Path("data") / Path("CoreShell Simulation Input - Copy.xlsx")
+    spreadsheet = Path(__file__).parent.parent.parent / Path("data") / Path("CoreShell_F20_pol - Copy.xlsx")
     runner = create_runner(spreadsheet)
-    #runner.run()
+    runner.run()
 
-    import cProfile
-    import pstats
-
-    with cProfile.Profile() as pr:
-        runner.run()
-
-    stats = pstats.Stats(pr)
-    stats.sort_stats(pstats.SortKey.TIME)
-    stats.print_stats()
-    #stats.dump_stats(filename='needs_profiling.prof')
     
 
 

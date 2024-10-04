@@ -32,13 +32,13 @@ class MetropolisAcceptance(AcceptanceScheme):
     temperature: float
     rng_val: float = field(default_factory= rng.uniform)
     loggable_data: dict | None = None
-
+    
     def is_acceptable(self, old_goodness_of_fit: float, new_goodness_of_fit: float) -> bool:
-        if new_goodness_of_fit < old_goodness_of_fit:
+        if np.abs(new_goodness_of_fit - 1) < np.abs(old_goodness_of_fit - 1):
             return True
         if self.temperature == 0:
             return False
-        delta_chi = new_goodness_of_fit - old_goodness_of_fit
+        delta_chi = np.abs(new_goodness_of_fit - 1) - np.abs(old_goodness_of_fit - 1)
         return self.rng_val < np.exp(-delta_chi / self.temperature)
     
     def get_loggable_data(self) -> dict:
@@ -49,5 +49,4 @@ class MetropolisAcceptance(AcceptanceScheme):
     
 
 if __name__ == "__main__":
-    m = MetropolisAcceptance(temperature=0, loggable_data={'index' : 0})
-    print(m.get_loggable_data())
+    pass

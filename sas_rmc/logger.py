@@ -34,7 +34,6 @@ class NoLogCallback(LogCallback):
     def stop(self, document: dict | None = None) -> None:
         pass
 
-
 @dataclass
 class PrintLogCallback(LogCallback):
 
@@ -43,9 +42,27 @@ class PrintLogCallback(LogCallback):
 
     def event(self, document: dict | None = None) -> None:
         print('event', document)
-
+        
     def stop(self, document: dict | None = None) -> None:
         print('event', document)
+        
+
+
+@dataclass
+class QuietLogCallback(LogCallback):
+
+    def start(self, document: dict | None = None) -> None:
+        print('start', document)
+
+    def event(self, document: dict | None = None) -> None:
+        #print('event', document)
+        if document is None:
+            return None
+        print({k : v for k, v in document.items() if k in ['Current goodness of fit', 'Cycle', 'Step']})
+
+    def stop(self, document: dict | None = None) -> None:
+        #print('event', document)
+        pass
 
 
 @dataclass

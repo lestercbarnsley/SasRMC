@@ -104,7 +104,7 @@ class CoreShellParticle(Particle):
         self.validate_shape()
         return self.shell_sphere.is_inside(position)
     
-    @method_array_cache(max_size=500)
+    #@method_array_cache(max_size=500)
     def collision_detected(self, other_particle: Particle) -> bool:
         self.validate_shape()
         return collision_detected([self.shell_sphere], other_particle.get_shapes())

@@ -85,15 +85,18 @@ def method_array_cache(func: Callable[P, R] | None = None, max_size: int = CLASS
             object_cache = getattr(obj, cache_name)
             if argument_tuple not in object_cache:
                 if len(object_cache) >= max_size:
-                    half_keys = list(object_cache.keys())[0:-2]
-                    uncached = [object_cache.pop(key) for key in half_keys]
+                    almost_all_keys = list(object_cache.keys())[0:-2]
+                    uncached = [object_cache.pop(key) for key in almost_all_keys]
                 result = func(*args, **kwargs)
                 object_cache[argument_tuple] = {
                     'result' : result,
                     'args' : args,
                     'kwargs' : kwargs
                 }
-            return object_cache[argument_tuple]['result']
+            res_collection = object_cache.pop(argument_tuple)
+            object_cache[argument_tuple] = res_collection
+            return res_collection['result']
+            #return object_cache[argument_tuple]['result']
         
         return wrapper
     if func is not None:
