@@ -3,20 +3,15 @@ from dataclasses import dataclass
 
 from typing_extensions import Self
 
-from sas_rmc import Vector, constants, array_cache
+from sas_rmc import Vector, constants
 from sas_rmc.particles import Particle
 from sas_rmc.shapes import Cube
-
 
 
 PI = constants.PI
 rng = constants.RNG
 
 
-def detect_particle_collision(particle_1: Particle, particle_2: Particle, cache_size: int | None = None):
-    cache_size = cache_size if cache_size is not None else 300
-    collision_detected_method = array_cache.method_array_cache(particle_1.collision_detected, max_size=cache_size)
-    return collision_detected_method(particle_2)
 
 
 @dataclass
@@ -55,8 +50,7 @@ class Box:
     def collision_test(self) -> bool:
         if not all(self.is_inside(particle.get_position()) for particle in self.particles):
             return True
-        cache_size = len(self) + 3
-        return any(detect_particle_collision(particle_i, particle_j, cache_size) for i, particle_i in enumerate(self.particles) for j, particle_j in enumerate(self.particles) if i > j)
+        return any(particle_i.collision_detected(particle_j) for i, particle_i in enumerate(self.particles) for j, particle_j in enumerate(self.particles) if i > j)
     
     def force_inside_box(self) -> Self:
         box = self

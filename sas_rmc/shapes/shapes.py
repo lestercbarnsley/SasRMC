@@ -126,7 +126,9 @@ class Interface:
         position_ref = position - self.position_marker
         return position_ref - (self.normal.unit_vector * position_ref) * self.normal.unit_vector + self.position_marker
 
-
+@array_cache(max_size = 100_000)
+def collision_detected_between_two_shapes(shape_1: Shape, shape_2: Shape) -> bool:
+    return shape_1.collision_detected(shape_2)
 
 #@array_cache(max_size=3000)
 def collision_detected(shapes_1: list[Shape], shape_2: list[Shape]) -> bool:
@@ -148,7 +150,7 @@ def collision_detected(shapes_1: list[Shape], shape_2: list[Shape]) -> bool:
     """
     for shape in shapes_1:
         for other_shape in shape_2:
-            if shape.collision_detected(other_shape):
+            if collision_detected_between_two_shapes(shape, other_shape):
                 return True
     return False
 

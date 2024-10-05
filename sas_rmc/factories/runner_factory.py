@@ -178,7 +178,7 @@ def create_runner(input_config_path: Path) -> RmcRunner:
 if __name__ == "__main__":
     #data_params = create_runner(r"E:\Programming\SasRMC\data\CoreShell_F20_pol.xlsx")
     #spreadsheet = Path(__file__).parent.parent.parent / Path("data") / Path("CoreShell Simulation Input - Copy - Copy.xlsx")
-    spreadsheet = Path(__file__).parent.parent.parent / Path("data") / Path("CoreShell_F20_pol - Copy.xlsx")
+    spreadsheet = Path(__file__).parent.parent.parent / Path("data") / Path("CoreShell_F20_pol.xlsx")
     runner = create_runner(spreadsheet)
     runner.run()
 
