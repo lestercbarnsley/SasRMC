@@ -5,6 +5,7 @@ import numpy as np
 from typing_extensions import Self
 
 from sas_rmc import Vector
+from sas_rmc.array_cache import array_cache
 from sas_rmc.particles.particle import FormResult
 from sas_rmc.shapes.sphere import sphere_volume, Sphere
 from sas_rmc.particles import Particle, magnetic_sld_in_angstrom_minus_2
@@ -13,6 +14,7 @@ from sas_rmc.particles import Particle, magnetic_sld_in_angstrom_minus_2
 def theta_fn(qR: np.ndarray) -> np.ndarray:
     return np.where(qR == 0, 1, 3 * (np.sin(qR) - qR* np.cos(qR)) / (qR**3))
 
+@array_cache(max_size = 2_000)
 def form_array_sphere(radius: float, sld: float, q_array: np.ndarray) -> np.ndarray:
     volume = sphere_volume(radius)
     theta_arr = theta_fn(q_array * radius)

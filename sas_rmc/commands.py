@@ -1,8 +1,7 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
-from typing_extensions import Self
 
 from sas_rmc.scattering_simulation import ScatteringSimulation
 from sas_rmc import Vector, Particle
@@ -125,19 +124,6 @@ def rotate_vector(vector: Vector, angle: float) -> Vector:
         y = x * np.sin(angle) + y * np.cos(angle)
     )
 
-'''
-@dataclass
-class FormLattice(ParticleCommand):
-    reference_particle_index: int
-    reference_angle: float
-
-    def execute(self) -> None:
-        reference_particle = self.box[self.reference_particle_index]
-        pointing_vectors = ((particle.position - reference_particle.position) for particle in self.box.particles)
-        vector_to_reference = min(pointing_vectors, key= lambda v : v.mag)
-        new_position = reference_particle.position + rotate_vector(vector_to_reference, self.reference_angle)
-        MoveParticleTo(self.box, self.particle_index, new_position).execute()
-'''
 
 @dataclass
 class OrbitParticle(ParticleCommand):
@@ -212,7 +198,18 @@ class FlipMagnetization(ParticleCommand):
         magnetization_new = -1 * magnetization
         return MagnetizeParticle(self.box_index, self.particle_index, magnetization_new).execute(scattering_simulation)
 
+@dataclass
+class RescaleBoxMagnetization(ParticleCommand):
+    rescale_factor: float
 
+    def execute(self, scattering_simulation: ScatteringSimulation) -> ScatteringSimulation:
+        box = scattering_simulation.box_list[self.box_index]
+        scattering_simulation_new = scattering_simulation
+        for particle_index, _ in enumerate(box.particles):
+            command = RescaleMagnetization(self.box_index, particle_index, self.rescale_factor)
+            scattering_simulation_new = command.execute(scattering_simulation_new)
+        return scattering_simulation_new
+    
 @dataclass
 class ScaleCommand(Command):
 
