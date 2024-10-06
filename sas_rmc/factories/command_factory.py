@@ -35,7 +35,7 @@ def create_command(
         commands.MoveParticleTo(
             box_index=box_index,
             particle_index=particle_index,
-            position_new=cube.random_position_inside()
+            position_new=cube.random_position_inside().project_to_xy()
             ),
         commands.JumpParticleTo(
             box_index=box_index,

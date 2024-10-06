@@ -1,4 +1,5 @@
 #%%
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from typing_extensions import Self
@@ -34,32 +35,54 @@ class Box:
     def is_inside(self, position) -> bool:
         return self.cube.is_inside(position)
     
-    def wall_or_particle_collision(self, i: int) -> bool: # Mark for deletion
+    def wall_or_particle_collision(self, i: int) -> bool:
         particle = self.particles[i]
         if not self.is_inside(particle.get_position()):
             return True
-        return any(particle.collision_detected(particle_j) for particle_j in self.particles)
+        return any(particle.collision_detected(particle_j) for j, particle_j in enumerate(self.particles) if j!=i)
     
-    def move_inside_box(self, i: int) -> Self:
-        new_position = self.cube.random_position_inside()
+    def move_to_new_position(self, i: int, new_position: Vector) -> Self:
         return type(self)(
             particles=[particle if j!=i else particle.change_position(new_position) for j, particle in enumerate(self.particles)],
             cube=self.cube
         )
+    
+    def move_inside_box(self, i: int) -> Self:
+        new_position = self.cube.random_position_inside()
+        return self.move_to_new_position(i, new_position)
+        
+    def move_to_plane(self, i: int) -> Self:
+        new_position = self.cube.random_position_inside().project_to_xy()
+        return self.move_to_new_position(i, new_position)
     
     def collision_test(self) -> bool:
         if not all(self.is_inside(particle.get_position()) for particle in self.particles):
             return True
         return any(particle_i.collision_detected(particle_j) for i, particle_i in enumerate(self.particles) for j, particle_j in enumerate(self.particles) if i > j)
     
-    def force_inside_box(self) -> Self:
+    def force_new_box(self, box_creation_function: Callable[[Self, int], Self]) -> Self:
         box = self
         l = len(box)
-        for i in range(10_000_000):
-            box = box.move_inside_box(i % l)
-            if not box.collision_test():
-                return box
-        raise ValueError("Box is too dense to resolve")
+        for p in range(l):
+            for _ in range(100_000):
+                box = box_creation_function(box, p)
+                if not box.wall_or_particle_collision(p):
+                    break
+            else:
+                raise ValueError("Box is too dense to resolve")
+        return box
+        '''for _ in range(100_000):
+            for p in range(l):
+                box = box_creation_function(box, p)
+                if not box.collision_test():
+                    return box
+        raise ValueError("Box is too dense to resolve")'''
+
+    def force_inside_box(self) -> Self:
+        return self.force_new_box(lambda box, p : box.move_inside_box(p))
+        
+    def force_to_plane(self) -> Self:
+        return self.force_new_box(lambda box, p : box.move_to_plane(p))
 
     def get_nearest_particle(self, position: Vector) -> Particle:
         return min(self.particles, key = lambda particle : position.distance_from_vector(particle.get_position()))

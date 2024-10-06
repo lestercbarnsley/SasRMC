@@ -1,8 +1,6 @@
 #%%
 
 
-from typing import ParamSpec, TypeVar
-
 import numpy as np
 from scipy import constants as scipy_constants
 

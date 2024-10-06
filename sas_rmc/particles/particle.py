@@ -5,15 +5,9 @@ from abc import ABC, abstractmethod
 import numpy as np
 from typing_extensions import Self
 
-from sas_rmc.array_cache import method_array_cache
 from sas_rmc.shapes import Shape, collision_detected
 from sas_rmc import Vector, constants
 
-
-PI = constants.PI
-GAMMA_N = constants.GAMMA_N
-R_0 = constants.R_0
-BOHR_MAG = constants.BOHR_MAG
 B_H_IN_INVERSE_AMP_METRES = constants.B_H_IN_INVERSE_AMP_METRES
 
 

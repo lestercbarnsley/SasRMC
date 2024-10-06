@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from sas_rmc import constants
-from sas_rmc.array_cache import array_cache, method_array_cache
+from sas_rmc.array_cache import method_array_cache
 from sas_rmc.acceptance_scheme import AcceptanceScheme
 from sas_rmc.detector import DetectorImage, make_smearing_function
 from sas_rmc.result_calculator import AnalyticalCalculator

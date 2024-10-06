@@ -159,6 +159,9 @@ class Vector:
             y = d.get(keys[1], 0.0),
             z = d.get(keys[2], 0.0)
         )
+    
+    def project_to_xy(self) -> Self:
+        return type(self)(x = self.x, y = self.y)
 
     def rotated_basis(self) -> tuple[Self, Self, Self]:
         unit_a = self.unit_vector
