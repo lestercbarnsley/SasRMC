@@ -15,10 +15,19 @@ def theta_fn(qR: np.ndarray) -> np.ndarray:
     return np.where(qR == 0, 1, 3 * (np.sin(qR) - qR* np.cos(qR)) / (qR**3))
 
 @array_cache(max_size = 2_000)
-def form_array_sphere(radius: float, sld: float, q_array: np.ndarray) -> np.ndarray:
+def form_array_sphere_normalized(radius: float, q_array: np.ndarray) -> np.ndarray:
     volume = sphere_volume(radius)
     theta_arr = theta_fn(q_array * radius)
-    return sld * volume * theta_arr
+    return volume * theta_arr
+
+@array_cache(max_size = 2_000)
+def form_array_sphere(radius: float, sld: float, q_array: np.ndarray) -> np.ndarray:
+    volume_theta_product = form_array_sphere_normalized(radius, q_array)
+    return sld * volume_theta_product
+
+@array_cache(max_size=50)
+def array_magnitude(*q_component_arrays: np.ndarray) -> np.ndarray: # I'm considering moving this to vector module
+    return np.sqrt((np.array(q_component_arrays)**2).sum(axis = 0))
 
 
 @dataclass
@@ -41,7 +50,7 @@ class SphericalParticle(Particle):
         return (self.sphere_sld - self.solvent_sld) * 1e-6
     
     def form_array(self, qx_array: np.ndarray, qy_array: np.ndarray) -> np.ndarray:
-        q_array = np.sqrt(qx_array**2 + qy_array**2)
+        q_array = array_magnitude(qx_array, qy_array)
         delta_sld = self.get_delta_sld()
         return form_array_sphere(self.core_sphere.radius, delta_sld, q_array)
     
@@ -58,7 +67,7 @@ class SphericalParticle(Particle):
         return self.core_sphere.get_volume()
     
     def magnetic_form_array(self, qx_array: np.ndarray, qy_array: np.ndarray) -> list[np.ndarray]:
-        q = np.sqrt(qx_array**2 + qy_array**2)
+        q = array_magnitude(qx_array, qy_array)
         if not self.is_magnetic():
             return [np.zeros(q.shape) for _ in range(3)]
         sphere = self.core_sphere
@@ -113,7 +122,10 @@ class SphericalParticle(Particle):
 
 
 if __name__ == "__main__":
-    test = SphericalParticle.gen_from_parameters(
-        position=Vector(0, 0, 1))
+    arrs = [np.random.rand(100, 200) for i in range(3)]
+    q_arr = array_magnitude(arrs[0], arrs[1], arrs[2])
+    print(q_arr.shape)
+
+    assert np.all(array_magnitude(arrs[0], arrs[1]) - np.sqrt(arrs[0]**2 + arrs[1]**2) == 0) #I'll use this for  a unit test later
     
   #%%

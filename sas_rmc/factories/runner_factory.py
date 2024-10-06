@@ -48,7 +48,7 @@ core_shell_commands = {
     commands.RotateMagnetization,
     commands.RescaleCommand,
     commands.RelativeRescale,
-    commands.RescaleBoxMagnetization
+    #commands.RescaleBoxMagnetization
 }
 
 create_core_shell_command = create_command_if_acceptable_command(command_factory.create_command, core_shell_commands)

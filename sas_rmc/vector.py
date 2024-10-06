@@ -1,24 +1,24 @@
 #%%
-from typing import Callable, Iterator, Type, overload
+from typing import Callable, Iterator, Type, overload, Sequence
 from dataclasses import dataclass
-import math
 
 import numpy as np
 from typing_extensions import Self
 
 from sas_rmc import constants
+from sas_rmc.array_cache import array_cache
 
 PI = constants.PI
 rng = constants.RNG
 
 
 @overload
-def cross(a: tuple[float, ...], b: tuple[float, ...]) -> tuple[float, ...]: ...
+def cross(a: Sequence[float], b: Sequence[float]) -> tuple[float, ...]: ...
 
 @overload
-def cross(a: tuple[np.ndarray | float, ...], b: tuple[np.ndarray | float, ...]) -> tuple[np.ndarray, ...]: ...
+def cross(a: Sequence[np.ndarray | float], b: Sequence[np.ndarray | float]) -> tuple[np.ndarray, ...]: ...
 
-def cross(a: tuple[np.ndarray | float, ...], b: tuple[np.ndarray | float, ...]) -> tuple[np.ndarray | float, ...]:
+def cross(a: Sequence[np.ndarray | float], b: Sequence[np.ndarray | float]) -> tuple[np.ndarray | float, ...]:
     ax, ay, az = a[0], a[1], a[2]
     bx, by, bz = b[0], b[1], b[2]
     cx = ay*bz-az*by
@@ -28,12 +28,12 @@ def cross(a: tuple[np.ndarray | float, ...], b: tuple[np.ndarray | float, ...]) 
 
 
 @overload
-def dot(a: tuple[float, ...], b: tuple[float, ...]) -> float: ...
+def dot(a: Sequence[float], b: Sequence[float]) -> float: ...
 
 @overload
-def dot(a: tuple[np.ndarray | float, ...], b: tuple[np.ndarray | float, ...]) -> np.ndarray: ...
+def dot(a: Sequence[np.ndarray | float], b: Sequence[np.ndarray | float]) -> np.ndarray: ...
 
-def dot(a: tuple[float | np.ndarray, ...], b: tuple[float | np.ndarray, ...]) -> float | np.ndarray:
+def dot(a: Sequence[np.ndarray | float], b: Sequence[np.ndarray | float]) -> np.ndarray | float:
     ax, ay = a[:2]
     az = a[2] if len(a) > 2 else 0
     bx, by = b[:2]
@@ -48,10 +48,9 @@ def broadcast_to_numpy_array(object_array: np.ndarray, getter_function: Callable
     array_function = broadcast_array_function(getter_function=getter_function, output_dtype=output_dtype)
     return array_function(object_array)
 
-
-'''@lru_cache
-def vec_mag(x: float, y: float, z: float) -> float:
-    return np.sqrt(x**2 + y**2 + z**2)'''
+@array_cache(max_size=100_000)
+def magnitude(*comps: float) -> float:
+    return np.sqrt((np.array(comps)**2).sum())
 
 
 @dataclass
@@ -62,7 +61,8 @@ class Vector:
 
     @property
     def mag(self) -> float:
-        return math.sqrt(self.x**2 + self.y**2 + self.z**2) # math is slightly faster for this application
+        return magnitude(self.x, self.y, self.z)
+        
 
     def itercomps(self) -> Iterator[float]: 
         yield self.x
@@ -188,104 +188,8 @@ class Vector:
         return cls.from_numpy(random_numbers)
 
 
-@dataclass
-class VectorElement:
-    position: Vector
-    dx: float
-    dy: float
-    dz: float
-
-    @property
-    def volume(self) -> float:
-        return self.dx * self.dy * self.dz
         
 
-@dataclass
-class VectorSpace:
-    vector_elements: np.ndarray
-
-    def array_from_elements(self, element_function: Callable[[VectorElement], float], output_type = np.float64) -> np.ndarray:
-        array_function = broadcast_array_function(element_function, output_dtype=output_type)
-        return array_function(self.vector_elements)
-
-    def field_from_element(self, field_function: Callable[[VectorElement], Vector], output_type = object) -> np.ndarray:
-        field_function_arr = broadcast_array_function(field_function, output_dtype=output_type)
-        return field_function_arr(self.vector_elements)
-        
-    @property
-    def position(self) -> np.ndarray:
-        get_position = lambda element: element.position
-        return self.array_from_elements(get_position, object)
-
-    @property
-    def volume(self) -> np.ndarray:
-        get_volume = lambda element: element.volume
-        return self.array_from_elements(get_volume)
-
-    @property
-    def x(self) -> np.ndarray:
-        get_x = lambda element: element.position.x
-        return self.array_from_elements(get_x)
-
-    @property
-    def y(self) -> np.ndarray:
-        get_y = lambda element: element.position.y
-        return self.array_from_elements(get_y)
-
-    @property
-    def z(self) -> np.ndarray:
-        get_z = lambda element: element.position.z
-        return self.array_from_elements(get_z)
-
-    @property
-    def dx(self) -> np.ndarray:
-        get_dx = lambda element: element.dx
-        return self.array_from_elements(get_dx)
-
-    @property
-    def dy(self) -> np.ndarray:
-        get_dy = lambda element: element.dy
-        return self.array_from_elements(get_dy)
-
-    @property
-    def dz(self) -> np.ndarray:
-        get_dz = lambda element: element.dz
-        return self.array_from_elements(get_dz)
-
-    def __getitem__(self, indices) -> VectorElement:
-        i, j, k = indices
-        return self.vector_elements[i, j, k]
-
-    def change_position(self, vector_offset: Vector):
-        def change_element_position(element: VectorElement):
-            return VectorElement(
-                position=element.position + vector_offset,
-                dx = element.dx,
-                dy = element.dy,
-                dz = element.dz
-            )
-        element_space_maker = np.frompyfunc(change_element_position, 1, 1)
-        return VectorSpace(
-            vector_elements = element_space_maker(self.vector_elements)
-        )
-
-    @classmethod
-    def gen_from_bounds(cls, x_min, x_max, x_num, y_min, y_max, y_num, z_min, z_max, z_num):
-        x = np.linspace(x_min, x_max, num = x_num)
-        y = np.linspace(y_min, y_max, num = y_num)
-        z = np.linspace(z_min, z_max, num = z_num)
-        dx = np.gradient(x)
-        dy = np.gradient(y)
-        dz = np.gradient(z)
-        elements = [[[VectorElement(
-            position=Vector(xi, yi, zi),
-            dx=dxi,
-            dy=dyi,
-            dz=dzi
-        ) for (dzi, zi) in zip(dz, z)]
-        for (dyi, yi) in zip(dy, y)]
-        for (dxi, xi) in zip(dx,x)]
-        return cls(vector_elements = np.array(elements))
 
 
 

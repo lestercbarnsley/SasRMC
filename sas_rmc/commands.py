@@ -54,8 +54,26 @@ class ParticleCommand(Command):
         if scattering_simulation is None:
             raise ValueError("scattering_simulation is not optional for this class")
         new_simulation = self.execute(scattering_simulation)
-        document = self.get_document_from_scattering_simulation(scattering_simulation)
-        return new_simulation, document 
+        document = self.get_document_from_scattering_simulation(new_simulation)
+        return new_simulation, document
+    
+
+@dataclass
+class GroupCommand(Command):
+    command_list: list[Command]
+
+    def execute(self, scattering_simulation: ScatteringSimulation | None = None) -> ScatteringSimulation:
+        return super().execute(scattering_simulation)
+
+    def execute_and_get_document(self, scattering_simulation: ScatteringSimulation | None = None) -> tuple[ScatteringSimulation, dict]:
+        if scattering_simulation is None:
+            raise ValueError("scattering_simulation is not optional for this class")
+        document = {"Action" : type(self).__name__}
+        new_simulation = scattering_simulation
+        for i, command in enumerate(self.command_list):
+            new_simulation, document_i = command.execute_and_get_document(new_simulation)
+            document = document | {f"Command {i}" : document_i}
+        return new_simulation, document
 
 
 @dataclass
@@ -197,19 +215,8 @@ class FlipMagnetization(ParticleCommand):
         magnetization = particle.get_magnetization()
         magnetization_new = -1 * magnetization
         return MagnetizeParticle(self.box_index, self.particle_index, magnetization_new).execute(scattering_simulation)
-
-@dataclass
-class RescaleBoxMagnetization(ParticleCommand):
-    rescale_factor: float
-
-    def execute(self, scattering_simulation: ScatteringSimulation) -> ScatteringSimulation:
-        box = scattering_simulation.box_list[self.box_index]
-        scattering_simulation_new = scattering_simulation
-        for particle_index, _ in enumerate(box.particles):
-            command = RescaleMagnetization(self.box_index, particle_index, self.rescale_factor)
-            scattering_simulation_new = command.execute(scattering_simulation_new)
-        return scattering_simulation_new
     
+
 @dataclass
 class ScaleCommand(Command):
 

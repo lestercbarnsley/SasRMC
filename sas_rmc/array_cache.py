@@ -7,8 +7,6 @@ import string
 
 import numpy as np
 
-from sas_rmc import Vector
-
 CLASS_MAX_SIZE = 18
 MAX_SIZE = 50
 

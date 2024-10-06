@@ -66,15 +66,9 @@ def create_command(
             box_index=box_index,
             particle_index=particle_index
             ),
-        commands.RescaleBoxMagnetization(
-            box_index=box_index,
-            particle_index=particle_index,
-            rescale_factor=rng.normal(loc = 1.0, scale=nominal_rescale_change)
-            ),
         commands.RelativeRescale(
             change_by_factor=rng.normal(loc = 1.0, scale=nominal_rescale_change)
             ),
-        
         ]
     return random.choice(possible_commands)
 
