@@ -68,27 +68,39 @@ def spin_up(fn: np.ndarray, fm_para: np.ndarray, fm_perp_1: np.ndarray, fm_perp_
     return sum_array_list([pol_func(fn, fm_para, fm_perp_1, fm_perp_2) for pol_func in (minus_minus, minus_plus)])
 
 def spin_down(fn: np.ndarray, fm_para: np.ndarray, fm_perp_1: np.ndarray, fm_perp_2: np.ndarray) -> np.ndarray:
-    return sum_array_list([pol_func(fn, fm_para, fm_perp_1, fm_perp_2) for pol_func in (minus_minus, minus_plus)])
+    return sum_array_list([pol_func(fn, fm_para, fm_perp_1, fm_perp_2) for pol_func in (plus_plus, plus_minus)])
 
 def unpolarized(fn: np.ndarray, fm_para: np.ndarray, fm_perp_1: np.ndarray, fm_perp_2: np.ndarray) -> np.ndarray:
     return sum_array_list([pol_func(fn, fm_para, fm_perp_1, fm_perp_2) for pol_func in (spin_up, spin_down)]) / 2 # The two is necessary to normalize unpolarized
 
+def form_set_from_field_direction(fn: np.ndarray, fmx: np.ndarray, fmy: np.ndarray, fmz: np.ndarray, field_direction: FieldDirection = FieldDirection.Y) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    match field_direction:
+        case FieldDirection.X:
+            return fn, fmx, fmy, fmz
+        case FieldDirection.Y:
+            return fn, fmy, fmx, fmz
+        case FieldDirection.Z:
+            return fn, fmz, fmx, fmy
+    raise ValueError("Unknown field direction")
+
 def intensity_polarization(fn: np.ndarray, fmx: np.ndarray, fmy: np.ndarray, fmz: np.ndarray, polarization: Polarization, field_direction: FieldDirection = FieldDirection.Y) -> np.ndarray:
-    form_set = {
-        FieldDirection.X : (fn, fmx, fmy, fmz),
-        FieldDirection.Y : (fn, fmy, fmx, fmz),
-        FieldDirection.Z: (fn, fmz, fmx, fmy)
-    }[field_direction]
-    polarization_function = {
-        Polarization.MINUS_MINUS: minus_minus,
-        Polarization.PLUS_PLUS: plus_plus,
-        Polarization.MINUS_PLUS: minus_plus,
-        Polarization.PLUS_MINUS: plus_minus,
-        Polarization.SPIN_UP: spin_up, 
-        Polarization.SPIN_DOWN: spin_down,
-        Polarization.UNPOLARIZED: unpolarized
-    }[polarization]
-    return polarization_function(fn = form_set[0], fm_para=form_set[1], fm_perp_1=form_set[2], fm_perp_2=form_set[3])
+    fn_actual, fm_para, fm_perp_1, fm_perp_2 = form_set_from_field_direction(fn, fmx, fmy, fmz, field_direction)
+    match polarization:
+        case Polarization.MINUS_MINUS:
+            return minus_minus(fn = fn_actual, fm_para=fm_para, fm_perp_1=fm_perp_1, fm_perp_2=fm_perp_2)
+        case Polarization.PLUS_PLUS:
+            return plus_plus(fn = fn_actual, fm_para=fm_para, fm_perp_1=fm_perp_1, fm_perp_2=fm_perp_2)
+        case Polarization.MINUS_PLUS:
+            return minus_plus(fn = fn_actual, fm_para=fm_para, fm_perp_1=fm_perp_1, fm_perp_2=fm_perp_2)
+        case Polarization.PLUS_MINUS:
+            return plus_minus(fn = fn_actual, fm_para=fm_para, fm_perp_1=fm_perp_1, fm_perp_2=fm_perp_2)
+        case Polarization.SPIN_UP:
+            return spin_up(fn = fn_actual, fm_para=fm_para, fm_perp_1=fm_perp_1, fm_perp_2=fm_perp_2)
+        case Polarization.SPIN_DOWN:
+            return spin_down(fn = fn_actual, fm_para=fm_para, fm_perp_1=fm_perp_1, fm_perp_2=fm_perp_2)
+        case Polarization.UNPOLARIZED:
+            return unpolarized(fn = fn_actual, fm_para=fm_para, fm_perp_1=fm_perp_1, fm_perp_2=fm_perp_2)
+    raise ValueError("Unknown Polarization state")
 
 def box_intensity(form_results: list[FormResult], box_volume: float, qx: np.ndarray, qy: np.ndarray, rescale_factor: float = 1, polarization: Polarization = Polarization.UNPOLARIZED, field_direction: FieldDirection = FieldDirection.Y) -> np.ndarray:
     fn = nuclear_amplitude(form_results)
