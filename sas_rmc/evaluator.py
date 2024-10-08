@@ -60,18 +60,14 @@ class Fitter(ABC):
 def calculate_goodness_of_fit(simulated_intensity: np.ndarray, experimental_detector: DetectorImage) -> float:
     experimental_intensity = experimental_detector.intensity
     uncertainty = experimental_detector.intensity_err
-    return float(np.average(
-        ((experimental_intensity - simulated_intensity)**2 / uncertainty**2),
-        weights=experimental_detector.shadow_factor
-    ))
-    #return ((experimental_intensity - simulated_intensity)**2 / uncertainty**2)[experimental_detector.shadow_factor].mean()
+    return ((experimental_intensity - simulated_intensity)**2 / uncertainty**2)[experimental_detector.shadow_factor].mean()
 
 def qXqY_delta(detector: DetectorImage) -> tuple[float, float]:
     qXs = np.unique(detector.qX)
     qYs = np.unique(detector.qY)
     qX_diff = np.max(np.gradient(qXs))
     qY_diff = np.max(np.gradient(qYs))
-    return qX_diff, qY_diff
+    return float(qX_diff), float(qY_diff)
     
 @dataclass
 class Smearing2DFitter(Fitter):
@@ -106,7 +102,8 @@ class Smearing2DFitter(Fitter):
         return {
             "Result calculator" : type(self.result_calculator).__name__,
             "Detector data" : self.experimental_detector.get_loggable_data(),
-            "Simulated intensity" : [intensity for intensity in self.simulate_intensity(simulation_state)],
+            "Simulated intensity" : [float(intensity) for intensity in self.simulate_intensity(simulation_state)],
+            "Polarization" : self.experimental_detector.polarization.value,
             "Smearing" : True
         }
     
@@ -131,7 +128,8 @@ class NoSmearing2DFitter(Fitter):
         return {
             "Result calculator" : type(self.result_calculator).__name__,
             "Detector data" : self.experimental_detector.get_loggable_data(),
-            "Simulated intensity" : [intensity for intensity in self.simulate_intensity(simulation_state)],
+            "Simulated intensity" : [float(intensity) for intensity in self.simulate_intensity(simulation_state)],
+            "Polarization" : self.experimental_detector.polarization.value,
             "Smearing" : False
         }
 
@@ -141,10 +139,17 @@ class FitterMultiple(Fitter):
     weight: list[float] | None = None
 
     def calculate_goodness_of_fit(self, simulation_state: ScatteringSimulation) -> float:
-        return float(np.average([fitter.calculate_goodness_of_fit(simulation_state) for fitter in self.fitter_list], weights=self.weight))
+        return float(
+            np.average(
+                [fitter.calculate_goodness_of_fit(simulation_state) for fitter in self.fitter_list], 
+                weights=self.weight)
+            )
 
     def default_box_dimensions(self) -> list[float]:
-        return max([fitter.default_box_dimensions() for fitter in self.fitter_list], key=lambda box_dimension : float(np.prod(box_dimension)))
+        return max(
+            [fitter.default_box_dimensions() for fitter in self.fitter_list], 
+            key=lambda box_dimension : float(np.prod(box_dimension))
+            )
 
     def get_loggable_data(self, simulation_state: ScatteringSimulation) -> dict:
         return {f"Fitter {i}" : fitter.get_loggable_data(simulation_state) 

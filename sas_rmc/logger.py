@@ -1,10 +1,12 @@
-
+#%%
 
 from abc import abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime
+from pathlib import Path
 
-
-
+import numpy as np
+import pandas as pd
 
 
 @dataclass
@@ -58,7 +60,7 @@ class QuietLogCallback(LogCallback):
         #print('event', document)
         if document is None:
             return None
-        print({k : v for k, v in document.items() if k in ['Current goodness of fit', 'Cycle', 'Step']})
+        print({k : v for k, v in document.items() if k in ['Current goodness of fit', 'Cycle', 'Step', 'timestamp']})
 
     def stop(self, document: dict | None = None) -> None:
         #print('event', document)
@@ -70,16 +72,156 @@ class LogEventBus(LogCallback):
     log_callbacks: list[LogCallback]
 
     def start(self, document: dict  | None = None) -> None:
+        if document:
+            timestamp = datetime.now().timestamp()
+            document = document | {'timestamp' : timestamp}
         for callback in self.log_callbacks:
             callback.start(document)
 
     def event(self, document: dict | None = None) -> None:
+        if document:
+            timestamp = datetime.now().timestamp()
+            document = document | {'timestamp' : timestamp}
         for callback in self.log_callbacks:
             callback.event(document)
 
     def stop(self, document: dict | None = None) -> None:
+        if document:
+            timestamp = datetime.now().timestamp()
+            document = document | {'timestamp' : timestamp}
         for callback in self.log_callbacks:
             callback.stop(document)
+
+
+
+
+
+def start_stop_docs_to_particle_states(docs: list[dict]) -> list[pd.DataFrame]:
+    doc = docs[-1]
+    simulation_data = doc.get('scattering_simulation', {})
+    return [
+        pd.DataFrame(data = [
+            simulation_data[box_key][particle_key] 
+            for particle_key in sorted(simulation_data[box_key].keys())
+            if 'particle' in particle_key.lower()
+        ]) for box_key in sorted(simulation_data.keys()) if 'box_' in box_key.lower()
+    ]
+
+def event_docs_to_simulation_data(event_docs: list[dict]) -> pd.DataFrame:
+    return pd.DataFrame(data = event_docs)
+
+def fitter_data_to_detector_data(data: dict) -> list[dict]:
+    detector_data = data['Detector data']
+    simulated_intensity = data['Simulated intensity']
+    polarization = data['Polarization']
+    return [
+        det_data | {'simulated_intensity' : sim_intensity} | ({'Polarization' : polarization} if i == 0 else {})
+        for i, (det_data, sim_intensity) in enumerate(zip(detector_data, simulated_intensity))
+        ]
+    #return [det_data | {'Simulated intensity': float(sim_int)} for det_data, sim_int in zip(detector_data, simulated_intensity)]
+    
+
+def start_stop_docs_to_detector_image_data(docs: list[dict]) -> list[pd.DataFrame]:
+    doc = docs[-1]
+    fitter_doc = doc['Fitter']
+    return [
+        pd.DataFrame(fitter_data_to_detector_data(fitter_doc[fitter_key])) 
+        for fitter_key in sorted(fitter_doc.keys()) 
+        if 'fitter' in fitter_key.lower()
+    ]
+
+def total_quantity(particle_list: list[dict], target_key: str) -> np.number:
+    return np.sum([particle[target_key] for particle in particle_list])
+
+def box_volume(box_data): pass
+
+
+@dataclass
+class BoxData:
+    particle_data: list[dict]
+    dimensions: list[float]
+
+
+@dataclass
+class SimulationData:
+    box_data: list[BoxData]
+
+
+def create_simulation_data(sim_data: dict):
+    return SimulationData(
+        box_data=[
+            BoxData(particle_data=[sim_data[box_key][particle_key]])
+        ]
+    )
+
+
+def stop_docs_to_global_data(docs: list[dict], total_time: float) ->  pd.DataFrame:
+    doc = docs[-1]
+    final_rescale = doc['scale_factor']['Value']
+    simulation_data = doc.get('scattering_simulation', {})
+    estimated_concentration = 0
+    
+    d = {
+        "Final scale": [final_rescale],
+        "Estimated concentration (v/v)": [final_rescale * float(estimated_concentration)],
+        "Simulation time (s)": [total_time],
+        "Effective magnetization" : ["Coming soon"]
+    }
+    return pd.DataFrame(d)
+
+
+@dataclass
+class ExcelCallback(LogCallback):
+    excel_file: Path
+    start_docs: list[dict] = field(default_factory=list)
+    event_docs: list[dict] = field(default_factory=list)
+    stop_docs: list[dict] = field(default_factory=list)
+
+    def start(self, document: dict | None = None) -> None:
+        if document:
+            self.start_docs.append(document)
+        stop_docs_to_global_data(self.start_docs, total_time=0.0)
+
+    def event(self, document: dict | None = None) -> None:
+        if document:
+            self.event_docs.append(document)
+
+    def stop(self, document: dict | None = None) -> None:
+        if document:
+            self.stop_docs.append(document)
+        with pd.ExcelWriter(self.excel_file) as writer:
+            particle_state_dfs = start_stop_docs_to_particle_states(self.start_docs)
+            for box_number, initial_particle_state_df in enumerate(particle_state_dfs):
+                initial_particle_state_df.to_excel(writer, sheet_name=f"Box {box_number} Initial Particle States")
+            simulation_df = event_docs_to_simulation_data(self.event_docs)
+            simulation_df.to_excel(writer, sheet_name="Simulation Data")
+            particle_state_dfs_final = start_stop_docs_to_particle_states(self.stop_docs)
+            for box_number, final_particle_state_df in enumerate(particle_state_dfs_final):
+                final_particle_state_df.to_excel(writer, sheet_name=f"Box {box_number} Final Particle States")
+            detector_image_data_dfs = start_stop_docs_to_detector_image_data(self.stop_docs)
+            for detector_number, detector_data_df in enumerate(detector_image_data_dfs):
+                detector_data_df.to_excel(writer, sheet_name= f"Final detector image {detector_number}")
+            total_time = 0
+            if any('timestamp' in event_doc for event_doc in self.event_docs):
+                total_time = max(event_doc.get('timestamp', 0) for event_doc in self.event_docs) - min(event_doc.get('timestamp', np.inf) for event_doc in self.event_docs)
+            
+            #global_df = stop_docs_to_global_data(self.stop_docs)
+            #global_df.to_excel(writer, sheet_name="Global parameters Final")
+
+
+@dataclass
+class BoxPlotter(LogCallback):
+    result_folder: Path
+
+    def start(self, document: dict | None = None) -> None:
+        pass
+
+    def event(self, document: dict | None = None) -> None:
+        pass
+
+    def stop(self, document: dict | None = None) -> None:
+        return super().stop(document)
+
 
 '''
 def box_writer(box: Box) -> pd.DataFrame:
@@ -320,5 +462,5 @@ class Logger:
 '''
 
 if __name__ == "__main__":
-    pass
+    print(datetime.now().timestamp())
 

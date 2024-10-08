@@ -162,12 +162,18 @@ class CoreShellRunner:
     
     def create_runner(self, evaluator: Evaluator) -> RmcRunner:
         state = self.create_simulation_state(default_box_dimensions=evaluator.default_box_dimensions())
+        log_callback = logger.LogEventBus(
+            log_callbacks=[
+                logger.QuietLogCallback(), 
+                logger.ExcelCallback(excel_file=Path(r"D:\Programming\SasRMC\data\results\test.xlsx")),
+                ]
+        )
         return RmcRunner(
             simulator=Simulator(
                 controller=Controller(ledger=[step for step in self.create_control_steps(state)]),
                 state = state,
                 evaluator=evaluator,
-                log_callback=logger.QuietLogCallback()
+                log_callback=log_callback
                 )
 
             )

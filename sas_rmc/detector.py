@@ -18,7 +18,7 @@ DEFAULT_GAUSSIAN_FLOOR_FRACTION = 1e-4
 # name string constants, this is the source of truth for the names of these quantities
 QX = 'qX'
 QY = 'qY'
-INTENSITY = 'intensity',
+INTENSITY = 'intensity'
 INTENSITY_ERROR = 'intensity_err'
 QZ = 'qZ'
 SIGMA_PARA = 'sigma_para'

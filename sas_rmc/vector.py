@@ -50,7 +50,7 @@ def broadcast_to_numpy_array(object_array: np.ndarray, getter_function: Callable
 
 @array_cache(max_size=100_000)
 def magnitude(*comps: float) -> float:
-    return np.sqrt((np.array(comps)**2).sum())
+    return float(np.sqrt((np.array(comps)**2).sum()))
 
 
 @dataclass
@@ -63,7 +63,6 @@ class Vector:
     def mag(self) -> float:
         return magnitude(self.x, self.y, self.z)
         
-
     def itercomps(self) -> Iterator[float]: 
         yield self.x
         yield self.y
@@ -178,7 +177,7 @@ class Vector:
 
     @classmethod
     def xy_from_angle(cls, length: float = 1, angle: float = 0):
-        return cls(x = length * np.cos(angle), y = length * np.sin(angle))
+        return cls(x = length * float(np.cos(angle)), y = length * float(np.sin(angle)))
 
     @classmethod
     def random_vector_xy(cls, length: float = 1):
@@ -197,7 +196,10 @@ class Vector:
 
 
 if __name__ == "__main__":
-    pass
+    random_angle = rng.uniform(low = -PI, high = +PI)
+    print(type(random_angle))
+    print(type(np.cos(random_angle)))
+    print(Vector.xy_from_angle(length=1.0, angle=random_angle))
 
 
 

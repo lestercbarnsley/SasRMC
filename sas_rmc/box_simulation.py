@@ -71,12 +71,7 @@ class Box:
             else:
                 raise ValueError("Box is too dense to resolve")
         return box
-        '''for _ in range(100_000):
-            for p in range(l):
-                box = box_creation_function(box, p)
-                if not box.collision_test():
-                    return box
-        raise ValueError("Box is too dense to resolve")'''
+        
 
     def force_inside_box(self) -> Self:
         return self.force_new_box(lambda box, p : box.move_inside_box(p))
