@@ -133,7 +133,7 @@ def jump_by_vector(position_1: Vector, position_2: Vector, fixed_distance: float
     return pointing_vector - (fixed_distance * pointing_vector.unit_vector)
 
 
-def rotate_vector(vector: Vector, angle: float) -> Vector:
+def rotate_vector(vector: Vector, angle: float) -> Vector: # mark for deletion
     x, y, z = vector.to_tuple()
     if z:
         raise ValueError("remember, no z")

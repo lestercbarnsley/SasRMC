@@ -1,28 +1,10 @@
 #%%
 from dataclasses import dataclass, field
-from functools import wraps
-import time
 
 from sas_rmc.evaluator import Evaluator
 from sas_rmc.logger import LogCallback, NoLogCallback
 from sas_rmc.scattering_simulation import ScatteringSimulation
 from sas_rmc.controller import Controller
-
-
-
-
-def timeit(my_func):
-    @wraps(my_func)
-    def timed(*args, **kw):
-    
-        tstart = time.time()
-        output = my_func(*args, **kw)
-        tend = time.time()
-        
-        print(f"{my_func.__name__} took {(tend - tstart)} seconds to execute")
-        return output
-    return timed
-
 
 
 @dataclass

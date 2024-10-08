@@ -14,7 +14,6 @@ from sas_rmc import constants
 
 
 PI = constants.PI
-DEFAULT_SLICING_FRACTION_DENOM = 6 # It turns out that a very small number of pixels actually contribute to resolution
 
 # name string constants, this is the source of truth for the names of these quantities
 QX = 'qX'#: self.qX,
@@ -29,23 +28,6 @@ SIMULATED_INTENSITY = 'simulated_intensity'#: self.simulated_intensity,
 SIMUATED_INTENSITY_ERR = 'simulated_intensity_err'#: self.simulated_intensity_err,
 POLARIZATION = "Polarization"
 
-#from matplotlib import pyplot as plt
-
-def get_slicing_func_from_gaussian(gaussian: np.ndarray, slicing_range: int | None = None) -> Callable[[np.ndarray], np.ndarray]:
-    i_of_max, j_of_max = np.where(gaussian == np.amax(gaussian))
-    i_of_max, j_of_max = i_of_max[0], j_of_max[0]
-    slicing_range = slicing_range if slicing_range is not None else int(max(gaussian.shape) / DEFAULT_SLICING_FRACTION_DENOM)
-    i_min = max(i_of_max - int(slicing_range / 2), 0)
-    i_max = min(i_min + slicing_range, gaussian.shape[0] - 1)
-    i_min = i_max - slicing_range
-    j_min = max(j_of_max - int(slicing_range / 2), 0)
-    j_max = min(j_min + slicing_range, gaussian.shape[1] - 1)
-    j_min = j_max - slicing_range
-    def slicing_func(arr: np.ndarray) -> np.ndarray:
-        res = arr[i_min:i_max, j_min:j_max]
-        
-        return res
-    return slicing_func
 
 def get_slicing_func_from_gaussian(gaussian: np.ndarray, gaussian_floor: float | None = None) -> Callable[[np.ndarray], np.ndarray]:
     gaussian_floor = gaussian_floor if gaussian_floor is not None else 1e-8
@@ -58,7 +40,7 @@ def test_uniques(test_space: np.ndarray, arr: np.ndarray) -> np.ndarray:
     closest_in_space = lambda v : test_space[np.argmin(np.abs(test_space - v))]
     return np.array([closest_in_space(a) for a in arr]) # I can't use broadcast because the pandas method passes in a data series rather than a numpy array
     
-def fuzzy_unique(arr: np.ndarray, array_filterer: Callable[[np.ndarray], np.ndarray] = None) -> np.ndarray:
+def fuzzy_unique(arr: np.ndarray, array_filterer: Callable[[np.ndarray], np.ndarray] | None = None) -> np.ndarray:
     unique_arr = np.unique(arr)
     test_range = 4 * int(np.sqrt(arr.shape[0]))
     if unique_arr.shape[0] < test_range:
@@ -90,7 +72,7 @@ def average_uniques(linear_arr: np.ndarray) -> np.ndarray:
     return np.array(fuzzy_uniques)
 
     
-def area_to_radius(area: float): # I made this not anonymous so I can write a docstring later if needed
+def area_to_radius(area: float) -> float: # I made this not anonymous so I can write a docstring later if needed
     return np.sqrt(area / PI)
 
 class Polarization(Enum):
