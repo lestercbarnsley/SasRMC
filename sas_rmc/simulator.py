@@ -23,9 +23,10 @@ class Simulator:
         return self
 
     def simulate(self) -> None:
-        for command, acceptance_scheme in self.controller.ledger:
+        for step in self.controller.ledger:
+            command = step.command
             new_state, command_document = command.execute_and_get_document(self.state)
-            evaluation, evaluation_document = self.evaluator.evaluate_and_get_document(new_state, acceptance_scheme)
+            evaluation, evaluation_document = self.evaluator.evaluate_and_get_document(new_state, step.acceptance_scheme)
             if evaluation:
                 self.state = new_state
             self.log_callback.event(command_document | evaluation_document)

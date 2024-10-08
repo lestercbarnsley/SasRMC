@@ -5,7 +5,7 @@ from sas_rmc.box_simulation import Box
 from sas_rmc import shapes
 from sas_rmc.detector import DetectorImage, DetectorPixel, DetectorConfig
 from sas_rmc.evaluator import Evaluator
-from sas_rmc.controller import Controller
+from sas_rmc.controller import Controller, ControlStep
 
 '''
 from sas_rmc.shapes import shapes

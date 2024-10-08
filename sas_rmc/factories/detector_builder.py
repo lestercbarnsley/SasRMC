@@ -142,7 +142,7 @@ if __name__ == "__main__":
     def test_1(a: float, b: float, c: float) -> float:
         return a + b + c
     
-    print(test_1(**{'a' : '3', 'b' : '4', 'c': 7, 'd' : 8}))
+    print(test_1(**{'a' : '3.7', 'b' : '4', 'c': 7, 'd' : 8}))
 
 
 # %%

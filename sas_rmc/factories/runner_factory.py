@@ -9,7 +9,7 @@ import pandas as pd
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 import numpy as np
 
-from sas_rmc import constants, Evaluator, commands, acceptance_scheme, Controller, logger
+from sas_rmc import constants, Evaluator, commands, acceptance_scheme, Controller, ControlStep, logger
 from sas_rmc.scattering_simulation import ScatteringSimulation, SimulationParam
 from sas_rmc.rmc_runner import RmcRunner
 from sas_rmc.particles import CoreShellParticle
@@ -107,7 +107,7 @@ class CoreShellRunner:
             box_list=box_factory.create_box_list(self.create_particle, box_dimensions, self.particle_number, self.box_number, self.nominal_concentration )
         )
 
-    def create_commands(self, simulation_state: ScatteringSimulation) -> Iterator[commands.Command]:
+    '''def create_commands(self, simulation_state: ScatteringSimulation) -> Iterator[commands.Command]:
         for _ in range(self.total_cycles):
             particle_box_indices = list(particle_box_index_iterator(simulation_state))
             for box_index, particle_index in random.sample(particle_box_indices, len(particle_box_indices)):
@@ -133,18 +133,38 @@ class CoreShellRunner:
                 yield acceptable_command_factory.create_metropolis_acceptance(temperature, cycle, step)
             temperature = temperature * (1- self.anneal_fall_rate)
             if "very".lower() not in self.annealing_type.lower():
-                temperature = self.anneal_start_temp / (1 + cycle)
+                temperature = self.anneal_start_temp / (1 + cycle)'''
             
-
+    def create_control_steps(self, simulation_state: ScatteringSimulation) -> Iterator[ControlStep]:
+        annealing_stop_cycle = self.annealing_stop_cycle_number if self.annealing_stop_cycle_number > 0 else int(self.total_cycles / 2)
+        temperature = self.anneal_start_temp
+        if self.annealing_type.lower() == "greedy".lower():
+            temperature = 0
+        for cycle in range(self.total_cycles):
+            if cycle > annealing_stop_cycle:
+                temperature = 0
+            particle_box_indices = list(particle_box_index_iterator(simulation_state))
+            for step, (box_index, particle_index) in enumerate(random.sample(particle_box_indices, len(particle_box_indices))):
+                box = simulation_state.box_list[box_index]
+                command = create_core_shell_command(
+                    box_index = box_index,
+                    particle_index=particle_index,
+                    move_by_distance=self.core_radius,
+                    cube = box.cube,
+                    total_particle_number=len(box.particles),
+                    nominal_magnetization=self.core_magnetization
+                )
+                acceptance_scheme = acceptable_command_factory.create_metropolis_acceptance(temperature, cycle, step)
+                yield ControlStep(command, acceptance_scheme)
+            temperature = temperature * (1- self.anneal_fall_rate)
+            if "very".lower() not in self.annealing_type.lower():
+                temperature = self.anneal_start_temp / (1 + cycle)
     
     def create_runner(self, evaluator: Evaluator) -> RmcRunner:
         state = self.create_simulation_state(default_box_dimensions=evaluator.default_box_dimensions())
         return RmcRunner(
             simulator=Simulator(
-                controller=Controller(
-                    commands=[c for c in self.create_commands(state)],
-                    acceptance_scheme=[a for a in self.create_acceptance_scheme(state)]
-                ),
+                controller=Controller(ledger=[step for step in self.create_control_steps(state)]),
                 state = state,
                 evaluator=evaluator,
                 log_callback=logger.QuietLogCallback()
