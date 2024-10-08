@@ -11,8 +11,6 @@ from sas_rmc.factories import parse_data
 PI = constants.PI
 
 
-
-
 @pydantic_dataclass
 class DetectorPixelFactory:
     qX: float
@@ -114,7 +112,37 @@ def create_detector_images(dataframes: dict[str, pd.DataFrame]) -> list[Detector
     
     
 if __name__ == "__main__":
-    pass
+    import inspect
+    from pprint import pprint
+    '''def coerce_types(a: float, b: float):
+        pass
+
+    pprint(dir(inspect.signature(coerce_types)))
+
+    pprint(inspect.signature(coerce_types).parameters)
+
+    for k, v in inspect.signature(coerce_types).parameters.items():
+        print(k)
+        print(v)
+        print(v.annotation(3))'''
+
+
+    def coerce_types(func):
+
+        def wrapper(*args, **kwargs):
+
+            coerced_kwargs = {}
+            for k, v in inspect.signature(func).parameters.items():
+                if k in kwargs:
+                    coerced_kwargs[k] = v.annotation(kwargs[k])
+            return func(*args, **coerced_kwargs)
+        return wrapper
+    
+    @coerce_types
+    def test_1(a: float, b: float, c: float) -> float:
+        return a + b + c
+    
+    print(test_1(**{'a' : '3', 'b' : '4', 'c': 7, 'd' : 8}))
 
 
 # %%

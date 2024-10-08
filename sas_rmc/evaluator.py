@@ -8,7 +8,7 @@ import numpy as np
 from sas_rmc import constants
 from sas_rmc.array_cache import method_array_cache
 from sas_rmc.acceptance_scheme import AcceptanceScheme
-from sas_rmc.detector import DetectorImage, make_smearing_function
+from sas_rmc.detector import DetectorImage, make_smearing_function, DEFAULT_GAUSSIAN_FLOOR_FRACTION
 from sas_rmc.result_calculator import AnalyticalCalculator
 from sas_rmc.scattering_simulation import ScatteringSimulation
 
@@ -73,7 +73,6 @@ def plot_detector(intensity: np.ndarray, qx_array: np.ndarray, qy_array: np.ndar
 def calculate_goodness_of_fit(simulated_intensity: np.ndarray, experimental_detector: DetectorImage) -> float:
     experimental_intensity = experimental_detector.intensity
     uncertainty = experimental_detector.intensity_err
-    #plot_detector(np.where(experimental_detector.qX > 0, simulated_intensity, experimental_intensity), experimental_detector.qX, experimental_detector.qY)
     return ((experimental_intensity - simulated_intensity)**2 / uncertainty**2)[experimental_detector.shadow_factor].mean()
 
 def qXqY_delta(detector: DetectorImage) -> tuple[float, float]:
@@ -87,14 +86,15 @@ def qXqY_delta(detector: DetectorImage) -> tuple[float, float]:
 class Smearing2DFitter(Fitter):
     result_calculator: AnalyticalCalculator
     experimental_detector: DetectorImage
-    #smearing_function: Callable[[np.ndarray], np.ndarray] | None = None
+    gaussian_floor: float = DEFAULT_GAUSSIAN_FLOOR_FRACTION
 
     @method_array_cache
     def create_smearing_function(self) -> Callable[[np.ndarray], np.ndarray]:
         return make_smearing_function(
             self.experimental_detector.detector_pixels,
             qx_matrix=self.result_calculator.qx_array,
-            qy_matrix=self.result_calculator.qy_array
+            qy_matrix=self.result_calculator.qy_array,
+            gaussian_floor=self.gaussian_floor
         )
     
     def default_box_dimensions(self) -> list[float]:
@@ -153,7 +153,7 @@ class FitterMultiple(Fitter):
         return float(np.average([fitter.calculate_goodness_of_fit(simulation_state) for fitter in self.fitter_list], weights=self.weight))
 
     def default_box_dimensions(self) -> list[float]:
-        return max([fitter.default_box_dimensions() for fitter in self.fitter_list], key=lambda box_dimension : np.prod(box_dimension))
+        return max([fitter.default_box_dimensions() for fitter in self.fitter_list], key=lambda box_dimension : float(np.prod(box_dimension)))
 
     def get_loggable_data(self, simulation_state: ScatteringSimulation) -> dict:
         return {f"Fitter {i}" : fitter.get_loggable_data(simulation_state) 

@@ -14,6 +14,7 @@ from sas_rmc import constants
 
 
 PI = constants.PI
+DEFAULT_GAUSSIAN_FLOOR_FRACTION = 1e-4
 
 # name string constants, this is the source of truth for the names of these quantities
 QX = 'qX'#: self.qX,
@@ -28,13 +29,6 @@ SIMULATED_INTENSITY = 'simulated_intensity'#: self.simulated_intensity,
 SIMUATED_INTENSITY_ERR = 'simulated_intensity_err'#: self.simulated_intensity_err,
 POLARIZATION = "Polarization"
 
-
-def get_slicing_func_from_gaussian(gaussian: np.ndarray, gaussian_floor: float | None = None) -> Callable[[np.ndarray], np.ndarray]:
-    gaussian_floor = gaussian_floor if gaussian_floor is not None else 1e-8
-    idxs = np.where(gaussian > gaussian.max() * gaussian_floor)
-    def slicing_func(arr: np.ndarray) -> np.ndarray:
-        return arr[idxs]
-    return slicing_func
 
 def test_uniques(test_space: np.ndarray, arr: np.ndarray) -> np.ndarray:
     closest_in_space = lambda v : test_space[np.argmin(np.abs(test_space - v))]
@@ -152,14 +146,8 @@ class DetectorPixel:
         return gaussian / np.sum(gaussian)
     
     @method_array_cache
-    def get_slicing_func(self, qx_array: np.ndarray, qy_array: np.ndarray, slicing_range: int | None = None) -> Callable[[np.ndarray], np.ndarray]:
+    def get_smearing_func(self, qx_array: np.ndarray, qy_array: np.ndarray, gaussian_floor: float = DEFAULT_GAUSSIAN_FLOOR_FRACTION) -> Callable[[np.ndarray], float]:
         gaussian = self.resolution_function(qx_array, qy_array)
-        return get_slicing_func_from_gaussian(gaussian, slicing_range)
-    
-    @method_array_cache
-    def get_smearing_func(self, qx_array: np.ndarray, qy_array: np.ndarray, gaussian_floor: float | None = None) -> Callable[[np.ndarray], float]:
-        gaussian = self.resolution_function(qx_array, qy_array)
-        gaussian_floor = gaussian_floor if gaussian_floor is not None else 1e-4
         idxs = np.where(gaussian > gaussian.max() * gaussian_floor)
         def slicing_func(arr: np.ndarray) -> np.ndarray:
             return arr[idxs]
@@ -372,8 +360,8 @@ class DetectorImage: # Major refactor needed for detector image, as it shouldn't
         return cls.gen_from_data(data_dict=data_dict, detector_config=detector_config)
 
 
-def make_smearing_function(pixel_list: Iterable[DetectorPixel], qx_matrix: np.ndarray, qy_matrix: np.ndarray, slicing_range: int | None = None) -> Callable[[np.ndarray], np.ndarray]:
-    slicing_funcs = [pixel.get_smearing_func(qx_matrix, qy_matrix) for pixel in pixel_list]
+def make_smearing_function(pixel_list: Iterable[DetectorPixel], qx_matrix: np.ndarray, qy_matrix: np.ndarray, gaussian_floor: float = DEFAULT_GAUSSIAN_FLOOR_FRACTION) -> Callable[[np.ndarray], np.ndarray]:
+    slicing_funcs = [pixel.get_smearing_func(qx_matrix, qy_matrix, gaussian_floor) for pixel in pixel_list]
     def smear(intensity: np.ndarray) -> np.ndarray:
         return np.array([slicing_func(intensity) for slicing_func in slicing_funcs])
     return smear

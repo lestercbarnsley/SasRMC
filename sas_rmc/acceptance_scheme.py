@@ -47,6 +47,19 @@ class MetropolisAcceptance(AcceptanceScheme):
             loggable_data |\
             {k : v for k, v in asdict(self).items() if k != 'loggable_data'}
     
+    
+@dataclass
+class AcceptanceEarlyTemination(AcceptanceScheme):
+    acceptance_scheme: AcceptanceScheme
+
+    def is_acceptable(self, old_goodness_of_fit: float, new_goodness_of_fit: float) -> bool:
+        if old_goodness_of_fit < 1.0 and new_goodness_of_fit < 1.0:
+            raise StopIteration
+        return self.acceptance_scheme.is_acceptable(old_goodness_of_fit, new_goodness_of_fit)
+    
+    def get_loggable_data(self) -> dict:
+        return self.acceptance_scheme.get_loggable_data()
+    
 
 if __name__ == "__main__":
     pass
