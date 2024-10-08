@@ -114,17 +114,8 @@ def create_detector_images(dataframes: dict[str, pd.DataFrame]) -> list[Detector
 if __name__ == "__main__":
     import inspect
     from pprint import pprint
-    '''def coerce_types(a: float, b: float):
-        pass
-
-    pprint(dir(inspect.signature(coerce_types)))
-
-    pprint(inspect.signature(coerce_types).parameters)
-
-    for k, v in inspect.signature(coerce_types).parameters.items():
-        print(k)
-        print(v)
-        print(v.annotation(3))'''
+    ### I'm keeping this here for now, because this could be a useful way to propagate
+    ### Config parameters to multiple factories
 
 
     def coerce_types(func):

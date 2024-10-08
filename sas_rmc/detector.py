@@ -4,7 +4,6 @@ from enum import Enum
 from typing import Any, Callable, Iterable
 
 import numpy as np
-import pandas as pd
 from typing_extensions import Self
 
 from sas_rmc import vector
@@ -17,53 +16,17 @@ PI = constants.PI
 DEFAULT_GAUSSIAN_FLOOR_FRACTION = 1e-4
 
 # name string constants, this is the source of truth for the names of these quantities
-QX = 'qX'#: self.qX,
-QY = 'qY'#: self.qY,
-INTENSITY = 'intensity'#: self.intensity,
-INTENSITY_ERROR = 'intensity_err'#: self.intensity_err,
-QZ = 'qZ'#: self.qZ,
-SIGMA_PARA = 'sigma_para'#: self.sigma_para,
-SIGMA_PERP = 'sigma_perp'#: self.sigma_perp,
-SHADOW_FACTOR = 'shadow_factor'#: int(self.shadow_factor),
-SIMULATED_INTENSITY = 'simulated_intensity'#: self.simulated_intensity,
-SIMUATED_INTENSITY_ERR = 'simulated_intensity_err'#: self.simulated_intensity_err,
+QX = 'qX'
+QY = 'qY'
+INTENSITY = 'intensity',
+INTENSITY_ERROR = 'intensity_err'
+QZ = 'qZ'
+SIGMA_PARA = 'sigma_para'
+SIGMA_PERP = 'sigma_perp'
+SHADOW_FACTOR = 'shadow_factor'
+SIMULATED_INTENSITY = 'simulated_intensity'
+SIMUATED_INTENSITY_ERR = 'simulated_intensity_err'
 POLARIZATION = "Polarization"
-
-
-def test_uniques(test_space: np.ndarray, arr: np.ndarray) -> np.ndarray:
-    closest_in_space = lambda v : test_space[np.argmin(np.abs(test_space - v))]
-    return np.array([closest_in_space(a) for a in arr]) # I can't use broadcast because the pandas method passes in a data series rather than a numpy array
-    
-def fuzzy_unique(arr: np.ndarray, array_filterer: Callable[[np.ndarray], np.ndarray] | None = None) -> np.ndarray:
-    unique_arr = np.unique(arr)
-    test_range = 4 * int(np.sqrt(arr.shape[0]))
-    if unique_arr.shape[0] < test_range:
-        return unique_arr
-
-    test_space_maker = lambda num : np.linspace(np.min(arr), np.max(arr), num = num) if num !=0 else np.array([np.inf])
-    filtered_array = array_filterer(arr) if array_filterer else arr
-    for i in range(5, test_range):#_ in enumerate(first_guess):
-        test_space = test_space_maker(i)
-        closest_arr = test_uniques(test_space, filtered_array)
-        if not all(t in closest_arr for t in test_space):
-            return test_space_maker(i-1)
-    raise Exception("Unable to find enough unique values in Q-space to map detector to 2-D grid")
-
-
-def average_uniques(linear_arr: np.ndarray) -> np.ndarray:
-    sorted_uniques = np.sort(np.unique(linear_arr))
-    if len(sorted_uniques) < 5 * np.sqrt(len(linear_arr)):
-        return sorted_uniques
-    diffs = np.diff(sorted_uniques)
-    in_range = lambda x : -np.std(diffs) < (x - np.average(diffs)) < +np.std(diffs)
-    fuzzy_uniques = []
-    fuzzy_row = []
-    for x, dx in zip(sorted_uniques, np.append(diffs, np.inf)):
-        fuzzy_row.append(x)
-        if not in_range(dx):
-            fuzzy_uniques.append(np.average(fuzzy_row))
-            fuzzy_row.clear()
-    return np.array(fuzzy_uniques)
 
     
 def area_to_radius(area: float) -> float: # I made this not anonymous so I can write a docstring later if needed
@@ -146,15 +109,15 @@ class DetectorPixel:
         return gaussian / np.sum(gaussian)
     
     @method_array_cache
-    def get_smearing_func(self, qx_array: np.ndarray, qy_array: np.ndarray, gaussian_floor: float = DEFAULT_GAUSSIAN_FLOOR_FRACTION) -> Callable[[np.ndarray], float]:
+    def get_smearing_func(self, qx_array: np.ndarray, qy_array: np.ndarray, gaussian_floor: float = DEFAULT_GAUSSIAN_FLOOR_FRACTION) -> Callable[[np.ndarray], np.number]:
         gaussian = self.resolution_function(qx_array, qy_array)
         idxs = np.where(gaussian > gaussian.max() * gaussian_floor)
         def slicing_func(arr: np.ndarray) -> np.ndarray:
             return arr[idxs]
         sliced_gaussian = slicing_func(gaussian)
-        correction_factor = sliced_gaussian.sum()
-        def smearing_func(arr: np.ndarray) -> float:
-            return (slicing_func(arr) * sliced_gaussian).sum() / correction_factor
+        def smearing_func(arr: np.ndarray) -> np.number:
+            return np.average(slicing_func(arr), weights=sliced_gaussian)
+            
         return smearing_func
 
 
@@ -242,7 +205,7 @@ def subtract_background(pixel: DetectorPixel, background: float) -> DetectorPixe
 
 
 @dataclass
-class DetectorImage: # Major refactor needed for detector image, as it shouldn't be responsible for how it's plotted
+class DetectorImage: 
     detector_pixels: list[DetectorPixel]
     polarization: Polarization = Polarization.UNPOLARIZED
 
@@ -289,76 +252,6 @@ class DetectorImage: # Major refactor needed for detector image, as it shouldn't
     def get_loggable_data(self) -> list[dict]:
         return [pixel.to_dict() for pixel in self.detector_pixels]
     
-    
-
-    @classmethod
-    def gen_from_data(cls, data_dict: dict, detector_config: DetectorConfig | None = None):
-        qX_data = data_dict[QX]
-        qY_data = data_dict[QY]
-        qX_1d = fuzzy_unique(qX_data, lambda a: a[np.abs(qY_data) < 0.025 * np.max(qY_data)])#.tolist() Ultimately, this should be a strategy somehow
-        qY_1d = fuzzy_unique(qY_data, lambda a: a[np.abs(qX_data) < 0.025 * np.max(qX_data)])#.tolist()
-        qx, qy = np.meshgrid(qX_1d, qY_1d)
-        blank_canvas_pixel = lambda qx_i, qy_i : DetectorPixel.row_to_pixel({QX : qx_i, QY : qy_i, INTENSITY : 0}, detector_config= detector_config)
-        make_blank_canvas = np.frompyfunc(blank_canvas_pixel, 2, 1)
-        detector_pixels = make_blank_canvas(qx, qy).astype(object)
-        for index, _ in enumerate(qX_data):
-            get_item = lambda k, v = None: data_dict.get(k, v)[index]
-            qX, qY = get_item(QX), get_item(QY)
-            row = {
-                QX : qX,
-                QY : qY,
-                INTENSITY : get_item(INTENSITY),
-                INTENSITY_ERROR : get_item(INTENSITY_ERROR),
-                QZ : get_item(QZ),
-                SIGMA_PARA: get_item(SIGMA_PARA),
-                SIGMA_PERP: get_item(SIGMA_PERP),
-                SHADOW_FACTOR : get_item(SHADOW_FACTOR),
-                SIMULATED_INTENSITY : get_item(SIMULATED_INTENSITY)
-            }
-            i = np.argmin(np.abs(qX_1d - qX)) # This now finds the closest value rather than an exact match, then it overwrites the pixel
-            j = np.argmin(np.abs(qY_1d - qY))
-            detector_pixels[j, i] = DetectorPixel.row_to_pixel(row, detector_config=detector_config)
-        polarization = detector_config.polarization if detector_config else Polarization(data_dict.get(POLARIZATION, Polarization.UNPOLARIZED.value))
-        return cls(
-            _detector_pixels = detector_pixels,
-            polarization = polarization
-        )
-
-    @classmethod
-    def gen_from_data(cls, data_dict: dict, detector_config: DetectorConfig = None):
-        qX_data = data_dict[QX]
-        get_row = lambda i : {k : data_dict.get(k)[i] for k in [QX, QY, INTENSITY, INTENSITY_ERROR, QZ, SIGMA_PARA, SIGMA_PERP, SHADOW_FACTOR]}
-        detector_pixels = np.array([DetectorPixel.row_to_pixel(get_row(i), detector_config=detector_config) for i, _ in enumerate(qX_data)])
-        polarization = detector_config.polarization if detector_config else Polarization(data_dict.get(POLARIZATION, Polarization.UNPOLARIZED.value))
-        return cls(
-            _detector_pixels = detector_pixels,
-            polarization = polarization
-        )
-
-    @classmethod
-    def gen_from_txt(cls, file_location, detector_config: DetectorConfig = None, skip_header: int = 2, transpose = False):
-        # This is an impure function
-        all_data = np.genfromtxt(file_location, skip_header = skip_header)
-        rows, cols = all_data.shape
-        fil_all_data = lambda column_index: np.zeros(rows) if column_index >= cols else all_data[:, column_index]
-        intensity_col = all_data[:, 2]
-        shadow_factor = fil_all_data(7)
-        if not np.sum(shadow_factor**2):
-            shadow_factor = intensity_col != 0
-        data_dict = {
-            QX : all_data[:, 1] if transpose else all_data[:, 0],
-            QY : all_data[:, 0] if transpose else all_data[:, 1],
-            INTENSITY : intensity_col,
-            INTENSITY_ERROR : fil_all_data(3),
-            QZ : fil_all_data(4),
-            SIGMA_PARA : fil_all_data(5),
-            SIGMA_PERP : fil_all_data(6),
-            SHADOW_FACTOR : shadow_factor,
-            SIMULATED_INTENSITY : fil_all_data(8),
-            SIMUATED_INTENSITY_ERR : fil_all_data(9),
-        }
-        return cls.gen_from_data(data_dict=data_dict, detector_config=detector_config)
-
 
 def make_smearing_function(pixel_list: Iterable[DetectorPixel], qx_matrix: np.ndarray, qy_matrix: np.ndarray, gaussian_floor: float = DEFAULT_GAUSSIAN_FLOOR_FRACTION) -> Callable[[np.ndarray], np.ndarray]:
     slicing_funcs = [pixel.get_smearing_func(qx_matrix, qy_matrix, gaussian_floor) for pixel in pixel_list]

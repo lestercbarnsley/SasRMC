@@ -3,7 +3,6 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 import numpy as np
-from scipy import special
 
 from sas_rmc.array_cache import method_array_cache
 from sas_rmc.detector import Polarization
@@ -13,7 +12,6 @@ from sas_rmc.scattering_simulation import ScatteringSimulation
 from sas_rmc import constants, vector
 
 PI = constants.PI
-j0_bessel = special.j0
 
 
 @dataclass

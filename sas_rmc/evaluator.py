@@ -56,24 +56,15 @@ class Fitter(ABC):
     def get_loggable_data(self, simulation_state: ScatteringSimulation) -> dict:
         pass
 
-from matplotlib import pyplot as plt
-
-def plot_detector(intensity: np.ndarray, qx_array: np.ndarray, qy_array: np.ndarray) -> None:
-    qx_diff = np.diff(np.unique(qx_array)).max()
-    qy_diff = np.diff(np.unique(qy_array)).max()
-    qx_lin = np.arange(start=qx_array.min(), stop=qx_array.max(), step = qx_diff)
-    qy_lin = np.arange(start=qy_array.min(), stop=qy_array.max(), step = qy_diff)
-    intensity_image = np.zeros((len(qy_lin), len(qx_lin)))
-    for j, qy in enumerate(qy_lin):
-        for i, qx in enumerate(qx_lin):
-            intensity_image[j, i] = intensity[np.argmin((qx_array - qx)**2 + (qy_array - qy)**2)]
-    plt.imshow(np.log(intensity_image))
-    plt.show()
 
 def calculate_goodness_of_fit(simulated_intensity: np.ndarray, experimental_detector: DetectorImage) -> float:
     experimental_intensity = experimental_detector.intensity
     uncertainty = experimental_detector.intensity_err
-    return ((experimental_intensity - simulated_intensity)**2 / uncertainty**2)[experimental_detector.shadow_factor].mean()
+    return float(np.average(
+        ((experimental_intensity - simulated_intensity)**2 / uncertainty**2),
+        weights=experimental_detector.shadow_factor
+    ))
+    #return ((experimental_intensity - simulated_intensity)**2 / uncertainty**2)[experimental_detector.shadow_factor].mean()
 
 def qXqY_delta(detector: DetectorImage) -> tuple[float, float]:
     qXs = np.unique(detector.qX)
