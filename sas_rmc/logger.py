@@ -93,19 +93,60 @@ class LogEventBus(LogCallback):
             callback.stop(document)
 
 
+@dataclass
+class BoxData:
+    particle_list: list
+    dim_list: list
 
+    def to_dataframe(self) -> pd.DataFrame:
+        dim_data = {f'box_dimension_{i}' : dim for i, dim in enumerate(self.dim_list)}
+        particle_data_list = [particle_data | (dim_data if i == 0 else {}) for i, particle_data in enumerate(self.particle_list)]
+        return pd.DataFrame(data = particle_data_list)
+    
+    def calculate_concentration(self) -> float:
+        total_particle_volume = np.sum([particle['Volume'] for particle in self.particle_list])
+        box_volume = np.prod(self.dim_list)
+        return float(total_particle_volume / box_volume)
+
+    @classmethod
+    def create_from_dict(cls, d):
+        particle_list = []
+        dim_list = []
+        for key in d:
+            if 'particle' in key.lower():
+                particle_list.append(d[key])
+            elif 'dim' in key.lower():
+                dim_list.append(d[key])
+        return BoxData(
+            particle_list=particle_list,
+            dim_list=dim_list
+        )
+    
+
+@dataclass
+class SimData:
+    box_data_list: list[BoxData]
+
+    def to_dataframes(self) -> list[pd.DataFrame]:
+        return [box_data.to_dataframe() for box_data in self.box_data_list]
+    
+    def calculate_concentration(self) -> float:
+        return float(np.average([box_data.calculate_concentration() for box_data in self.box_data_list]))
+
+    @classmethod
+    def create_from_dict(cls, d):
+        box_data_list = []
+        for key in d:
+            if 'box_' in key.lower():
+                box_data_list.append(BoxData.create_from_dict(d[key]))
+        return SimData(box_data_list=box_data_list)
 
 
 def start_stop_docs_to_particle_states(docs: list[dict]) -> list[pd.DataFrame]:
     doc = docs[-1]
     simulation_data = doc.get('scattering_simulation', {})
-    return [
-        pd.DataFrame(data = [
-            simulation_data[box_key][particle_key] 
-            for particle_key in sorted(simulation_data[box_key].keys())
-            if 'particle' in particle_key.lower()
-        ]) for box_key in sorted(simulation_data.keys()) if 'box_' in box_key.lower()
-    ]
+    simdata = SimData.create_from_dict(simulation_data)
+    return simdata.to_dataframes()
 
 def event_docs_to_simulation_data(event_docs: list[dict]) -> pd.DataFrame:
     return pd.DataFrame(data = event_docs)
@@ -136,25 +177,6 @@ def total_quantity(particle_list: list[dict], target_key: str) -> np.number:
 def box_volume(box_data): pass
 
 
-@dataclass
-class BoxData:
-    particle_data: list[dict]
-    dimensions: list[float]
-
-
-@dataclass
-class SimulationData:
-    box_data: list[BoxData]
-
-
-def create_simulation_data(sim_data: dict):
-    return SimulationData(
-        box_data=[
-            BoxData(particle_data=[sim_data[box_key][particle_key]])
-        ]
-    )
-
-
 def stop_docs_to_global_data(docs: list[dict], total_time: float) ->  pd.DataFrame:
     doc = docs[-1]
     final_rescale = doc['scale_factor']['Value']
@@ -180,7 +202,7 @@ class ExcelCallback(LogCallback):
     def start(self, document: dict | None = None) -> None:
         if document:
             self.start_docs.append(document)
-        stop_docs_to_global_data(self.start_docs, total_time=0.0)
+        #start_stop_docs_to_particle_states(self.start_docs)#, total_time=0.0)
 
     def event(self, document: dict | None = None) -> None:
         if document:
