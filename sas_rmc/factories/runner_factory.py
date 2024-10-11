@@ -106,35 +106,7 @@ class CoreShellRunner:
             scale_factor=SimulationParam( 1.0, name = "scale_factor", bounds = (0, np.inf)),
             box_list=box_factory.create_box_list(self.create_particle, box_dimensions, self.particle_number, self.box_number, self.nominal_concentration )
         )
-
-    '''def create_commands(self, simulation_state: ScatteringSimulation) -> Iterator[commands.Command]:
-        for _ in range(self.total_cycles):
-            particle_box_indices = list(particle_box_index_iterator(simulation_state))
-            for box_index, particle_index in random.sample(particle_box_indices, len(particle_box_indices)):
-                box = simulation_state.box_list[box_index]
-                yield create_core_shell_command(
-                    box_index = box_index,
-                    particle_index=particle_index,
-                    move_by_distance=self.core_radius,
-                    cube = box.cube,
-                    total_particle_number=len(box.particles),
-                    nominal_magnetization=self.core_magnetization
-                )
-
-    def create_acceptance_scheme(self, simulation_state: ScatteringSimulation) -> Iterator[acceptance_scheme.AcceptanceScheme]:
-        annealing_stop_cycle = self.annealing_stop_cycle_number if self.annealing_stop_cycle_number > 0 else int(self.total_cycles / 2)
-        temperature = self.anneal_start_temp
-        if self.annealing_type.lower() == "greedy".lower():
-            temperature = 0
-        for cycle in range(self.total_cycles):
-            if cycle > annealing_stop_cycle:
-                temperature = 0
-            for step, _ in enumerate(particle_box_index_iterator(simulation_state)):
-                yield acceptable_command_factory.create_metropolis_acceptance(temperature, cycle, step)
-            temperature = temperature * (1- self.anneal_fall_rate)
-            if "very".lower() not in self.annealing_type.lower():
-                temperature = self.anneal_start_temp / (1 + cycle)'''
-            
+    
     def create_control_steps(self, simulation_state: ScatteringSimulation) -> Iterator[ControlStep]:
         annealing_stop_cycle = self.annealing_stop_cycle_number if self.annealing_stop_cycle_number > 0 else int(self.total_cycles / 2)
         temperature = self.anneal_start_temp
