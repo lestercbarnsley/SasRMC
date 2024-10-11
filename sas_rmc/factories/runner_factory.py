@@ -162,10 +162,11 @@ class CoreShellRunner:
     
     def create_runner(self, evaluator: Evaluator) -> RmcRunner:
         state = self.create_simulation_state(default_box_dimensions=evaluator.default_box_dimensions())
+        results_folder = Path(__file__).parent.parent.parent / Path("data") / Path("Results")
         log_callback = logger.LogEventBus(
             log_callbacks=[
                 logger.QuietLogCallback(), 
-                logger.ExcelCallback(excel_file=Path(r"D:\Programming\SasRMC\data\results\test.xlsx")),
+                logger.ExcelCallback(excel_file= results_folder / Path("test.xlsx")),
                 ]
         )
         return RmcRunner(

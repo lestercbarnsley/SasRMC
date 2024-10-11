@@ -8,6 +8,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from sas_rmc.vector import Vector
+
 
 @dataclass
 class LogCallback:
@@ -47,6 +49,8 @@ class PrintLogCallback(LogCallback):
         
     def stop(self, document: dict | None = None) -> None:
         print('event', document)
+
+
         
 
 
@@ -54,16 +58,15 @@ class PrintLogCallback(LogCallback):
 class QuietLogCallback(LogCallback):
 
     def start(self, document: dict | None = None) -> None:
-        print('start', document)
+        pass
+        #print('start', document)
 
     def event(self, document: dict | None = None) -> None:
-        #print('event', document)
         if document is None:
             return None
         print({k : v for k, v in document.items() if k in ['Current goodness of fit', 'Cycle', 'Step', 'timestamp']})
 
     def stop(self, document: dict | None = None) -> None:
-        #print('event', document)
         pass
 
 
@@ -93,6 +96,17 @@ class LogEventBus(LogCallback):
             callback.stop(document)
 
 
+def particle_data_to_magnetization_vector(particle_data: dict) -> Vector | None:
+    try:
+        return Vector(
+            x = particle_data['Magnetization.X'],
+            y = particle_data['Magnetization.Y'],
+            z = particle_data['Magnetization.Z']
+        )
+    except KeyError:
+        return None
+
+
 @dataclass
 class BoxData:
     particle_list: list
@@ -103,8 +117,15 @@ class BoxData:
         particle_data_list = [particle_data | (dim_data if i == 0 else {}) for i, particle_data in enumerate(self.particle_list)]
         return pd.DataFrame(data = particle_data_list)
     
+    def get_all_magnetization(self) -> list[Vector]:
+        all_vectors = [particle_data_to_magnetization_vector(particle_data) for particle_data in self.particle_list]
+        return [vector for vector in all_vectors if vector is not None]
+    
+    def get_all_volume(self) -> list[float]:
+        return [particle['Volume'] for particle in self.particle_list]
+
     def calculate_concentration(self) -> float:
-        total_particle_volume = np.sum([particle['Volume'] for particle in self.particle_list])
+        total_particle_volume = np.sum(self.get_all_volume())
         box_volume = np.prod(self.dim_list)
         return float(total_particle_volume / box_volume)
 
@@ -126,27 +147,37 @@ class BoxData:
 @dataclass
 class SimData:
     box_data_list: list[BoxData]
+    scale_factor_data: dict
 
     def to_dataframes(self) -> list[pd.DataFrame]:
         return [box_data.to_dataframe() for box_data in self.box_data_list]
     
-    def calculate_concentration(self) -> float:
-        return float(np.average([box_data.calculate_concentration() for box_data in self.box_data_list]))
+    def get_scale_factor_value(self) -> float:
+        return self.scale_factor_data['Value']
+
+    def calculate_corrected_concentration(self) -> float:
+        return float(
+            self.get_scale_factor_value() * np.average(
+                [box_data.calculate_concentration() for box_data in self.box_data_list]
+                )
+            )
+    
+    def get_average_magnetization(self) -> Vector:
+        vectors = sum((box_data.get_all_magnetization() for box_data in self.box_data_list), start= [])
+        total_particles = len(vectors)
+        vector_sum = sum(vectors, start = Vector.null_vector())
+        return vector_sum / total_particles
 
     @classmethod
     def create_from_dict(cls, d):
+        simulation_data = d.get('scattering_simulation', {})
         box_data_list = []
-        for key in d:
+        scale_factor_data = d.get('scale_factor', {})
+        for key in simulation_data:
             if 'box_' in key.lower():
-                box_data_list.append(BoxData.create_from_dict(d[key]))
-        return SimData(box_data_list=box_data_list)
+                box_data_list.append(BoxData.create_from_dict(simulation_data[key]))
+        return SimData(box_data_list=box_data_list, scale_factor_data=scale_factor_data)
 
-
-def start_stop_docs_to_particle_states(docs: list[dict]) -> list[pd.DataFrame]:
-    doc = docs[-1]
-    simulation_data = doc.get('scattering_simulation', {})
-    simdata = SimData.create_from_dict(simulation_data)
-    return simdata.to_dataframes()
 
 def event_docs_to_simulation_data(event_docs: list[dict]) -> pd.DataFrame:
     return pd.DataFrame(data = event_docs)
@@ -159,8 +190,6 @@ def fitter_data_to_detector_data(data: dict) -> list[dict]:
         det_data | {'simulated_intensity' : sim_intensity} | ({'Polarization' : polarization} if i == 0 else {})
         for i, (det_data, sim_intensity) in enumerate(zip(detector_data, simulated_intensity))
         ]
-    #return [det_data | {'Simulated intensity': float(sim_int)} for det_data, sim_int in zip(detector_data, simulated_intensity)]
-    
 
 def start_stop_docs_to_detector_image_data(docs: list[dict]) -> list[pd.DataFrame]:
     doc = docs[-1]
@@ -171,23 +200,20 @@ def start_stop_docs_to_detector_image_data(docs: list[dict]) -> list[pd.DataFram
         if 'fitter' in fitter_key.lower()
     ]
 
-def total_quantity(particle_list: list[dict], target_key: str) -> np.number:
-    return np.sum([particle[target_key] for particle in particle_list])
+def sim_data_to_global_df(sim_data: SimData, total_time: float) ->  pd.DataFrame:
+    
+    final_rescale = sim_data.get_scale_factor_value()
+    estimated_concentration = sim_data.calculate_corrected_concentration()
 
-def box_volume(box_data): pass
-
-
-def stop_docs_to_global_data(docs: list[dict], total_time: float) ->  pd.DataFrame:
-    doc = docs[-1]
-    final_rescale = doc['scale_factor']['Value']
-    simulation_data = doc.get('scattering_simulation', {})
-    estimated_concentration = 0
+    average_magnetization = sim_data.get_average_magnetization()
     
     d = {
         "Final scale": [final_rescale],
-        "Estimated concentration (v/v)": [final_rescale * float(estimated_concentration)],
+        "Estimated concentration (v/v)": [estimated_concentration],
         "Simulation time (s)": [total_time],
-        "Effective magnetization" : ["Coming soon"]
+        "AverageMagnetization.X" : [average_magnetization.x],
+        "AverageMagnetization.Y" : [average_magnetization.y],
+        "AverageMagnetization.Z" : [average_magnetization.z]
     }
     return pd.DataFrame(d)
 
@@ -202,7 +228,6 @@ class ExcelCallback(LogCallback):
     def start(self, document: dict | None = None) -> None:
         if document:
             self.start_docs.append(document)
-        #start_stop_docs_to_particle_states(self.start_docs)#, total_time=0.0)
 
     def event(self, document: dict | None = None) -> None:
         if document:
@@ -212,23 +237,21 @@ class ExcelCallback(LogCallback):
         if document:
             self.stop_docs.append(document)
         with pd.ExcelWriter(self.excel_file) as writer:
-            particle_state_dfs = start_stop_docs_to_particle_states(self.start_docs)
-            for box_number, initial_particle_state_df in enumerate(particle_state_dfs):
+            start_sim_data = SimData.create_from_dict(self.start_docs[-1])
+            for box_number, initial_particle_state_df in enumerate(start_sim_data.to_dataframes()):
                 initial_particle_state_df.to_excel(writer, sheet_name=f"Box {box_number} Initial Particle States")
             simulation_df = event_docs_to_simulation_data(self.event_docs)
             simulation_df.to_excel(writer, sheet_name="Simulation Data")
-            particle_state_dfs_final = start_stop_docs_to_particle_states(self.stop_docs)
-            for box_number, final_particle_state_df in enumerate(particle_state_dfs_final):
+            final_sim_data = SimData.create_from_dict(self.stop_docs[-1])
+            for box_number, final_particle_state_df in enumerate(final_sim_data.to_dataframes()):
                 final_particle_state_df.to_excel(writer, sheet_name=f"Box {box_number} Final Particle States")
             detector_image_data_dfs = start_stop_docs_to_detector_image_data(self.stop_docs)
             for detector_number, detector_data_df in enumerate(detector_image_data_dfs):
                 detector_data_df.to_excel(writer, sheet_name= f"Final detector image {detector_number}")
-            total_time = 0
-            if any('timestamp' in event_doc for event_doc in self.event_docs):
-                total_time = max(event_doc.get('timestamp', 0) for event_doc in self.event_docs) - min(event_doc.get('timestamp', np.inf) for event_doc in self.event_docs)
+            total_time = max(event_doc.get('timestamp', 0) for event_doc in self.event_docs) - min(event_doc.get('timestamp', np.inf) for event_doc in self.event_docs)
             
-            #global_df = stop_docs_to_global_data(self.stop_docs)
-            #global_df.to_excel(writer, sheet_name="Global parameters Final")
+            global_df = sim_data_to_global_df(final_sim_data, total_time = total_time)
+            global_df.to_excel(writer, sheet_name="Global parameters Final")
 
 
 @dataclass
