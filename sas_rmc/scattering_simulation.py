@@ -71,7 +71,9 @@ class ScatteringSimulation:
     def get_physical_acceptance(self) -> bool:
         if not self.scale_factor.get_physical_acceptance():
             return False
-        return not any(box.collision_test() for box in self.box_list)
+        if any(box.collision_test() for box in self.box_list):
+            return False
+        return True
     
     def set_scale_factor(self, new_scale_factor: float) -> Self:
         return type(self)(

@@ -164,6 +164,7 @@ class BoxData:
             for patch in particle_data_to_patches(particle_data):
                 ax.add_patch(patch)
 
+        ax.set_aspect("equal")
         ax.set_box_aspect(d_1 / d_0)
 
         fig.tight_layout()
