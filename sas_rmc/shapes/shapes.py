@@ -125,12 +125,12 @@ class Interface:
     def project_onto_surface(self, position: Vector) -> Vector:
         position_ref = position - self.position_marker
         return position_ref - (self.normal.unit_vector * position_ref) * self.normal.unit_vector + self.position_marker
+    
 
 @array_cache(max_size = 100_000)
 def collision_detected_between_two_shapes(shape_1: Shape, shape_2: Shape) -> bool:
     return shape_1.collision_detected(shape_2)
 
-#@array_cache(max_size=3000)
 def collision_detected(shapes_1: list[Shape], shape_2: list[Shape]) -> bool:
     """Detect if a collision has occured between two lists of shapes.
 
@@ -156,6 +156,12 @@ def collision_detected(shapes_1: list[Shape], shape_2: list[Shape]) -> bool:
 
 #%%
 if __name__ == "__main__":
-    interface = Interface(Vector(0, 0, 0), normal=Vector(0, 0, 1))
+    from sas_rmc.shapes.sphere import Sphere
+
+    sphere_1 = Sphere(radius= 1, central_position=Vector(5.9, 1, 0))
+    sphere_2 = Sphere(radius=2, central_position=Vector(3, 0, 0))
+
+    print(sphere_1.collision_detected(sphere_2))
+
 
 #%%

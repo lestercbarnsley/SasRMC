@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+from matplotlib import pyplot as plt, patches, figure
 import numpy as np
 import pandas as pd
 
@@ -105,6 +106,28 @@ def particle_data_to_magnetization_vector(particle_data: dict) -> Vector | None:
         )
     except KeyError:
         return None
+    
+
+def particle_data_to_patches(particle_data: dict) -> list[patches.Patch]:
+    particle_type = particle_data.get('Particle type')
+    if particle_type == 'CoreShellParticle':
+        xy = (particle_data.get('Position.X', -np.inf), particle_data.get('Position.Y', -np.inf))
+        core_radius = particle_data.get('Core radius', 0.0)
+        shell_radius = core_radius + particle_data.get('Thickness')
+        return [
+            patches.Circle(
+                xy = xy,
+                radius=shell_radius,
+                color = 'black'
+            ),
+            patches.Circle(
+                xy = xy,
+                radius=core_radius,
+                color = 'blue'
+            )
+        ]
+    else:
+        raise ValueError("Unrecognized particle type")
 
 
 @dataclass
@@ -123,6 +146,28 @@ class BoxData:
     
     def get_all_volume(self) -> list[float]:
         return [particle['Volume'] for particle in self.particle_list]
+    
+    def to_plot(self, fontsize: int = 14) -> figure.Figure:
+        fig, ax = plt.subplots()
+        fig.set_size_inches(4,4)
+        
+                
+        d_0, d_1 = self.dim_list[0], self.dim_list[1]
+        ax.set_xlim(-d_0 / 2, +d_0 / 2)
+        ax.set_ylim(-d_1 / 2, +d_1 / 2)
+        ax.set_xlabel(r'X (Angstrom)',fontsize =  fontsize)
+        ax.set_ylabel(r'Y (Angstrom)',fontsize =  fontsize)
+
+        
+        
+        for particle_data in self.particle_list:
+            for patch in particle_data_to_patches(particle_data):
+                ax.add_patch(patch)
+
+        ax.set_box_aspect(d_1 / d_0)
+
+        fig.tight_layout()
+        return fig
 
     def calculate_concentration(self) -> float:
         total_particle_volume = np.sum(self.get_all_volume())
@@ -191,8 +236,7 @@ def fitter_data_to_detector_data(data: dict) -> list[dict]:
         for i, (det_data, sim_intensity) in enumerate(zip(detector_data, simulated_intensity))
         ]
 
-def start_stop_docs_to_detector_image_data(docs: list[dict]) -> list[pd.DataFrame]:
-    doc = docs[-1]
+def start_stop_doc_to_detector_image_data(doc: dict) -> list[pd.DataFrame]:
     fitter_doc = doc['Fitter']
     return [
         pd.DataFrame(fitter_data_to_detector_data(fitter_doc[fitter_key])) 
@@ -228,6 +272,7 @@ class ExcelCallback(LogCallback):
     def start(self, document: dict | None = None) -> None:
         if document:
             self.start_docs.append(document)
+        #start_sim_data = SimData.create_from_dict(self.start_docs[-1])
 
     def event(self, document: dict | None = None) -> None:
         if document:
@@ -245,7 +290,7 @@ class ExcelCallback(LogCallback):
             final_sim_data = SimData.create_from_dict(self.stop_docs[-1])
             for box_number, final_particle_state_df in enumerate(final_sim_data.to_dataframes()):
                 final_particle_state_df.to_excel(writer, sheet_name=f"Box {box_number} Final Particle States")
-            detector_image_data_dfs = start_stop_docs_to_detector_image_data(self.stop_docs)
+            detector_image_data_dfs = start_stop_doc_to_detector_image_data(self.stop_docs[-1])
             for detector_number, detector_data_df in enumerate(detector_image_data_dfs):
                 detector_data_df.to_excel(writer, sheet_name= f"Final detector image {detector_number}")
             total_time = max(event_doc.get('timestamp', 0) for event_doc in self.event_docs) - min(event_doc.get('timestamp', np.inf) for event_doc in self.event_docs)
@@ -257,6 +302,9 @@ class ExcelCallback(LogCallback):
 @dataclass
 class BoxPlotter(LogCallback):
     result_folder: Path
+    file_plot_prefix: str
+    file_plot_format: str = "pdf"
+    fontsize: int = 14
 
     def start(self, document: dict | None = None) -> None:
         pass
@@ -265,7 +313,10 @@ class BoxPlotter(LogCallback):
         pass
 
     def stop(self, document: dict | None = None) -> None:
-        return super().stop(document)
+        stop_sim_data = SimData.create_from_dict(document)
+        for i, box_data in enumerate(stop_sim_data.box_data_list):
+            fig = box_data.to_plot(self.fontsize)
+            fig.savefig(self.result_folder / Path(f"{self.file_plot_prefix}_particle_positions_box_{i}.{self.file_plot_format}"))
 
 
 '''

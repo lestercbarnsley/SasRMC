@@ -52,6 +52,7 @@ class Sphere(Shape):
             central_position=self.central_position
         )
     
+    
 if __name__ == "__main__":
     s = Sphere(radius=1, central_position=Vector.null_vector())
 

@@ -35,25 +35,25 @@ class Box:
     def is_inside(self, position) -> bool:
         return self.cube.is_inside(position)
     
-    def wall_or_particle_collision(self, i: int) -> bool:
-        particle = self.particles[i]
+    def wall_or_particle_collision(self, particle_index: int) -> bool:
+        particle = self.particles[particle_index]
         if not self.is_inside(particle.get_position()):
             return True
-        return any(particle.collision_detected(particle_j) for j, particle_j in enumerate(self.particles) if j!=i)
+        return any(particle.collision_detected(particle_j) for j, particle_j in enumerate(self.particles) if j!=particle_index)
     
-    def move_to_new_position(self, i: int, new_position: Vector) -> Self:
+    def move_to_new_position(self, particle_index: int, new_position: Vector) -> Self:
         return type(self)(
-            particles=[particle if j!=i else particle.change_position(new_position) for j, particle in enumerate(self.particles)],
+            particles=[particle if j!=particle_index else particle.change_position(new_position) for j, particle in enumerate(self.particles)],
             cube=self.cube
         )
     
-    def move_inside_box(self, i: int) -> Self:
+    def move_inside_box(self, particle_index: int) -> Self:
         new_position = self.cube.random_position_inside()
-        return self.move_to_new_position(i, new_position)
+        return self.move_to_new_position(particle_index, new_position)
         
-    def move_to_plane(self, i: int) -> Self:
+    def move_to_plane(self, particle_index: int) -> Self:
         new_position = self.cube.random_position_inside().project_to_xy()
-        return self.move_to_new_position(i, new_position)
+        return self.move_to_new_position(particle_index, new_position)
     
     def collision_test(self) -> bool:
         if not all(self.is_inside(particle.get_position()) for particle in self.particles):
@@ -63,10 +63,10 @@ class Box:
     def force_new_box(self, box_creation_function: Callable[[Self, int], Self]) -> Self:
         box = self
         l = len(box)
-        for p in range(l):
+        for particle_index in range(l):
             for _ in range(100_000):
-                box = box_creation_function(box, p)
-                if not box.wall_or_particle_collision(p):
+                box = box_creation_function(box, particle_index)
+                if not box.wall_or_particle_collision(particle_index):
                     break
             else:
                 raise ValueError("Box is too dense to resolve")
