@@ -317,20 +317,34 @@ class BoxPlotter(LogCallback):
             fig.savefig(self.result_folder / Path(f"{self.file_plot_prefix}_particle_positions_box_{i}.{self.file_plot_format}"))
 
 
-def plot_detector_image(df: pd.DataFrame) -> figure.Figure:
+def plot_detector_image(df: pd.DataFrame, fontsize = 16) -> figure.Figure:
     fig, ax = plt.subplots()
     fig.set_size_inches(10, 10)
 
-    qx = df['qX']
-    qy = df['qY']
-    intensity = df['intensity']
+    qx_lin = df['qX']
+    qy_lin = df['qY']
+    intensity_lin = df['intensity']
+    intensity_sim_lin = df['simulated_intensity']
+    qx_diff = np.diff(np.unique(qx_lin)).max()
+    qy_diff = np.diff(np.unique(qy_lin)).max()
+    qx, qy = np.meshgrid(
+        np.arange(start=qx_lin.min(), stop = qx_lin.max(), step=qx_diff),
+        np.arange(start=qy_lin.min(), stop = qy_lin.max(), step=qy_diff),
+        )
+    intensity = np.zeros(qx.shape)
 
-    ax.contourf(qx, qy, np.log(intensity) if intensity else intensity, levels = 30, cmap = 'jet')
-    ax.set_xlabel(r'Q$_{x}$ ($\AA^{-1}$)',fontsize =  16)#'x-large')
-    ax.set_ylabel(r'Q$_{y}$ ($\AA^{-1}$)',fontsize =  16)#'x-large')
-    if show_crosshair:
-        ax.axhline(0, linestyle='-', color='k') # horizontal lines
-        ax.axvline(0, linestyle='-', color='k') # vertical lines
+    for qxi, qyi, intensity_i, intensity_sim_i in zip(qx_lin, qy_lin, intensity_lin, intensity_sim_lin):
+        j = ((qy[:,0] - qyi)**2).argmin()
+        i = ((qx[0,:] - qxi)**2).argmin()
+        intensity[j, i] = intensity_i if qxi < 0 else intensity_sim_i
+    
+    
+    ax.pcolormesh(qx, qy, intensity, cmap='jet', norm='log')
+    ax.set_xlabel(r'Q$_{x}$ ($\AA^{-1}$)',fontsize =  fontsize)#'x-large')
+    ax.set_ylabel(r'Q$_{y}$ ($\AA^{-1}$)',fontsize =  fontsize)#'x-large')
+    
+    ax.axhline(0, linestyle='-', color='k') # horizontal lines
+    ax.axvline(0, linestyle='-', color='k') # vertical lines
     ax.set_aspect("equal")
     fig.tight_layout()
     return fig
@@ -338,6 +352,10 @@ def plot_detector_image(df: pd.DataFrame) -> figure.Figure:
 
 @dataclass
 class DetectorImagePlotter(LogCallback):
+    result_folder: Path
+    file_plot_prefix: str
+    file_plot_format: str = "pdf"
+    fontsize: int = 16
 
     def start(self, document: dict | None = None) -> None:
         return super().start(document)
@@ -349,6 +367,10 @@ class DetectorImagePlotter(LogCallback):
         if document is None:
             return None
         detector_image_data_dfs = start_stop_doc_to_detector_image_data(document)
+        for i, detector_data in enumerate(detector_image_data_dfs):
+            fig = plot_detector_image(detector_data, fontsize=self.fontsize)
+            fig.savefig(self.result_folder / Path(f"{self.file_plot_prefix}_detector_{i}_final.{self.file_plot_format}"))
+
 
 
 '''
@@ -560,55 +582,26 @@ class Logger:
 '''
 
 if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    #plt.style.use('_mpl-gallery-nogrid')
+
+    # make data with uneven sampling in x
+    x = [-3, -2, -1.6, -1.2, -.8, -.5, -.2, .1, .3, .5, .8, 1.1, 1.5, 1.9, 2.3, 3]
+    x = np.array(x) * 300
+    X, Y = np.meshgrid(x, np.linspace(-3, 3, 128))
+    Z = (1 - X/2 + X**5 + Y**3)# * np.exp(-X**2 - Y**2)
+
+    # plot
     fig, ax = plt.subplots()
-    fig.set_size_inches(8,8)
-    d_0, d_1 = 14000, 14000
-    ax.set_xlim(-d_0 / 2, +d_0 / 2)
-    ax.set_ylim(-d_1 / 2, +d_1 / 2)
+    fig.set_size_inches(10, 10)
 
-    ax.set_aspect("equal")
-            
-    ax.set_xlabel(r'X (Angstrom)',fontsize =  14)
-    ax.set_ylabel(r'Y (Angstrom)',fontsize =  14)
+    ax.pcolormesh(X, Y, Z)#, vmin=-0.5, vmax=1.0)
 
-    patch_list = [
-            patches.Circle(
-                xy = (0, 0),
-                radius=140,
-                color = 'black'
-            ),
-            patches.Circle(
-                xy = (0, 0),
-                radius=120,
-                color = 'blue'
-            )
-        ]
-
-    patch_list_2 = [
-            patches.Circle(
-                xy = (0,260),
-                radius=120,
-                color = 'black'
-            ),
-            patches.Circle(
-                xy = (0, 260),
-                radius=100,
-                color = 'blue'
-            )
-        ]
-    
-    for patch in patch_list + patch_list_2:
-        #patch.set_snap(False)
-        ax.add_artist(patch)
-    
-    
-    
-    #ax.set_box_aspect(d_1 / d_0)
-
-    fig.tight_layout()
-    print(fig.get_size_inches())
+    plt.show()
     #print(fig.)
     fig.show()
-    fig.savefig('test.pdf')
+    #fig.savefig('test.pdf')
 
 #%%

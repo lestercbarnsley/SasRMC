@@ -139,7 +139,8 @@ class CoreShellRunner:
             log_callbacks=[
                 logger.QuietLogCallback(), 
                 logger.ExcelCallback(excel_file= results_folder / Path("test.xlsx")),
-                logger.BoxPlotter(result_folder=results_folder, file_plot_prefix='test')
+                logger.BoxPlotter(result_folder=results_folder, file_plot_prefix='test'),
+                logger.DetectorImagePlotter(result_folder=results_folder, file_plot_prefix='test')
                 ]
         )
         return RmcRunner(
