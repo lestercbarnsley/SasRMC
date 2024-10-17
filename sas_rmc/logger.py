@@ -305,10 +305,10 @@ class BoxPlotter(LogCallback):
     fontsize: int = 14
 
     def start(self, document: dict | None = None) -> None:
-        pass
+        return super().start(document)
 
     def event(self, document: dict | None = None) -> None:
-        pass
+        return super().event(document)
 
     def stop(self, document: dict | None = None) -> None:
         stop_sim_data = SimData.create_from_dict(document)
@@ -317,14 +317,14 @@ class BoxPlotter(LogCallback):
             fig.savefig(self.result_folder / Path(f"{self.file_plot_prefix}_particle_positions_box_{i}.{self.file_plot_format}"))
 
 
-def plot_detector_image(df: pd.DataFrame, fontsize = 16) -> figure.Figure:
+def plot_detector_image(detector_df: pd.DataFrame, fontsize = 16) -> figure.Figure:
     fig, ax = plt.subplots()
     fig.set_size_inches(10, 10)
 
-    qx_lin = df['qX']
-    qy_lin = df['qY']
-    intensity_lin = df['intensity']
-    intensity_sim_lin = df['simulated_intensity']
+    qx_lin = detector_df['qX']
+    qy_lin = detector_df['qY']
+    intensity_lin = detector_df['intensity']
+    intensity_sim_lin = detector_df['simulated_intensity']
     qx_diff = np.diff(np.unique(qx_lin)).max()
     qy_diff = np.diff(np.unique(qy_lin)).max()
     qx, qy = np.meshgrid(
@@ -372,6 +372,30 @@ class DetectorImagePlotter(LogCallback):
             fig.savefig(self.result_folder / Path(f"{self.file_plot_prefix}_detector_{i}_final.{self.file_plot_format}"))
 
 
+def plot_profile(detector_df: pd.DataFrame) -> figure.Figure:
+    pass
+
+
+@dataclass
+class ProfilePlotter(LogCallback):
+    result_folder: Path
+    file_plot_prefix: str
+    sector_number: int = 4
+    file_plot_format: str = "pdf"
+    fontsize: int = 16
+
+    def start(self, document: dict | None = None) -> None:
+        return super().start(document)
+    
+    def event(self, document: dict | None = None) -> None:
+        return super().event(document)
+    
+    def stop(self, document: dict | None = None) -> None:
+        if document is None:
+            return None
+        detector_image_data_dfs = start_stop_doc_to_detector_image_data(document)
+        for i, detector_data in enumerate(detector_image_data_dfs):
+    
 
 '''
 def box_writer(box: Box) -> pd.DataFrame:
