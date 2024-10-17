@@ -150,22 +150,19 @@ class BoxData:
     def to_plot(self, fontsize: int = 14) -> figure.Figure:
         fig, ax = plt.subplots()
         fig.set_size_inches(4,4)
-        
-                
+                    
         d_0, d_1 = self.dim_list[0], self.dim_list[1]
         ax.set_xlim(-d_0 / 2, +d_0 / 2)
         ax.set_ylim(-d_1 / 2, +d_1 / 2)
         ax.set_xlabel(r'X (Angstrom)',fontsize =  fontsize)
         ax.set_ylabel(r'Y (Angstrom)',fontsize =  fontsize)
 
-        
-        
         for particle_data in self.particle_list:
             for patch in particle_data_to_patches(particle_data):
                 ax.add_patch(patch)
 
         ax.set_aspect("equal")
-        ax.set_box_aspect(d_1 / d_0)
+        #ax.set_box_aspect(d_1 / d_0)
 
         fig.tight_layout()
         return fig
@@ -317,6 +314,7 @@ class BoxPlotter(LogCallback):
         stop_sim_data = SimData.create_from_dict(document)
         for i, box_data in enumerate(stop_sim_data.box_data_list):
             fig = box_data.to_plot(self.fontsize)
+            fig.show()
             fig.savefig(self.result_folder / Path(f"{self.file_plot_prefix}_particle_positions_box_{i}.{self.file_plot_format}"))
 
 
@@ -529,5 +527,54 @@ class Logger:
 '''
 
 if __name__ == "__main__":
-    print(datetime.now().timestamp())
+    fig, ax = plt.subplots()
+    fig.set_size_inches(4,4)
+    d_0, d_1 = 14000, 14000
+    ax.set_xlim(-d_0 / 2, +d_0 / 2)
+    ax.set_ylim(-d_1 / 2, +d_1 / 2)
 
+    ax.set_aspect("equal")
+            
+    ax.set_xlabel(r'X (Angstrom)',fontsize =  14)
+    ax.set_ylabel(r'Y (Angstrom)',fontsize =  14)
+
+    patch_list = [
+            patches.Circle(
+                xy = (0, 0),
+                radius=140,
+                color = 'black'
+            ),
+            patches.Circle(
+                xy = (0, 0),
+                radius=120,
+                color = 'blue'
+            )
+        ]
+
+    patch_list_2 = [
+            patches.Circle(
+                xy = (0,260),
+                radius=120,
+                color = 'black'
+            ),
+            patches.Circle(
+                xy = (0, 260),
+                radius=100,
+                color = 'blue'
+            )
+        ]
+    
+    for patch in patch_list + patch_list_2:
+        patch.set_snap(False)
+        ax.add_patch(patch)
+    
+    
+    
+    #ax.set_box_aspect(d_1 / d_0)
+
+    fig.tight_layout()
+    #print(fig.)
+    fig.show()
+    fig.savefig('test.pdf')
+
+#%%

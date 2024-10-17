@@ -87,14 +87,9 @@ class ScatteringSimulation:
     def change_particle(self, box_index: int, particle_index: int, new_particle: Particle) -> Self:
         return type(self)(
             scale_factor=self.scale_factor,
-            box_list=[Box(
-                particles = [new_particle if j == particle_index else particle
-                             for j, particle 
-                             in enumerate(box.particles)],
-                cube = box.cube
-            ) if i == box_index else box 
-                      for i, box 
-                      in enumerate(self.box_list)]
+            box_list=[
+                box if box_index !=i else box.change_particle(particle_index, new_particle) 
+                for i, box in enumerate(self.box_list)]
         )
     
     def get_loggable_data(self) -> dict:

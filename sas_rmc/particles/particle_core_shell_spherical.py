@@ -152,5 +152,20 @@ if __name__ == "__main__":
         core_sld=6,
         shell_sld=1
     )
+    p_1 = CoreShellParticle.gen_from_parameters(
+        position=Vector(-1104.023002,4529.279886),
+        core_radius = 132.071905,
+        thickness=13.4,
+        core_sld=6,
+        shell_sld=1
+    )
+    p_2 = CoreShellParticle.gen_from_parameters(
+        position=Vector(-1062.928088, 4823.94499),
+        core_radius = 138.6449959,
+        thickness=13.4,
+        core_sld=6,
+        shell_sld=1
+    )
+    print(p_1.collision_detected(p_2))
 
 #%%

@@ -41,11 +41,15 @@ class Box:
             return True
         return any(particle.collision_detected(particle_j) for j, particle_j in enumerate(self.particles) if j!=particle_index)
     
-    def move_to_new_position(self, particle_index: int, new_position: Vector) -> Self:
+    def change_particle(self, particle_index: int, new_particle: Particle) -> Self:
         return type(self)(
-            particles=[particle if j!=particle_index else particle.change_position(new_position) for j, particle in enumerate(self.particles)],
-            cube=self.cube
+            particles=[particle if j!=particle_index else new_particle for j, particle in enumerate(self.particles)],
+            cube = self.cube
         )
+    
+    def move_to_new_position(self, particle_index: int, new_position: Vector) -> Self:
+        new_particle = self.particles[particle_index].change_position(new_position)
+        return self.change_particle(particle_index, new_particle)
     
     def move_inside_box(self, particle_index: int) -> Self:
         new_position = self.cube.random_position_inside()
