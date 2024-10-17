@@ -149,20 +149,20 @@ class BoxData:
     
     def to_plot(self, fontsize: int = 14) -> figure.Figure:
         fig, ax = plt.subplots()
-        fig.set_size_inches(4,4)
+        fig.set_size_inches(10,10)
                     
         d_0, d_1 = self.dim_list[0], self.dim_list[1]
         ax.set_xlim(-d_0 / 2, +d_0 / 2)
         ax.set_ylim(-d_1 / 2, +d_1 / 2)
+
+        ax.set_aspect("equal")
+
         ax.set_xlabel(r'X (Angstrom)',fontsize =  fontsize)
         ax.set_ylabel(r'Y (Angstrom)',fontsize =  fontsize)
 
         for particle_data in self.particle_list:
             for patch in particle_data_to_patches(particle_data):
                 ax.add_patch(patch)
-
-        ax.set_aspect("equal")
-        #ax.set_box_aspect(d_1 / d_0)
 
         fig.tight_layout()
         return fig
@@ -314,8 +314,41 @@ class BoxPlotter(LogCallback):
         stop_sim_data = SimData.create_from_dict(document)
         for i, box_data in enumerate(stop_sim_data.box_data_list):
             fig = box_data.to_plot(self.fontsize)
-            fig.show()
             fig.savefig(self.result_folder / Path(f"{self.file_plot_prefix}_particle_positions_box_{i}.{self.file_plot_format}"))
+
+
+def plot_detector_image(df: pd.DataFrame) -> figure.Figure:
+    fig, ax = plt.subplots()
+    fig.set_size_inches(10, 10)
+
+    qx = df['qX']
+    qy = df['qY']
+    intensity = df['intensity']
+
+    ax.contourf(qx, qy, np.log(intensity) if intensity else intensity, levels = 30, cmap = 'jet')
+    ax.set_xlabel(r'Q$_{x}$ ($\AA^{-1}$)',fontsize =  16)#'x-large')
+    ax.set_ylabel(r'Q$_{y}$ ($\AA^{-1}$)',fontsize =  16)#'x-large')
+    if show_crosshair:
+        ax.axhline(0, linestyle='-', color='k') # horizontal lines
+        ax.axvline(0, linestyle='-', color='k') # vertical lines
+    ax.set_aspect("equal")
+    fig.tight_layout()
+    return fig
+
+
+@dataclass
+class DetectorImagePlotter(LogCallback):
+
+    def start(self, document: dict | None = None) -> None:
+        return super().start(document)
+    
+    def event(self, document: dict | None = None) -> None:
+        return super().event(document)
+    
+    def stop(self, document: dict | None = None) -> None:
+        if document is None:
+            return None
+        detector_image_data_dfs = start_stop_doc_to_detector_image_data(document)
 
 
 '''
@@ -528,7 +561,7 @@ class Logger:
 
 if __name__ == "__main__":
     fig, ax = plt.subplots()
-    fig.set_size_inches(4,4)
+    fig.set_size_inches(8,8)
     d_0, d_1 = 14000, 14000
     ax.set_xlim(-d_0 / 2, +d_0 / 2)
     ax.set_ylim(-d_1 / 2, +d_1 / 2)
@@ -565,14 +598,15 @@ if __name__ == "__main__":
         ]
     
     for patch in patch_list + patch_list_2:
-        patch.set_snap(False)
-        ax.add_patch(patch)
+        #patch.set_snap(False)
+        ax.add_artist(patch)
     
     
     
     #ax.set_box_aspect(d_1 / d_0)
 
     fig.tight_layout()
+    print(fig.get_size_inches())
     #print(fig.)
     fig.show()
     fig.savefig('test.pdf')
