@@ -148,7 +148,7 @@ class CoreShellRunner:
                 logger.ProfilePlotter(result_folder=results_folder, file_plot_prefix=f'{datetime_string}_{self.simulation_title}')
                 ]
         )
-        log_callback = logger.QuietLogCallback()
+        #log_callback = logger.QuietLogCallback()
         return RmcRunner(
             simulator=Simulator(
                 controller=Controller(ledger=[step for step in self.create_control_steps(state)]),
@@ -188,9 +188,9 @@ if __name__ == "__main__":
     spreadsheet = Path(__file__).parent.parent.parent / Path("data") / Path("CoreShell Simulation Input - Copy - Copy.xlsx")
     #spreadsheet = Path(__file__).parent.parent.parent / Path("data") / Path("CoreShell_F20_pol - Copy.xlsx")
     runner = create_runner(spreadsheet)
-    #runner.run()
+    runner.run()
 
-    import cProfile
+    '''import cProfile
     import pstats
 
     with cProfile.Profile() as pr:
@@ -199,7 +199,7 @@ if __name__ == "__main__":
     stats = pstats.Stats(pr)
     stats.sort_stats(pstats.SortKey.TIME)
     stats.print_stats()
-
+    '''
     
 
 

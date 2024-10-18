@@ -53,11 +53,19 @@ class PrintLogCallback(LogCallback):
         print('event', document)
 
 
-        
+
+
+def clear_lines(lines: int) -> None:
+    CURSOR_UP = "\033[1A"
+    CLEAR = "\x1b[2K"
+    for _ in range(lines):
+        print(CURSOR_UP, end = CLEAR)
 
 
 @dataclass
 class QuietLogCallback(LogCallback):
+    current_keys: set[str] = field(default_factory=set)
+    important_keys: set[str] = field(default_factory=lambda : {'Current goodness of fit', 'Cycle', 'Step', 'timestamp'})
 
     def start(self, document: dict | None = None) -> None:
         pass
@@ -66,7 +74,15 @@ class QuietLogCallback(LogCallback):
     def event(self, document: dict | None = None) -> None:
         if document is None:
             return None
-        print({k : v for k, v in document.items() if k in ['Current goodness of fit', 'Cycle', 'Step', 'timestamp']})
+        current_key_len = len(self.current_keys)
+        for key in document.keys():
+            self.current_keys.add(key)
+        printable_document = {k : document.get(k, None) for k in self.current_keys if k not in self.important_keys} | {k : document.get(k, None) for k in self.important_keys}
+        clear_lines(lines = current_key_len)
+        print('\n'.join(f"{k}: {v}" for k, v in printable_document.items()))
+        
+        #print({k : v for k, v in document.items() if k in ['Current goodness of fit', 'Cycle', 'Step', 'timestamp']})
+        
 
     def stop(self, document: dict | None = None) -> None:
         pass

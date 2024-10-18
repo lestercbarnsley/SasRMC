@@ -118,7 +118,7 @@ class DetectorPixel:
         sliced_gaussian_sum = sliced_gaussian.sum()
         def smearing_func(arr: np.ndarray) -> float:
             #return np.average(slicing_func(arr), weights=sliced_gaussian)
-            return (slicing_func(arr) * sliced_gaussian).sum() / sliced_gaussian_sum
+            return (slicing_func(arr) * sliced_gaussian).sum() / sliced_gaussian_sum # This is way faster than np.average
             
         return smearing_func
 
