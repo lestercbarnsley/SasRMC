@@ -109,14 +109,16 @@ class DetectorPixel:
         return gaussian / np.sum(gaussian)
     
     @method_array_cache
-    def get_smearing_func(self, qx_array: np.ndarray, qy_array: np.ndarray, gaussian_floor: float = DEFAULT_GAUSSIAN_FLOOR_FRACTION) -> Callable[[np.ndarray], np.number]:
+    def get_smearing_func(self, qx_array: np.ndarray, qy_array: np.ndarray, gaussian_floor: float = DEFAULT_GAUSSIAN_FLOOR_FRACTION) -> Callable[[np.ndarray], float]:
         gaussian = self.resolution_function(qx_array, qy_array)
         idxs = np.where(gaussian > gaussian.max() * gaussian_floor)
         def slicing_func(arr: np.ndarray) -> np.ndarray:
             return arr[idxs]
         sliced_gaussian = slicing_func(gaussian)
-        def smearing_func(arr: np.ndarray) -> np.number:
-            return np.average(slicing_func(arr), weights=sliced_gaussian)
+        sliced_gaussian_sum = sliced_gaussian.sum()
+        def smearing_func(arr: np.ndarray) -> float:
+            #return np.average(slicing_func(arr), weights=sliced_gaussian)
+            return (slicing_func(arr) * sliced_gaussian).sum() / sliced_gaussian_sum
             
         return smearing_func
 

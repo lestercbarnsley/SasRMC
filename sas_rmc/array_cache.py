@@ -22,6 +22,21 @@ def create_arg_key(arg: Iterable) -> tuple: ...
 def create_arg_key(arg: MutableMapping) -> tuple: ...
 
 def create_arg_key(arg: Any) -> Hashable:
+    if hasattr(arg, 'items') and hasattr(arg, 'values') and hasattr(arg, 'keys'):
+        return tuple((create_arg_key(k), create_arg_key(v)) for k, v in arg.items())
+    if hasattr(arg, 'flags') and hasattr(arg.flags, 'writeable'):
+        if arg.flags.writeable:
+            arg.flags.writeable = False
+        return id(arg)
+    if isinstance(arg, str):
+        return arg
+    if hasattr(arg, '__iter__'):
+        return tuple(create_arg_key(a) for a in arg)
+    if hasattr(arg, '__hash__') and arg.__hash__ is not None:
+        return arg
+    return id(arg)
+
+'''def create_arg_key(arg: Any) -> Hashable:
     if isinstance(arg, MutableMapping):
         return tuple((create_arg_key(k), create_arg_key(v)) for k, v in arg.items())
     if isinstance(arg, np.ndarray):
@@ -34,7 +49,7 @@ def create_arg_key(arg: Any) -> Hashable:
         return tuple(create_arg_key(a) for a in arg)
     if isinstance(arg, Hashable):
         return arg
-    return id(arg)
+    return id(arg)'''
 
 def create_function_cache_key(*args, **kwargs) -> Hashable:
     return () + create_arg_key(args) + create_arg_key(kwargs)
