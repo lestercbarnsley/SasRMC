@@ -53,38 +53,23 @@ class PrintLogCallback(LogCallback):
         print('event', document)
 
 
-CURSOR_UP = "\033[1A"
-CLEAR = "\x1b[2K"
-
-def clear_lines(lines: int) -> None:
-    print(CURSOR_UP * lines,end = "")
-
-
 @dataclass
 class QuietLogCallback(LogCallback):
-    current_keys: set[str] = field(default_factory=set)
-    important_keys: set[str] = field(default_factory=lambda : {'Current goodness of fit', 'Cycle', 'Step', 'timestamp'})
-
+    
     def start(self, document: dict | None = None) -> None:
-        print("Do not scroll mouse wheel in terminal window while Quiet Log Callback is running")
-        print('\033[?25l', end="")
-        #print('start', document)
+        pass
 
     def event(self, document: dict | None = None) -> None:
         if document is None:
             return None
-        current_key_len = len(self.current_keys)
-        for key in document.keys():
-            self.current_keys.add(key)
-        printable_document = {k : document.get(k, None) for k in self.current_keys if k not in self.important_keys} | {k : document.get(k, None) for k in self.important_keys}
-        clear_lines(lines = current_key_len)
-        print('\n'.join(CLEAR + f"{k}: {v}"  for k, v in printable_document.items()))
-        
-        #print({k : v for k, v in document.items() if k in ['Current goodness of fit', 'Cycle', 'Step', 'timestamp']})
+        doc = {k : f"{v:.6f}" if isinstance(v, float) else v for k, v in document.items() if k in ['Current goodness of fit', 'Cycle', 'Step']}
+        if 'timestamp' in document:
+            doc = doc | {'timestamp' : str(datetime.fromtimestamp(document.get('timestamp', 0)))}
+        print(doc)
         
 
     def stop(self, document: dict | None = None) -> None:
-        print('\033[?25h', end="")
+        pass
 
 
 @dataclass
