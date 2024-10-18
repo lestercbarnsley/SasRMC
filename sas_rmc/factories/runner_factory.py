@@ -1,5 +1,6 @@
 #%%
 
+from datetime import datetime
 from pathlib import Path
 from collections.abc import Callable
 from typing import Iterable, Iterator, ParamSpec, TypeVar
@@ -18,6 +19,7 @@ from sas_rmc.simulator import Simulator
 
 
 rng = constants.RNG
+DATETIME_FORMAT = '%Y%m%d%H%M%S'
 
 
 def polydisperse_parameter(loc: float, polyd: float) -> float:
@@ -61,6 +63,7 @@ def particle_box_index_iterator(simulation_state: ScatteringSimulation) -> Itera
 
 @pydantic_dataclass
 class CoreShellRunner:
+    simulation_title: str
     core_radius: float
     core_polydispersity: float
     core_sld: float
@@ -135,12 +138,14 @@ class CoreShellRunner:
     def create_runner(self, evaluator: Evaluator) -> RmcRunner:
         state = self.create_simulation_state(default_box_dimensions=evaluator.default_box_dimensions())
         results_folder = Path(__file__).parent.parent.parent / Path("data") / Path("Results")
+        datetime_string = datetime.now().strftime(DATETIME_FORMAT)
         log_callback = logger.LogEventBus(
             log_callbacks=[
                 logger.QuietLogCallback(), 
-                logger.ExcelCallback(excel_file= results_folder / Path("test.xlsx")),
-                logger.BoxPlotter(result_folder=results_folder, file_plot_prefix='test'),
-                logger.DetectorImagePlotter(result_folder=results_folder, file_plot_prefix='test')
+                logger.ExcelCallback(excel_file= results_folder / Path(f'{datetime_string}_{self.simulation_title}.xlsx')),
+                logger.BoxPlotter(result_folder=results_folder, file_plot_prefix=f'{datetime_string}_{self.simulation_title}'),
+                logger.DetectorImagePlotter(result_folder=results_folder, file_plot_prefix=f'{datetime_string}_{self.simulation_title}'),
+                logger.ProfilePlotter(result_folder=results_folder, file_plot_prefix=f'{datetime_string}_{self.simulation_title}')
                 ]
         )
         return RmcRunner(

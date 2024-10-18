@@ -395,10 +395,14 @@ class DetectorImagePlotter(LogCallback):
         for i, detector_data in enumerate(detector_image_data_dfs):
             fig = plot_detector_image(detector_data, fontsize=self.fontsize)
             fig.savefig(self.result_folder / Path(f"{self.file_plot_prefix}_detector_{i}_final.{self.file_plot_format}"))
-            
+
 
 def interpolate_qxqy(qx: np.ndarray, qy: np.ndarray, intensity: np.ndarray, shadow_factor: np.ndarray, qx_target: float, qy_target: float) -> float | None:
     distances = np.sqrt((qx - qx_target)**2 + (qy - qy_target)**2)
+    if not (qx.min() <= qx_target <= qx.max()):
+        return None
+    if not (qy.min() <= qy_target <= qy.max()):
+        return None
     return intensity[distances.argmin()] if shadow_factor[distances.argmin()] else None
 
 def sector_at_q(qx: np.ndarray, qy: np.ndarray, intensity: np.ndarray, shadow_factor: np.ndarray, q_value: float, nominal_angle: float, angle_range: float) -> float | None:
@@ -429,7 +433,7 @@ def plot_profile(detector_df: pd.DataFrame, size_inches: tuple[float, float] = (
     factors = [i * 2 for i, _ in enumerate(sector_angles)]
     for factor, colour, sector_angle in zip(factors, colours, sector_angles):
         q, exp_int = sector_analysis(detector_df['qX'], detector_df['qY'], detector_df['intensity'], detector_df['shadow_factor'], sector_angle, PI / 10)
-        q_sim, sim_int = sector_analysis(detector_df['qX'], detector_df['qY'], detector_df['intensity'], detector_df['shadow_factor'], sector_angle, PI / 10)
+        q_sim, sim_int = sector_analysis(detector_df['qX'], detector_df['qY'], detector_df['simulated_intensity'], detector_df['shadow_factor'], sector_angle, PI / 10)
         ax.loglog(q, (10**factor) * exp_int, colour + '.' , label = f"{(180/PI)*sector_angle:.2f} deg")
         ax.loglog(q_sim, (10**factor) * sim_int, colour + '-')
     ax.set_xlabel(r'Q ($\AA^{-1}$)',fontsize =  fontsize)
