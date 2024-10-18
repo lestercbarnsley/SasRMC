@@ -5,11 +5,12 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
-from matplotlib import pyplot as plt, patches, figure
+from matplotlib import pyplot as plt, patches, figure, colors as mcolors
 import numpy as np
 import pandas as pd
 
 from sas_rmc.vector import Vector
+from sas_rmc.constants import PI
 
 
 @dataclass
@@ -118,13 +119,30 @@ def particle_data_to_patches(particle_data: dict) -> list[patches.Patch]:
             patches.Circle(
                 xy = xy,
                 radius=shell_radius,
-                color = 'black'
+                ec = None,
+                fc = 'black'
             ),
             patches.Circle(
                 xy = xy,
                 radius=core_radius,
-                color = 'blue'
+                ec = None,
+                fc = 'blue'
             )
+        ]
+    else:
+        raise ValueError("Unrecognized particle type")
+    
+def magnetic_data_to_patches(particle_data: dict) -> list[patches.Patch]:
+    particle_type = particle_data.get('Particle type')
+    if particle_type == 'CoreShellParticle':
+        x, y = particle_data.get('Position.X', -np.inf), particle_data.get('Position.Y', -np.inf)
+        core_radius = particle_data.get('Core radius', 0.0)
+        magnetization = particle_data_to_magnetization_vector(particle_data)
+        if magnetization is None:
+            return []
+        dx, dy, *_ = (3 * core_radius * magnetization.unit_vector).to_tuple()
+        return [
+            patches.Arrow(x = x, y=y, dx=dx, dy=dy)
         ]
     else:
         raise ValueError("Unrecognized particle type")
@@ -147,9 +165,10 @@ class BoxData:
     def get_all_volume(self) -> list[float]:
         return [particle['Volume'] for particle in self.particle_list]
     
-    def to_plot(self, fontsize: int = 14) -> figure.Figure:
+    def to_plot(self, fontsize: int = 14, size_inches: tuple[float, float] = (6,6), include_magnetic: bool = False) -> figure.Figure:
         fig, ax = plt.subplots()
-        fig.set_size_inches(10,10)
+        w, h = size_inches
+        fig.set_size_inches(w, h)
                     
         d_0, d_1 = self.dim_list[0], self.dim_list[1]
         ax.set_xlim(-d_0 / 2, +d_0 / 2)
@@ -163,6 +182,11 @@ class BoxData:
         for particle_data in self.particle_list:
             for patch in particle_data_to_patches(particle_data):
                 ax.add_patch(patch)
+
+        if include_magnetic:
+            for particle_data in self.particle_list:
+                for patch in magnetic_data_to_patches(particle_data):
+                    ax.add_patch(patch)
 
         fig.tight_layout()
         return fig
@@ -317,9 +341,10 @@ class BoxPlotter(LogCallback):
             fig.savefig(self.result_folder / Path(f"{self.file_plot_prefix}_particle_positions_box_{i}.{self.file_plot_format}"))
 
 
-def plot_detector_image(detector_df: pd.DataFrame, fontsize = 16) -> figure.Figure:
+def plot_detector_image(detector_df: pd.DataFrame, fontsize = 14, size_inches: tuple[float, float] = (6,6)) -> figure.Figure:
     fig, ax = plt.subplots()
-    fig.set_size_inches(10, 10)
+    w, h = size_inches
+    fig.set_size_inches(w, h)
 
     qx_lin = detector_df['qX']
     qy_lin = detector_df['qY']
@@ -370,10 +395,47 @@ class DetectorImagePlotter(LogCallback):
         for i, detector_data in enumerate(detector_image_data_dfs):
             fig = plot_detector_image(detector_data, fontsize=self.fontsize)
             fig.savefig(self.result_folder / Path(f"{self.file_plot_prefix}_detector_{i}_final.{self.file_plot_format}"))
+            
 
+def interpolate_qxqy(qx: np.ndarray, qy: np.ndarray, intensity: np.ndarray, shadow_factor: np.ndarray, qx_target: float, qy_target: float) -> float | None:
+    distances = np.sqrt((qx - qx_target)**2 + (qy - qy_target)**2)
+    return intensity[distances.argmin()] if shadow_factor[distances.argmin()] else None
 
-def plot_profile(detector_df: pd.DataFrame) -> figure.Figure:
-    pass
+def sector_at_q(qx: np.ndarray, qy: np.ndarray, intensity: np.ndarray, shadow_factor: np.ndarray, q_value: float, nominal_angle: float, angle_range: float) -> float | None:
+    angles = np.linspace(-PI , +PI, num = 180)
+    intensities = [interpolate_qxqy(qx, qy, intensity, shadow_factor, q_value * np.cos(angle), q_value * np.sin(angle)) for angle in angles if np.abs(angle - nominal_angle) < angle_range / 2 or np.abs(angle - (nominal_angle + PI)) < angle_range / 2]
+    intensities = [intensity for intensity in intensities if intensity]
+    if not intensities:
+        return None
+    return float(np.average(intensities))
+
+def sector_analysis(qx: np.ndarray, qy: np.ndarray, intensity: np.ndarray, shadow_factor: np.ndarray, nominal_angle: float, angle_range: float) -> tuple[np.ndarray, np.ndarray]:
+    qx_diff = np.diff(np.unique(qx)).max()
+    qy_diff = np.diff(np.unique(qy)).max()
+    q_step = np.min([qx_diff, qy_diff])
+    q_max = np.sqrt(qx**2 + qy**2).max()
+    q_range = np.arange(start = 0, stop=q_max, step = q_step)
+    sector_intensity = [sector_at_q(qx, qy, intensity, shadow_factor, q, nominal_angle, angle_range) for q in q_range]
+    q_final = [q for q, intensity in zip(q_range, sector_intensity) if intensity]
+    intensity_final = [intensity for _, intensity in zip(q_range, sector_intensity) if intensity]
+    return np.array(q_final), np.array(intensity_final)
+
+def plot_profile(detector_df: pd.DataFrame, size_inches: tuple[float, float] = (6,6), sector_number: int = 4, fontsize: int = 16) -> figure.Figure:
+    fig, ax = plt.subplots()
+    w, h = size_inches
+    fig.set_size_inches(w, h)
+    sector_angles = np.linspace(start = 0, stop = PI / 2, num = sector_number)
+    colours = [c for c in mcolors.BASE_COLORS.keys() if c!='w'] * 50
+    factors = [i * 2 for i, _ in enumerate(sector_angles)]
+    for factor, colour, sector_angle in zip(factors, colours, sector_angles):
+        q, exp_int = sector_analysis(detector_df['qX'], detector_df['qY'], detector_df['intensity'], detector_df['shadow_factor'], sector_angle, PI / 10)
+        q_sim, sim_int = sector_analysis(detector_df['qX'], detector_df['qY'], detector_df['intensity'], detector_df['shadow_factor'], sector_angle, PI / 10)
+        ax.loglog(q, (10**factor) * exp_int, colour + '.' , label = f"{(180/PI)*sector_angle:.2f} deg")
+        ax.loglog(q_sim, (10**factor) * sim_int, colour + '-')
+    ax.set_xlabel(r'Q ($\AA^{-1}$)',fontsize =  fontsize)
+    ax.set_ylabel(r'Intensity (cm $^{-1}$)',fontsize =  fontsize)
+    ax.legend()
+    return fig
 
 
 @dataclass
@@ -395,237 +457,66 @@ class ProfilePlotter(LogCallback):
             return None
         detector_image_data_dfs = start_stop_doc_to_detector_image_data(document)
         for i, detector_data in enumerate(detector_image_data_dfs):
-    
+            fig = plot_profile(detector_data, sector_number=self.sector_number, fontsize=self.fontsize)
+            fig.savefig(self.result_folder / Path(f"{self.file_plot_prefix}_profiles_{i}_final.{self.file_plot_format}"))
 
-'''
-def box_writer(box: Box) -> pd.DataFrame:
-    box_df = pd.DataFrame([p.get_loggable_data() for p in box.particles])
-    return box_df
-
-def detector_writer(detector: DetectorImage) -> pd.DataFrame:
-    detector_df = detector.get_pandas()
-    return detector_df
-
-def get_loggable_commmand(command: LoggableCommandProtocol) -> dict:
-    command.execute()
-    return command.get_loggable_data()
-
-def controller_writer(controller: Controller) -> pd.DataFrame:
-    return pd.DataFrame([get_loggable_commmand(command) for command in controller.completed_commands])
-
-def make_global_params(box_list: List[Box], before_time: datetime, commands: List[AcceptableCommand]) -> pd.DataFrame:
-    final_rescale = 1
-    test_command = lambda acc : isinstance(acc, AcceptableCommand) and acc.acceptance_scheme.is_acceptable() and isinstance(acc.base_command, ScaleCommand)
-    test_commands = [acceptable_command for acceptable_command in commands if test_command(acceptable_command)]
-    for acceptable_command in test_commands:
-        final_rescale = acceptable_command.base_command.simulation_params.get_value(key = constants.NUCLEAR_RESCALE)
-    estimated_concentration = final_rescale * np.average([np.sum([particle.volume for particle in box.particles ]) / box.volume for box in box_list])
-    d = {
-        "Final scale": [final_rescale],
-        "Estimated concentration (v/v)": [estimated_concentration],
-        "Simulation time (s)": [(datetime.now() - before_time).total_seconds()],
-        "Effective magnetization" : ["Coming soon"]
-    }
-    return pd.DataFrame(d)
-
-
-
-
-def plot_box(box: Box, file_name: Path) -> None:
-    box_writer = BoxWriter.standard_box_writer()
-    fig = box_writer.to_plot(box)
-    fig.savefig(file_name)
-
-
-@dataclass
-class BoxPlotter(LogCallback):
-    save_path_maker: Callable[[str, str],Path]
-    box_list: List[Box]
-    format: str = "pdf"
-    make_initial: bool = True
-
-    def plot_boxes(self, comment_maker: Callable[[int], Path]) -> None:
-        for box_number, box in enumerate(self.box_list):
-            comment = comment_maker(box_number)
-            plot_box(box, self.save_path_maker(comment, self.format))
-
-    def before_event(self, d: dict = None) -> None:
-        if not self.make_initial:
-            return
-        comment_maker = lambda box_number : f"_box_{box_number}_initial_particle_positions"
-        self.plot_boxes(comment_maker)
-
-    def after_event(self, d: dict = None) -> None:
-        comment_maker = lambda box_number : f"_box_{box_number}_final_particle_positions"
-        self.plot_boxes(comment_maker)
-
-
-def plot_detector(detector: DetectorImage, file_name: Path) -> None:
-    fig = detector.plot_intensity(show_fig=False)
-    fig.savefig(file_name)
-
-
-@dataclass
-class DetectorPlotter(LogCallback):
-    save_path_maker: Callable[[str, str],Path]
-    detector_list: List[DetectorImage]
-    format: str = "pdf"
-    make_initial: bool = False
-
-    def plot_detectors(self, comment_maker: Callable[[int], Path]) -> None:
-        for detector_number, detector in enumerate(self.detector_list):
-            comment = comment_maker(detector_number)
-            plot_detector(detector, self.save_path_maker(comment, self.format))
-
-    def before_event(self, d: dict = None) -> None:
-        if not self.make_initial:
-            return
-        comment_maker = lambda detector_number : f"_detector_{detector_number}_initial"
-        self.plot_detectors(comment_maker)
-
-    def after_event(self, d: dict = None) -> None:
-        comment_maker = lambda detector_number : f"_detector_{detector_number}_final"
-        self.plot_detectors(comment_maker)
-
-def interpolate_qxqy(qx: np.ndarray, qy: np.ndarray, intensity: np.ndarray, shadow: np.ndarray, qx_target: float, qy_target: float) -> Optional[float]:
-    distances = np.sqrt((qx - qx_target)**2 + (qy - qy_target)**2)
-    arg_of_min = np.where(distances == np.amin(distances))
-    return intensity[arg_of_min] if shadow[arg_of_min] else None
-
-
-def sector_average(detector: DetectorImage, intensity_2d: Callable[[DetectorImage], Tuple[np.ndarray, np.ndarray, np.ndarray]] = None, sector_tuple: Tuple[float, float] = (0, np.inf), num_per_rotation: int = 360) -> Tuple[np.ndarray, np.ndarray]:
-    sector_tuple = sector_tuple if sector_tuple[1] < 2 * PI else (0, 2 *PI)
-    nominal_sector_angle, sector_range = sector_tuple   
-    qx, qy, intensity, shadow = intensity_2d(detector) if intensity_2d is not None else lambda detector : detector.intensity_2d()
-    detector_q_arr = np.sqrt((qx[shadow])**2 + (qy[shadow])**2)
-    q_list = np.arange(start = np.min(detector_q_arr), stop = np.max(detector_q_arr), step = np.min(detector.qxqy_delta))
-    def intensity_at_q(q: float) -> float:
-        angle_num = int(num_per_rotation * sector_range / (2* PI))
-        angle_min = nominal_sector_angle - sector_range / 2
-        angle_max = nominal_sector_angle + sector_range / 2
-        intensities = []
-        angles = np.linspace(angle_min, angle_max, num = angle_num)
-        for angle in np.concatenate([angles, angles + PI]):
-            qx_target, qy_target = q * np.cos(angle), q * np.sin(angle)
-            if np.min(qx) < qx_target < np.max(qx) and np.min(qy) < qy_target < np.max(qy):
-                intensity_out = interpolate_qxqy(qx, qy, intensity, shadow, qx_target, qy_target)
-                if intensity_out is not None:
-                    intensities.append(intensity_out)
-        return np.average(intensities) if len(intensities) else 0.0
-    tensity_list_fn = np.frompyfunc(intensity_at_q, nin = 1, nout = 1)
-    tensity_list = tensity_list_fn(q_list)
-    tensity_filter = lambda arr: arr[tensity_list!=0]
-    return tensity_filter(q_list), tensity_filter(tensity_list)
-
-def plot_profile(detector: SimulatedDetectorImage, file_name: Path, angle_list: List[float] = None) -> None:
-    fig, ax = plt.subplots()
-    angle_list = angle_list if angle_list is not None else [i * PI/6 for i in range(4)]
-    colours = [c for c in mcolors.BASE_COLORS.keys() if c!='w'] * 50
-    factors = [i * 2 for i, _ in enumerate(angle_list)]
-    for factor, colour, angle in zip(factors, colours, angle_list):
-        q, exp_int = sector_average(detector, lambda d: d.intensity_2d(), sector_tuple=[angle, PI/10])
-        q_sim, sim_int = sector_average(detector, lambda d: d.simulated_intensity_2d(), sector_tuple=[angle, PI/10])
-        ax.loglog(q, (10**factor) * exp_int, colour + '.' , label = f"{(180/PI)*angle:.2f} deg")
-        ax.loglog(q_sim, (10**factor) * sim_int, colour + '-')
-    fig.set_size_inches(5,5)
-    ax.set_xlabel(r'Q ($\AA^{-1}$)',fontsize =  16)#'x-large')
-    ax.set_ylabel(r'Intensity (cm $^{-1}$)',fontsize =  16)#'x-large')
-    ax.legend()
-    fig.savefig(file_name)
-    
-
-@dataclass
-class ProfilePlotter(LogCallback): # This is bad code, a better solution is composition, but the point is, I have to write the bad code before I can write the good code
-    save_path_maker: Callable[[str, str],Path]
-    detector_list: List[DetectorImage]
-    format: str = "pdf"
-    make_initial: bool = False
-
-    def plot_detectors(self, comment_maker: Callable[[int], Path]) -> None:
-        for detector_number, detector in enumerate(self.detector_list):
-            comment = comment_maker(detector_number)
-            plot_profile(detector, self.save_path_maker(comment, self.format))
-
-    def before_event(self, d: dict = None) -> None:
-        if not self.make_initial:
-            return
-        comment_maker = lambda detector_number : f"_profiles_{detector_number}_initial"
-        self.plot_detectors(comment_maker)
-
-    def after_event(self, d: dict = None) -> None:
-        comment_maker = lambda detector_number : f"_profiles_{detector_number}_final"
-        self.plot_detectors(comment_maker)
-
-
-@dataclass
-class BoxPlotter(LogCallback):
-    save_path_maker: Callable[[str, str],Path]
-    box_list: List[Box]
-    format: str = "pdf"
-    make_initial: bool = False
-
-    def plot_box_list(self, timing_string: str = "initial") -> None:
-        box_writer = BoxWriter.standard_box_writer()
-        for box_number, box in enumerate(self.box_list):
-            fig = box_writer.to_plot(box)
-            fig_path = self.save_path_maker(f"_box_{box_number}_{timing_string}_particle_positions", self.format)
-            fig.savefig(fig_path)
-
-    def before_event(self, d: dict = None) -> None:
-        if self.make_initial:
-            self.plot_box_list(timing_string="initial")
-
-    def after_event(self, d: dict = None) -> None:
-        self.plot_box_list(timing_string="final")
-
-
-@dataclass
-class Logger:
-
-    callback_list: List[LogCallback] = field(default_factory=list)
-
-    def add_callback(self, log_callback: LogCallback):
-        self.callback_list.append(log_callback)
-
-    def before_event(self) -> None:
-        for bec in self.callback_list:
-            bec.before_event()
-
-    def after_event(self) -> None:
-        for bec in self.callback_list:
-            bec.after_event()
-
-    def __enter__(self):
-        self.before_event()
-        return self
-
-    def __exit__(self, exc_type, exc_value, exc_tb) -> None:
-        self.after_event()
-
-
-'''
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
     import numpy as np
 
-    #plt.style.use('_mpl-gallery-nogrid')
-
-    # make data with uneven sampling in x
-    x = [-3, -2, -1.6, -1.2, -.8, -.5, -.2, .1, .3, .5, .8, 1.1, 1.5, 1.9, 2.3, 3]
-    x = np.array(x) * 300
-    X, Y = np.meshgrid(x, np.linspace(-3, 3, 128))
-    Z = (1 - X/2 + X**5 + Y**3)# * np.exp(-X**2 - Y**2)
-
-    # plot
     fig, ax = plt.subplots()
-    fig.set_size_inches(10, 10)
+    fig.set_size_inches(4,4)
+    d_0, d_1 = 14000, 14000
+    ax.set_xlim(-d_0 / 2, +d_0 / 2)
+    ax.set_ylim(-d_1 / 2, +d_1 / 2)
 
-    ax.pcolormesh(X, Y, Z)#, vmin=-0.5, vmax=1.0)
+    ax.set_aspect("equal")
 
-    plt.show()
+    ax.set_xlabel(r'X (Angstrom)',fontsize =  14)
+    ax.set_ylabel(r'Y (Angstrom)',fontsize =  14)
+
+    patch_list = [
+            patches.Circle(
+                xy = (0, 0),
+                radius=120,
+                ec = None,
+                fc = 'black'
+            ),
+            patches.Circle(
+                xy = (0, 0),
+                radius=100,
+                ec = None,
+                fc = 'blue'
+            )
+        ]
+
+    patch_list_2 = [
+            patches.Circle(
+                xy = (0,120 + 120),
+                radius=120,
+                ec = None,
+                fc = 'black'
+            ),
+            patches.Circle(
+                xy = (0,120 + 120),
+                radius=100,
+                ec = None,
+                fc = 'blue'
+            )
+        ]
+
+    for patch in patch_list + patch_list_2:
+        #patch.set_snap(False)
+        ax.add_patch(patch)
+
+
+
+    #ax.set_box_aspect(d_1 / d_0)
+
+    #fig.tight_layout()
     #print(fig.)
     fig.show()
-    #fig.savefig('test.pdf')
+    fig.savefig('test.pdf')
 
 #%%
