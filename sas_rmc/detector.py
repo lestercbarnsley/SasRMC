@@ -117,11 +117,9 @@ class DetectorPixel:
         sliced_gaussian = slicing_func(gaussian)
         sliced_gaussian_sum = sliced_gaussian.sum()
         def smearing_func(arr: np.ndarray) -> float:
-            #return np.average(slicing_func(arr), weights=sliced_gaussian)
             return (slicing_func(arr) * sliced_gaussian).sum() / sliced_gaussian_sum # This is way faster than np.average
             
         return smearing_func
-
 
     def to_dict(self):
         return {
@@ -150,7 +148,6 @@ class DetectorPixel:
         )
 
 
-
 def get_pixel_qX(pixel: DetectorPixel) -> float:
     return pixel.qX
 
@@ -176,7 +173,9 @@ def get_pixel_shadow_factor(pixel: DetectorPixel) -> bool:
     return pixel.shadow_factor
 
 def get_nearest_pixel(qx: float, qy: float, pixels: Iterable[DetectorPixel]) -> DetectorPixel:
-    return min(pixels, key = lambda p : (qx - p.qX)**2 + (qy - p.qY)**2)
+    def distance_from_pixel(pixel: DetectorPixel) -> float:
+        return (qx - pixel.qX)**2 + (qy - pixel.qY)**2
+    return min(pixels, key = distance_from_pixel)
 
 def subtract_nearest_pixel(pixel: DetectorPixel, pixels: Iterable[DetectorPixel]) -> DetectorPixel:
     qX = pixel.qX

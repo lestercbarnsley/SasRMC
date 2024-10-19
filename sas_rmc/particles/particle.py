@@ -51,11 +51,6 @@ class Particle(ABC):
     @abstractmethod
     def get_volume(self) -> float:
         pass
-
-    @abstractmethod
-    def form_result(self, qx_array: np.ndarray, qy_array: np.ndarray) -> FormResult:
-        pass
-
     @abstractmethod
     def get_shapes(self) -> list[Shape]:
         pass
@@ -95,6 +90,8 @@ class Particle(ABC):
             'Volume' : self.get_volume(),
             'Total scattering length' : self.get_scattering_length(),
         }
+    
+
 
 
 

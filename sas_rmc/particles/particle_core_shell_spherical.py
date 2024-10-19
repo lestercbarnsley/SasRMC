@@ -7,6 +7,7 @@ import numpy as np
 from typing_extensions import Self
 
 from sas_rmc.particles import FormResult, Particle
+from sas_rmc.particles.particle_form import ParticleForm
 from sas_rmc.particles.particle_spherical import SphericalParticle
 from sas_rmc import Vector
 from sas_rmc.shapes import Shape, Sphere, collision_detected
@@ -144,6 +145,23 @@ class CoreShellParticle(Particle):
             "Solvent SLD" : self.solvent_sld,
         }
     
+
+@dataclass
+class CoreShellParticleForm(ParticleForm):
+    core_shell_particle: CoreShellParticle
+
+    def get_bound_particle(self) -> Particle:
+        return self.core_shell_particle
+    
+    def change_bound_particle(self, bound_particle: Particle) -> Self:
+        if not isinstance(bound_particle, CoreShellParticle):
+            raise TypeError("Only bind core shell particle to this form calculator")
+        return type(self)(core_shell_particle=bound_particle)
+    
+    def form_result(self, qx_array: np.ndarray, qy_array: np.ndarray) -> FormResult:
+        return self.core_shell_particle.form_result(qx_array, qy_array)
+    
+
 if __name__ == "__main__":
     t = CoreShellParticle.gen_from_parameters(
         position=Vector(0,0,0),
@@ -167,5 +185,9 @@ if __name__ == "__main__":
         shell_sld=1
     )
     print(p_1.collision_detected(p_2))
+
+    core_shell_form = CoreShellParticleForm(core_shell_particle=p_2)
+
+    print(core_shell_form.get_loggable_data())
 
 #%%
