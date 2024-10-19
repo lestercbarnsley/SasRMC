@@ -13,7 +13,7 @@ import numpy as np
 from sas_rmc import constants, Evaluator, commands, Controller, ControlStep, logger
 from sas_rmc.scattering_simulation import ScatteringSimulation, SimulationParam
 from sas_rmc.rmc_runner import RmcRunner
-from sas_rmc.particles import CoreShellParticle
+from sas_rmc.particles.particle_core_shell_spherical import CoreShellParticleForm
 from sas_rmc.factories import parse_data, box_factory, particle_factory, command_factory, acceptable_command_factory, evaluator_factory
 from sas_rmc.simulator import Simulator
 
@@ -87,7 +87,7 @@ class CoreShellRunner:
     box_dimension_2: float = 0.0
     box_dimension_3: float = 0.0
 
-    def create_particle(self) -> CoreShellParticle:
+    def create_particle(self) -> CoreShellParticleForm:
         return particle_factory.create_core_shell_particle(
             core_radius=self.core_radius,
             core_polydispersity=self.core_polydispersity,
@@ -186,8 +186,8 @@ if __name__ == "__main__":
     #data_params = create_runner(r"E:\Programming\SasRMC\data\CoreShell_F20_pol.xlsx")
     spreadsheet = Path(__file__).parent.parent.parent / Path("data") / Path("CoreShell Simulation Input - Copy - Copy.xlsx")
     #spreadsheet = Path(__file__).parent.parent.parent / Path("data") / Path("CoreShell_F20_pol - Copy.xlsx")
-    runner = create_runner(spreadsheet)
-    runner.run()
+    #runner = create_runner(spreadsheet)
+    #runner.run()
 
     '''import cProfile
     import pstats
@@ -200,7 +200,5 @@ if __name__ == "__main__":
     stats.print_stats()
     '''
     
-
-
 
 # %%

@@ -62,7 +62,7 @@ class QuietLogCallback(LogCallback):
     def event(self, document: dict | None = None) -> None:
         if document is None:
             return None
-        doc = {k : f"{v:.6f}" if isinstance(v, float) else v for k, v in document.items() if k in ['Current goodness of fit', 'Cycle', 'Step']}
+        doc = {k : v for k, v in document.items() if k in ['Current goodness of fit', 'Cycle', 'Step', 'Acceptance']}
         if 'timestamp' in document:
             doc = doc | {'timestamp' : str(datetime.fromtimestamp(document.get('timestamp', 0)))}
         print(doc)
@@ -432,8 +432,8 @@ def plot_profile(detector_df: pd.DataFrame, size_inches: tuple[float, float] = (
     colours = [c for c in mcolors.BASE_COLORS.keys() if c!='w'] * 50
     factors = [i * 2 for i, _ in enumerate(sector_angles)]
     for factor, colour, sector_angle in zip(factors, colours, sector_angles):
-        q, exp_int = sector_analysis(detector_df['qX'], detector_df['qY'], detector_df['intensity'], detector_df['shadow_factor'], sector_angle, PI / 10)
-        q_sim, sim_int = sector_analysis(detector_df['qX'], detector_df['qY'], detector_df['simulated_intensity'], detector_df['shadow_factor'], sector_angle, PI / 10)
+        q, exp_int = sector_analysis(np.array(detector_df['qX']), np.array(detector_df['qY']), np.array(detector_df['intensity']), np.array(detector_df['shadow_factor']), sector_angle, PI / 10)
+        q_sim, sim_int = sector_analysis(np.array(detector_df['qX']), np.array(detector_df['qY']), np.array(detector_df['simulated_intensity']), np.array(detector_df['shadow_factor']), sector_angle, PI / 10)
         ax.loglog(q, (10**factor) * exp_int, colour + '.' , label = f"{(180/PI)*sector_angle:.2f} deg")
         ax.loglog(q_sim, (10**factor) * sim_int, colour + '-')
     ax.set_xlabel(r'Q ($\AA^{-1}$)',fontsize =  fontsize)

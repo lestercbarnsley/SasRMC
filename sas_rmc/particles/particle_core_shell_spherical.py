@@ -150,6 +150,19 @@ class CoreShellParticle(Particle):
 class CoreShellParticleForm(ParticleForm):
     core_shell_particle: CoreShellParticle
 
+    @classmethod
+    def gen_from_parameters(cls, position: Vector, magnetization: Vector | None = None, core_radius: float = 0, thickness: float = 0, core_sld: float = 0, shell_sld: float = 0, solvent_sld: float = 0):
+        core_shell_particle = CoreShellParticle.gen_from_parameters(
+            position=position,
+            magnetization=magnetization,
+            core_radius=core_radius,
+            thickness=thickness,
+            core_sld=core_sld,
+            shell_sld=shell_sld,
+            solvent_sld=solvent_sld
+        )
+        return cls(core_shell_particle=core_shell_particle)
+
     def get_bound_particle(self) -> Particle:
         return self.core_shell_particle
     

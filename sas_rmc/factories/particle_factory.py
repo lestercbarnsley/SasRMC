@@ -1,7 +1,7 @@
 #%%
 
 from sas_rmc import Vector, constants
-from sas_rmc.particles import CoreShellParticle
+from sas_rmc.particles.particle_core_shell_spherical import CoreShellParticleForm
 
 rng = constants.RNG
 
@@ -18,8 +18,8 @@ def create_core_shell_particle(
                 shell_sld: float,
                 solvent_sld: float,
                 core_magnetization: float,
-                ) -> CoreShellParticle:
-    return CoreShellParticle.gen_from_parameters(
+                ) -> CoreShellParticleForm:
+    return CoreShellParticleForm.gen_from_parameters(
         position=Vector.null_vector(),
         magnetization=core_magnetization * Vector.random_vector_xy(),
         core_radius=polydisperse_parameter(core_radius, core_polydispersity),
