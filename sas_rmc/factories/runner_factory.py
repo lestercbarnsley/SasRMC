@@ -148,7 +148,6 @@ class CoreShellRunner:
                 logger.ProfilePlotter(result_folder=results_folder, file_plot_prefix=f'{datetime_string}_{self.simulation_title}')
                 ]
         )
-        #log_callback = logger.QuietLogCallback()
         return RmcRunner(
             simulator=Simulator(
                 controller=Controller(ledger=[step for step in self.create_control_steps(state)]),

@@ -135,5 +135,11 @@ if __name__ == "__main__":
     
     print(test_1(**{'a' : '3.7', 'b' : '4', 'c': 7, 'd' : 8}))
 
+    @coerce_types
+    def test_with_polarization(polarization: Polarization) -> None:
+        print(polarization)
+
+    test_with_polarization(**{'polarization' : 'spin_up'})
+
 
 # %%

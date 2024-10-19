@@ -21,24 +21,43 @@ def analytical_calculator_from_experimental_detector(detector: DetectorImage, de
         field_direction=field_direction
     )
 
+def create_smearing_fitter_from_experimental_detector(detector: DetectorImage, density_factor: float = 1.4, field_direction: FieldDirection = FieldDirection.Y) -> Smearing2DFitter:
+    analytical_calculator = analytical_calculator_from_experimental_detector(detector, density_factor, field_direction)
+    qx_matrix = analytical_calculator.qx_array
+    qy_matrix = analytical_calculator.qy_array
+    return Smearing2DFitter(
+        result_calculator=analytical_calculator,
+        experimental_detector=detector,
+        qx_matrix=qx_matrix,
+        qy_matrix=qy_matrix
+    )
+
 def create_evaluator_with_smearing(dataframes: dict[str, pd.DataFrame]) -> EvaluatorWithFitter:
     detector_list = detector_builder.create_detector_images(dataframes)
+    density_factor = 1.4
+    field_direction = FieldDirection.Y
     return EvaluatorWithFitter(
         fitter=FitterMultiple(
-            fitter_list=[Smearing2DFitter(
-                result_calculator=analytical_calculator_from_experimental_detector(detector, 1.4),
-                experimental_detector=detector
-            ) for detector in detector_list],
+            fitter_list=[
+                create_smearing_fitter_from_experimental_detector(detector, density_factor, field_direction) 
+                for detector in detector_list
+            ],
             weight=[detector.shadow_factor.sum() for detector in detector_list]
         ),
     )
 
 def create_evaluator_no_smearing(dataframes: dict[str, pd.DataFrame]) -> EvaluatorWithFitter:
     detector_list = detector_builder.create_detector_images(dataframes)
+    field_direction = FieldDirection.Y
     return EvaluatorWithFitter(
         fitter=FitterMultiple(
             fitter_list=[NoSmearing2DFitter(
-                result_calculator=AnalyticalCalculator(detector.qX, detector.qY, detector.polarization),
+                result_calculator=AnalyticalCalculator(
+                    qx_array=detector.qX, 
+                    qy_array=detector.qY, 
+                    polarization=detector.polarization,
+                    field_direction=field_direction
+                    ),
                 experimental_detector=detector
             ) for detector in detector_list],
             weight=[detector.shadow_factor.sum() for detector in detector_list]

@@ -9,7 +9,7 @@ from sas_rmc import constants
 from sas_rmc.array_cache import method_array_cache
 from sas_rmc.acceptance_scheme import AcceptanceScheme
 from sas_rmc.detector import DetectorImage, make_smearing_function, DEFAULT_GAUSSIAN_FLOOR_FRACTION
-from sas_rmc.result_calculator import AnalyticalCalculator
+from sas_rmc.result_calculator import ResultCalculator
 from sas_rmc.scattering_simulation import ScatteringSimulation
 
 
@@ -69,18 +69,21 @@ def qXqY_delta(detector: DetectorImage) -> tuple[float, float]:
     qY_diff = np.max(np.gradient(qYs))
     return float(qX_diff), float(qY_diff)
     
+
 @dataclass
 class Smearing2DFitter(Fitter):
-    result_calculator: AnalyticalCalculator
+    result_calculator: ResultCalculator
     experimental_detector: DetectorImage
+    qx_matrix: np.ndarray
+    qy_matrix: np.ndarray
     gaussian_floor: float = DEFAULT_GAUSSIAN_FLOOR_FRACTION
 
     @method_array_cache
     def create_smearing_function(self) -> Callable[[np.ndarray], np.ndarray]:
         return make_smearing_function(
             self.experimental_detector.detector_pixels,
-            qx_matrix=self.result_calculator.qx_array,
-            qy_matrix=self.result_calculator.qy_array,
+            qx_matrix=self.qx_matrix,
+            qy_matrix=self.qy_matrix,
             gaussian_floor=self.gaussian_floor
         )
     
@@ -88,7 +91,6 @@ class Smearing2DFitter(Fitter):
         qX_diff, qY_diff = qXqY_delta(self.experimental_detector)
         return [2 * PI / qX_diff, 2 * PI / qY_diff, 2 * PI / qX_diff]
         
-    
     def simulate_intensity(self, simulation_state: ScatteringSimulation) -> np.ndarray:
         intensity_result = self.result_calculator.intensity_result(simulation_state)
         smearing_function = self.create_smearing_function()
@@ -109,7 +111,7 @@ class Smearing2DFitter(Fitter):
     
 @dataclass
 class NoSmearing2DFitter(Fitter):
-    result_calculator: AnalyticalCalculator
+    result_calculator: ResultCalculator
     experimental_detector: DetectorImage
 
     def simulate_intensity(self, simulation_state: ScatteringSimulation) -> np.ndarray:
