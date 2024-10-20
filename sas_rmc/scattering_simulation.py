@@ -4,9 +4,8 @@ from dataclasses import dataclass
 import numpy as np
 from typing_extensions import Self
 
+from sas_rmc import Particle
 from sas_rmc.box_simulation import Box
-from sas_rmc.particles.particle import Particle
-
 
 
 @dataclass

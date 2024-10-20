@@ -4,13 +4,13 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from sas_rmc import constants, vector, Particle
 from sas_rmc.array_cache import method_array_cache
 from sas_rmc.detector import Polarization
 from sas_rmc.form_calculator import box_intensity, FieldDirection
-from sas_rmc.particles.particle import FormResult, Particle
-from sas_rmc.particles.particle_form import ParticleForm
+from sas_rmc.particles import ParticleForm, FormResult
 from sas_rmc.scattering_simulation import ScatteringSimulation
-from sas_rmc import constants, vector
+
 
 PI = constants.PI
 

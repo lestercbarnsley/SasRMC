@@ -5,15 +5,14 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from sas_rmc import constants
+from sas_rmc import constants, ResultCalculator, detector, DetectorImage
 from sas_rmc.array_cache import method_array_cache
 from sas_rmc.acceptance_scheme import AcceptanceScheme
-from sas_rmc.detector import DetectorImage, make_smearing_function, DEFAULT_GAUSSIAN_FLOOR_FRACTION
-from sas_rmc.result_calculator import ResultCalculator
 from sas_rmc.scattering_simulation import ScatteringSimulation
 
 
 PI = constants.PI
+DEFAULT_GAUSSIAN_FLOOR_FRACTION = detector.DEFAULT_GAUSSIAN_FLOOR_FRACTION
 
 
 @dataclass
@@ -80,7 +79,7 @@ class Smearing2DFitter(Fitter):
 
     @method_array_cache
     def create_smearing_function(self) -> Callable[[np.ndarray], np.ndarray]:
-        return make_smearing_function(
+        return detector.make_smearing_function(
             self.experimental_detector.detector_pixels,
             qx_matrix=self.qx_matrix,
             qy_matrix=self.qy_matrix,

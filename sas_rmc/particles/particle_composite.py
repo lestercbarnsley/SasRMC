@@ -8,7 +8,7 @@ import numpy as np
 from ..array_cache import round_vector
 from .particle import Particle
 from ..vector import Vector
-from ..shapes.shapes import Shape
+from ..shapes.shape import Shape
 
 
 

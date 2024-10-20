@@ -10,7 +10,8 @@ import pandas as pd
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 import numpy as np
 
-from sas_rmc import constants, Evaluator, commands, Controller, ControlStep, logger
+from sas_rmc import constants, Evaluator, commands, Controller, ControlStep
+from sas_rmc.loggers import logger
 from sas_rmc.scattering_simulation import ScatteringSimulation, SimulationParam
 from sas_rmc.rmc_runner import RmcRunner
 from sas_rmc.particles.particle_core_shell_spherical import CoreShellParticleForm

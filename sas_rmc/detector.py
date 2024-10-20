@@ -6,9 +6,8 @@ from typing import Any, Callable, Iterable
 import numpy as np
 from typing_extensions import Self
 
-from sas_rmc import vector
+from sas_rmc import vector, Vector
 from sas_rmc.array_cache import method_array_cache
-from sas_rmc.vector import Vector
 from sas_rmc import constants
 
 

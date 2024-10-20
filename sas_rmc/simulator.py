@@ -3,10 +3,9 @@ from dataclasses import dataclass
 
 from typing_extensions import Self
 
-from sas_rmc.evaluator import Evaluator
-from sas_rmc.logger import LogCallback
+#from sas_rmc.evaluator import Evaluator
+from sas_rmc import LogCallback, Evaluator, Controller
 from sas_rmc.scattering_simulation import ScatteringSimulation
-from sas_rmc.controller import Controller
 
 
 @dataclass
