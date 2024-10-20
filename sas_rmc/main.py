@@ -1,37 +1,48 @@
 #%%
-import sys
 from pathlib import Path
 
-import sas_rmc
+import click
+import yaml
 
-CONFIG_FILE = "./data/config.yaml"
+from sas_rmc.factories import runner_factory
 
-def run_rmc(config_file: str) -> None:
-    rmc = sas_rmc.load_config(config_file)
-    rmc.run()
+CONFIG_FILE = Path(__file__).parent.parent / Path("data") / Path("config.yaml")
 
-def run_dev_rmc() -> None:
-    with open("dev_config.txt",'r') as dev_config:
-        secret_dev_config = dev_config.read()
-    run_rmc(secret_dev_config)
+with open(CONFIG_FILE) as f:
+    config = yaml.load(f, Loader=yaml.FullLoader)
 
-def generate_template(args: list[str]) -> None:
-    command = ' '.join(args)
-    sas_rmc.generate_template(command, Path(CONFIG_FILE).parent)
+#print(CONFIG_FILE)
+DEFAULT_INPUT = Path(config.get('input_config_source'))
+DEFAULT_OUTPUT =  Path(config.get('output_folder'))
 
-def main():
-    argv = sys.argv
-    if len(argv) <= 1 or not argv[1]:
-        run_rmc(CONFIG_FILE)
-    elif "dev" in argv[1]:
-        run_dev_rmc()
-    elif "create" in argv[1]:
-        generate_template(argv[1:])
-    else:
-        run_rmc(CONFIG_FILE)
+
+@click.group()
+@click.version_option()
+@click.pass_context
+def cli(ctx: click.Context):
+    '''SasRMC is a Python library for numerical modelling of small-angle scattering data.'''
+    pass
+
+
+@click.command()
+@click.option("-i", "--input", "inputs", help="List of Excel files containing small-angle scattering data and simulation configurations to run", type = list, default = [DEFAULT_INPUT], show_default = True, multiple = True)
+@click.option("-o", "--output", "output", help="Folder to output results", type = click.Path(), default = DEFAULT_OUTPUT, show_default = True)
+@click.pass_context
+def run(ctx: click.Context, inputs: list[Path], output: Path) -> None:
+    abs_output = CONFIG_FILE.parent / output
+    print(inputs)
+    for input_ in inputs:
+        abs_input = CONFIG_FILE.parent / input_
+        click.echo(f"Loading configuration from {abs_input}, please wait a moment...")
+        click.echo(f'{abs_input=}')
+        click.echo(f'{abs_output=}')
+        runner = runner_factory.create_runner(abs_input, abs_output)
+        #runner.run()
+
+cli.add_command(run)
     
 
 if __name__ == "__main__":
-    main()
+    print(config)
     
 #%%

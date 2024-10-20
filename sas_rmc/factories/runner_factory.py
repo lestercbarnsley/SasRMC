@@ -135,9 +135,8 @@ class CoreShellRunner:
             if "very".lower() not in self.annealing_type.lower():
                 temperature = self.anneal_start_temp / (1 + cycle)
     
-    def create_runner(self, evaluator: Evaluator) -> RmcRunner:
+    def create_runner(self, evaluator: Evaluator, results_folder: Path) -> RmcRunner:
         state = self.create_simulation_state(default_box_dimensions=evaluator.default_box_dimensions())
-        results_folder = Path(__file__).parent.parent.parent / Path("data") / Path("Results")
         datetime_string = datetime.now().strftime(DATETIME_FORMAT)
         log_callback = logger.LogEventBus(
             log_callbacks=[
@@ -164,9 +163,8 @@ class CoreShellRunner:
         return cls(**d)
 
 
-def create_runner(input_config_path: Path) -> RmcRunner:
+def create_runner(input_config_path: Path, result_folder: Path) -> RmcRunner:
 
-    print(f"Loading configuration from {input_config_path}, please wait a moment...")
     dataframes = pd.read_excel(
         input_config_path,
         dtype = str,
@@ -178,7 +176,7 @@ def create_runner(input_config_path: Path) -> RmcRunner:
     evaluator = (evaluator_factory.create_evaluator_with_smearing(dataframes) 
                  if runner_factory.detector_smearing 
                  else evaluator_factory.create_evaluator_no_smearing(dataframes))
-    return runner_factory.create_runner(evaluator)
+    return runner_factory.create_runner(evaluator, result_folder)
     
 
 
