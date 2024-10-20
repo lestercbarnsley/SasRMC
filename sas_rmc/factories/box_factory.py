@@ -3,7 +3,8 @@ from collections.abc import Callable
 from typing import Iterator, Sequence
 
 
-from sas_rmc import Particle, Vector, Box
+from sas_rmc import Particle, Vector
+from sas_rmc.box_simulation import Box
 from sas_rmc.shapes import Cube
 
 def create_cube(dimensions: Sequence[float]) -> Cube:

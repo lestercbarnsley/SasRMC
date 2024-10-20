@@ -10,8 +10,7 @@ import pandas as pd
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 import numpy as np
 
-from sas_rmc import constants, Evaluator, commands, Controller, ControlStep
-from sas_rmc.loggers import logger
+from sas_rmc import constants, Evaluator, commands, Controller, ControlStep, loggers
 from sas_rmc.scattering_simulation import ScatteringSimulation, SimulationParam
 from sas_rmc.rmc_runner import RmcRunner
 from sas_rmc.particles.particle_core_shell_spherical import CoreShellParticleForm
@@ -139,13 +138,13 @@ class CoreShellRunner:
     def create_runner(self, evaluator: Evaluator, results_folder: Path) -> RmcRunner:
         state = self.create_simulation_state(default_box_dimensions=evaluator.default_box_dimensions())
         datetime_string = datetime.now().strftime(DATETIME_FORMAT)
-        log_callback = logger.LogEventBus(
+        log_callback = loggers.LogEventBus(
             log_callbacks=[
-                logger.QuietLogCallback(), 
-                logger.ExcelCallback(excel_file= results_folder / Path(f'{datetime_string}_{self.simulation_title}.xlsx')),
-                logger.BoxPlotter(result_folder=results_folder, file_plot_prefix=f'{datetime_string}_{self.simulation_title}'),
-                logger.DetectorImagePlotter(result_folder=results_folder, file_plot_prefix=f'{datetime_string}_{self.simulation_title}'),
-                logger.ProfilePlotter(result_folder=results_folder, file_plot_prefix=f'{datetime_string}_{self.simulation_title}')
+                loggers.QuietLogCallback(), 
+                loggers.ExcelCallback(excel_file= results_folder / Path(f'{datetime_string}_{self.simulation_title}.xlsx')),
+                loggers.BoxPlotter(result_folder=results_folder, file_plot_prefix=f'{datetime_string}_{self.simulation_title}'),
+                loggers.DetectorImagePlotter(result_folder=results_folder, file_plot_prefix=f'{datetime_string}_{self.simulation_title}'),
+                loggers.ProfilePlotter(result_folder=results_folder, file_plot_prefix=f'{datetime_string}_{self.simulation_title}')
                 ]
         )
         return RmcRunner(

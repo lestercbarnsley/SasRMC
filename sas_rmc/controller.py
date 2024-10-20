@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from sas_rmc import Command
+from sas_rmc.commands import Command
 from sas_rmc.acceptance_scheme import AcceptanceScheme
 
 
