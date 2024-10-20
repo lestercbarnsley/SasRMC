@@ -174,6 +174,9 @@ class CoreShellParticleForm(ParticleForm):
     def form_result(self, qx_array: np.ndarray, qy_array: np.ndarray) -> FormResult:
         return self.core_shell_particle.form_result(qx_array, qy_array)
     
+    def get_loggable_data(self) -> dict:
+        return self.get_bound_particle().get_loggable_data()
+    
 
 if __name__ == "__main__":
     t = CoreShellParticle.gen_from_parameters(

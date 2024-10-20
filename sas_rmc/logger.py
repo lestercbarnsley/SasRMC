@@ -294,7 +294,6 @@ class ExcelCallback(LogCallback):
     def start(self, document: dict | None = None) -> None:
         if document:
             self.start_docs.append(document)
-        #start_sim_data = SimData.create_from_dict(self.start_docs[-1])
 
     def event(self, document: dict | None = None) -> None:
         if document:
@@ -398,12 +397,14 @@ class DetectorImagePlotter(LogCallback):
 
 
 def interpolate_qxqy(qx: np.ndarray, qy: np.ndarray, intensity: np.ndarray, shadow_factor: np.ndarray, qx_target: float, qy_target: float) -> float | None:
-    distances = np.sqrt((qx - qx_target)**2 + (qy - qy_target)**2)
     if not (qx.min() <= qx_target <= qx.max()):
         return None
     if not (qy.min() <= qy_target <= qy.max()):
         return None
-    return intensity[distances.argmin()] if shadow_factor[distances.argmin()] else None
+    distances = np.sqrt((qx - qx_target)**2 + (qy - qy_target)**2)
+    if not shadow_factor[distances.argmin()]:
+        return None
+    return intensity[distances.argmin()]
 
 def sector_at_q(qx: np.ndarray, qy: np.ndarray, intensity: np.ndarray, shadow_factor: np.ndarray, q_value: float, nominal_angle: float, angle_range: float) -> float | None:
     angles = np.linspace(-PI , +PI, num = 180)
