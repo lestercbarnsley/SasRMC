@@ -163,6 +163,80 @@ class CoreShellRunner:
         return cls(**d)
 
 
+from sas_rmc.factories.parse_data import coerce_types
+
+@coerce_types
+def create_core_shell_particle(
+    core_radius: float,
+    core_polydispersity: float,
+    core_sld: float,
+    shell_thickness: float,
+    shell_polydispersity: float,
+    shell_sld: float,
+    solvent_sld: float,
+    core_magnetization: float,
+) -> CoreShellParticleForm:
+    return particle_factory.create_core_shell_particle(
+        core_radius=core_radius,
+        core_polydispersity=core_polydispersity,
+        core_sld=core_sld,
+        shell_thickness=shell_thickness,
+        shell_polydispersity=shell_polydispersity,
+        shell_sld=shell_sld,
+        solvent_sld=solvent_sld,
+        core_magnetization=core_magnetization
+    )
+
+@coerce_types
+def create_simulation_state(
+        create_particle: Callable[[], CoreShellParticleForm],
+        default_box_dimensions: list[float],*,
+        box_dimension_1: float = 0.0,
+        box_dimension_2: float = 0.0,
+        box_dimension_3: float = 0.0,
+        nominal_concentration: float = 0.0,
+        particle_number: int = 0,
+        box_number: int = 0 ) -> ScatteringSimulation:
+    box_dimensions = [box_dimension_1, box_dimension_2, box_dimension_3]
+    if np.prod(box_dimensions) == 0:
+        box_dimensions = default_box_dimensions
+    if box_dimensions is None:
+        raise ValueError("Box dimensions are missing.")
+    return ScatteringSimulation(
+        scale_factor=SimulationParam( 1.0, name = "scale_factor", bounds = (0, np.inf)),
+        box_list=box_factory.create_box_list(create_particle, box_dimensions, particle_number, box_number, nominal_concentration )
+    )
+
+@coerce_types
+def create_control_steps(
+            simulation_state: ScatteringSimulation,
+            command_factory: Callable[[int, int], commands.Command],*,
+            total_cycles: int,
+            annealing_type: str,
+            anneal_start_temp: float,
+            anneal_fall_rate: float,
+            annealing_stop_cycle_number: int = -1,
+        ) -> Iterator[ControlStep]:
+    annealing_stop_cycle = annealing_stop_cycle_number if annealing_stop_cycle_number > 0 else int(total_cycles / 2)
+    temperature = anneal_start_temp
+    if annealing_type.lower() == "greedy".lower():
+        temperature = 0
+    for cycle in range(total_cycles):
+        if cycle > annealing_stop_cycle:
+            temperature = 0
+        particle_box_indices = list(particle_box_index_iterator(simulation_state))
+        for step, (box_index, particle_index) in enumerate(random.sample(particle_box_indices, len(particle_box_indices))):
+            command = command_factory(
+                box_index,
+                particle_index,
+                )
+            acceptance_scheme = acceptable_command_factory.create_metropolis_acceptance(temperature, cycle, step)
+            yield ControlStep(command, acceptance_scheme)
+        temperature = temperature * (1- anneal_fall_rate)
+        if "very".lower() not in annealing_type.lower():
+            temperature = anneal_start_temp / (1 + cycle)
+
+
 def create_runner(input_config_path: Path, result_folder: Path) -> RmcRunner:
 
     dataframes = pd.read_excel(
@@ -186,6 +260,24 @@ if __name__ == "__main__":
     #spreadsheet = Path(__file__).parent.parent.parent / Path("data") / Path("CoreShell_F20_pol - Copy.xlsx")
     #runner = create_runner(spreadsheet)
     #runner.run()
+    dataframes = pd.read_excel(
+        spreadsheet,
+        dtype = str,
+        sheet_name = None,
+        keep_default_na=False,
+        )
+    value_frame = list(dataframes.values())[0]
+    config = parse_data.parse_value_frame(value_frame)
+    #config.pop('core_radius')
+    state = create_simulation_state(lambda : create_core_shell_particle(**config), [16000, 16000, 16000], **config)
+
+    control_steps = [step for step in create_control_steps(
+        simulation_state=state,
+        command_factory=
+    )]
+    print(state.scale_factor)
+    print(len(state.box_list))
+    print([len(box.particles) for box in state.box_list])
 
     '''import cProfile
     import pstats
