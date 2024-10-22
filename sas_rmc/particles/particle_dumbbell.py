@@ -113,7 +113,17 @@ class Dumbbell(Particle):
         
     
     def form_array(self, qx_array: np.ndarray, qy_array: np.ndarray) -> np.ndarray:
-        pass
+        particle_size = 2 * self.core_particle.core_radius
+        x_array, y_array = np.meshgrid(
+            np.arange(start = -2 * particle_size, stop= 2* particle_size, step = self.simulation_lattice_spacing),
+            np.arange(start = -2 * particle_size, stop= 2* particle_size, step = self.simulation_lattice_spacing))
+        z_array = np.arange(start = -2 * particle_size, stop = 2* particle_size, step=self.simulation_lattice_spacing)
+        sld = np.zeros(x_array.shape)
+        for ji, x in np.ndenumerate(x_array):
+            j, i = ji
+            y = y_array[j, i]
+            sld[j,i] = np.sum([self.get_sld(Vector(x, y, z)) * (self.simulation_lattice_spacing)**3 for z in z_array])
+        return numerical_form_array(x_array, y_array, sld, qx_array, qy_array)
         
     @classmethod
     def gen_from_parameters(cls, core_radius, seed_radius, shell_thickness, core_sld, seed_sld, shell_sld, solvent_sld, position: Vector = None, centre_to_centre_distance: float = None, orientation: Vector = None, core_magnetization: Vector = None, seed_magnetization: Vector = None):
