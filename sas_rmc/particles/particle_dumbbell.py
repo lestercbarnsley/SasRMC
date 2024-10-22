@@ -3,17 +3,30 @@
 from dataclasses import dataclass
 
 from typing_extensions import Self
+import numpy as np
 
 from sas_rmc import Particle, Vector
 from sas_rmc.particles import CoreShellParticle
 from sas_rmc.shapes import Shape
 
 
+def numerical_form(x_array: np.ndarray, y_array: np.ndarray, sld_sum: np.ndarray, qx: float, qy: float) -> float:
+    return np.sum(sld_sum * np.exp(1j * (x_array * qx + y_array * qy)))
+
+def numerical_form_array(x_array: np.ndarray, y_array: np.ndarray, sld_sum: np.ndarray, qx_array: np.ndarray, qy_array: np.ndarray) -> np.ndarray
+    form = np.zeros(qx_array.shape)
+    for ji, qx in np.ndenumerate(qx_array):
+        j, i = ji
+        qy = qy_array[j, i]
+        form[j, i] = numerical_form(x_array, y_array, sld_sum, qx, qy)
+    return form
+
+
 @dataclass
 class Dumbbell(Particle):
     core_particle: CoreShellParticle
     seed_particle: CoreShellParticle
-    simulation_density: float
+    simulation_lattice_spacing: float
 
     def get_position(self) -> Vector:
         return self.core_particle.get_position()
@@ -47,7 +60,7 @@ class Dumbbell(Particle):
         return type(self)(
             core_particle=self.core_particle.change_position(self.core_particle.get_position() + position_delta),
             seed_particle=self.seed_particle.change_position(self.seed_particle.get_position() + position_delta),
-            simulation_density=self.simulation_density
+            simulation_lattice_spacing=self.simulation_lattice_spacing
         )
     
     def change_orientation(self, orientation: Vector) -> Self:
@@ -56,116 +69,52 @@ class Dumbbell(Particle):
         return type(self)(
             core_particle=self.core_particle,
             seed_particle=self.seed_particle.change_position(seed_particle_position),
-            simulation_density=self.simulation_density
+            simulation_lattice_spacing=self.simulation_lattice_spacing
+        )
+    
+    def change_core_magnetization(self, magnetization: Vector) -> Self:
+        return type(self)(
+            core_particle=self.core_particle.change_magnetization(magnetization),
+            seed_particle=self.seed_particle,
+            simulation_lattice_spacing=self.simulation_lattice_spacing
+        )
+    
+    def change_seed_magnetization(self, magnetization: Vector) -> Self:
+        return type(self)(
+            core_particle=self.core_particle,
+            seed_particle=self.seed_particle.change_magnetization(magnetization),
+            simulation_lattice_spacing=self.simulation_lattice_spacing
         )
     
     def change_magnetization(self, magnetization: Vector) -> Self:
-        if magnetization.mag == 0:
-            return type(self)(
-                core_particle=self.core_particle.change_magnetization(magnetization),
-                seed_particle=self.seed_particle.change_magnetization(magnetization),
-                simulation_density=self.simulation_density
-            )
-        magnetization_factor = self.core_particle.get_magnetization().mag / magnetization.mag
-
-
-    def change_particle_list(self, particle_list: list[Particle]):
-        return Dumbbell(
-            _magnetization = self._magnetization,
-            _shapes = self._shapes,
-            solvent_sld=self.solvent_sld,
-            particle_list=particle_list,
-            _centre_to_centre_distance = self._centre_to_centre_distance
-        )
+        return self.change_core_magnetization(magnetization)
     
-    def is_spherical(self) -> bool:
-        return False
-
-    
-
-    @property
-    def centre_to_centre_distance(self) -> float:
-        return self._centre_to_centre_distance
-
-    @property
-    def position(self) -> Vector:
-        return self.core_particle.position
-
-    @property
-    def orientation(self) -> Vector:
-        return (self.seed_particle.position - self.core_particle.position).unit_vector
-
-    def set_orientation(self, orientation: Vector):
-        orientation_new = orientation.unit_vector
-        distance = self.centre_to_centre_distance
-        new_seed = self.seed_particle.set_position(self.core_particle.position + distance * orientation_new)
-        particle_list = [self.core_particle, new_seed]
-        return self.change_particle_list(particle_list)
-
-    def set_position(self, position: Vector):
-        return super().set_position(position)
-
-    def set_centre_to_centre_distance(self, centre_to_centre_distance: float):
-        orientation_new = self.orientation.unit_vector
-        distance = centre_to_centre_distance
-        new_seed = self.seed_particle.set_position(self.core_particle.position + distance * orientation_new)
-        particle_list = [self.core_particle, new_seed]
-        return self.change_particle_list(particle_list)
-
-    def get_sld(self, relative_position: Vector) -> float:
-        position = relative_position + self.position
-        if self.seed_particle.core_sphere.is_inside(position): # The seed particle is the spherical one
-            return self.seed_particle.core_sld
-        if self.core_particle.core_sphere.is_inside(position):
-            return self.core_particle.core_sld
-        if self.is_inside(position):
-            return self.core_particle.shell_sld
-        return self.solvent_sld
-
-    ''' def get_magnetization(self, relative_position: Vector) -> Vector:
-        position = relative_position + self.position
-        if self.seed_particle.core_sphere.is_inside(position):
-            return self.seed_particle.magnetization
-        if self.core_particle.core_sphere.is_inside(position):
-            return self.core_particle.magnetization
-        return Vector.null_vector()'''
-
-    @property
-    def magnetization(self) -> Vector:
-        return self.core_particle.magnetization
-
-    def set_magnetization(self, magnetization: Vector):
-        core_particle = self.core_particle.set_magnetization(magnetization)
-        return self.change_particle_list([core_particle, self.seed_particle])
-
-    @property
-    def seed_magnetization(self) -> Vector:
-        return self.seed_particle.magnetization
-
-    def set_seed_magnetization(self, magnetization: Vector):
-        seed_particle = self.seed_particle.set_magnetization(magnetization)
-        return self.change_particle_list([self.core_particle, seed_particle])
-
     def get_loggable_data(self) -> dict:
-        core_radius = self.core_particle.shapes[0].radius
-        overall_radius = self.core_particle.shapes[1].radius
-        thickness = overall_radius - core_radius
-        data = {
-            'Particle type' : "",
-            'Core radius': core_radius,
-            'Seed radius' : self.seed_particle.shapes[0].radius,
-            'Shell thickness': thickness,
+        return super().get_loggable_data() | {
+            'Core radius': self.core_particle.core_radius,
+            'Seed radius' : self.seed_particle.core_radius,
+            'Shell thickness': self.core_particle.thickness,
             'Core SLD': self.core_particle.core_sld,
             'Seed SLD': self.seed_particle.core_sld,
             'Shell SLD' : self.core_particle.shell_sld,
-            'Solvent SLD': self.solvent_sld,
+            'Solvent SLD': self.core_particle.solvent_sld,
         }
-        data.update(super().get_loggable_data())
-        data.update(self.core_particle.magnetization.to_dict('MagnetizationCore'))
-        data.update(self.seed_particle.magnetization.to_dict('MagnetizationSeed'))
+    
+    def get_sld(self, position: Vector) -> float:
+        position_delta_offset = position + self.get_position()
+        solvent_sld = self.core_particle.solvent_sld
+        if self.core_particle.core_sphere.is_inside(position_delta_offset):
+            return self.core_particle.core_sld - solvent_sld
+        if self.seed_particle.core_sphere.is_inside(position_delta_offset):
+            return self.seed_particle.core_sld - solvent_sld
+        if self.is_inside(position_delta_offset):
+            return self.core_particle.shell_sld - solvent_sld
+        return solvent_sld
         
-        return data
-
+    
+    def form_array(self, qx_array: np.ndarray, qy_array: np.ndarray) -> np.ndarray:
+        pass
+        
     @classmethod
     def gen_from_parameters(cls, core_radius, seed_radius, shell_thickness, core_sld, seed_sld, shell_sld, solvent_sld, position: Vector = None, centre_to_centre_distance: float = None, orientation: Vector = None, core_magnetization: Vector = None, seed_magnetization: Vector = None):
         if position is None:
@@ -192,15 +141,13 @@ class Dumbbell(Particle):
             solvent_sld=solvent_sld,
             magnetization=seed_magnetization if seed_magnetization else Vector.null_vector()
         )
-        dumbell = Dumbbell(
-            solvent_sld=solvent_sld,
-            particle_list=[core_shell, seed_shell],
-            _centre_to_centre_distance = centre_to_centre_distance
-        )
-        return dumbell.set_orientation(orientation)
-        #return dumbell
+        return cls(
+            core_particle=core_shell,
+            seed_particle=seed_shell,
+            simulation_lattice_spacing=100
+        ).change_orientation(orientation)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__": 
     pass
 
