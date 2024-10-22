@@ -51,6 +51,7 @@ class Particle(ABC):
     @abstractmethod
     def get_volume(self) -> float:
         pass
+    
     @abstractmethod
     def get_shapes(self) -> list[Shape]:
         pass

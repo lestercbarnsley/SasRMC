@@ -1,20 +1,22 @@
 #%%
 from abc import abstractmethod
 from dataclasses import dataclass, field
-from typing import List, Tuple
 
 import numpy as np
 
-from ..array_cache import round_vector
-from .particle import Particle
-from ..vector import Vector
-from ..shapes.shape import Shape
+from sas_rmc import Shape, Particle, Vector
 
 
 
 @dataclass
 class ParticleComposite(Particle):
-    particle_list: List[Particle] = field(default_factory=list)
+    particle_list: list[Particle] = field(default_factory=list)
+
+    def get_position(self) -> Vector:
+        position_vector = Vector.null_vector()
+        for particle in self.particle_list:
+            position_vector = position_vector + particle.get_position()
+        return position_vector / len(self.particle_list)
 
     @property
     def shapes(self) -> List[Shape]:

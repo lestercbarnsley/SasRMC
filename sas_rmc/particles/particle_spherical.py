@@ -7,6 +7,7 @@ from typing_extensions import Self
 from sas_rmc import Vector
 from sas_rmc.array_cache import array_cache
 from sas_rmc.particles.particle import FormResult
+from sas_rmc.particles.particle_form import ParticleForm
 from sas_rmc.shapes.sphere import sphere_volume, Sphere
 from sas_rmc.particles import Particle, magnetic_sld_in_angstrom_minus_2
 
@@ -116,7 +117,24 @@ class SphericalParticle(Particle):
             "Solvent SLD" : self.solvent_sld,
         }
     
-   
+
+@dataclass
+class SphericalParticleForm(ParticleForm):
+    spherical_particle: SphericalParticle
+
+    def get_bound_particle(self) -> Particle:
+        return self.spherical_particle
+    
+    def change_bound_particle(self, bound_particle: Particle) -> Self:
+        if not isinstance(bound_particle, SphericalParticle):
+            raise TypeError("Only bind spherical particle to this form calculator")
+        return type(self)(spherical_particle=bound_particle)
+    
+    def form_result(self, qx_array: np.ndarray, qy_array: np.ndarray) -> FormResult:
+        return self.spherical_particle.form_result(qx_array, qy_array)
+    
+    def get_loggable_data(self) -> dict:
+        return self.get_bound_particle().get_loggable_data()
     
     
 

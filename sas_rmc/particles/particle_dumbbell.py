@@ -1,20 +1,75 @@
 #%%
 
-from dataclasses import dataclass, field
-from typing import List
+from dataclasses import dataclass
 
-from .particle import Particle
-from .particle_composite import ParticleComposite
-from .particle_core_shell_spherical import CoreShellParticle
-from ..vector import Vector
+from typing_extensions import Self
+
+from sas_rmc import Particle, Vector
+from sas_rmc.particles import CoreShellParticle
+from sas_rmc.shapes import Shape
 
 
 @dataclass
-class Dumbbell(ParticleComposite):
-    particle_list: List[CoreShellParticle] = field(default_factory=lambda : [CoreShellParticle(), CoreShellParticle()])
-    _centre_to_centre_distance: float = 0
+class Dumbbell(Particle):
+    core_particle: CoreShellParticle
+    seed_particle: CoreShellParticle
+    simulation_density: float
 
-    def change_particle_list(self, particle_list: List[Particle]):
+    def get_position(self) -> Vector:
+        return self.core_particle.get_position()
+    
+    def get_orientation(self) -> Vector:
+        return (self.seed_particle.get_position() - self.core_particle.get_position()).unit_vector
+    
+    def get_magnetization(self) -> Vector:
+        return max([self.core_particle.get_magnetization(), self.seed_particle.get_magnetization()], key = lambda v : v.mag)
+    
+    def get_volume(self) -> float:
+        return self.core_particle.get_volume() + self.seed_particle.get_volume()
+    
+    def get_shapes(self) -> list[Shape]:
+        return self.core_particle.get_shapes() + self.seed_particle.get_shapes()
+    
+    def is_inside(self, position: Vector) -> bool:
+        return self.core_particle.is_inside(position) or self.seed_particle.is_inside(position)
+    
+    def collision_detected(self, other_particle: Self) -> bool:
+        return self.core_particle.collision_detected(other_particle) or self.seed_particle.collision_detected(other_particle)
+    
+    def get_scattering_length(self) -> float:
+        return self.core_particle.get_scattering_length() + self.seed_particle.get_scattering_length()
+    
+    def is_magnetic(self) -> bool:
+        return self.core_particle.is_magnetic() or self.seed_particle.is_magnetic()
+    
+    def change_position(self, position: Vector) -> Self:
+        position_delta = position - self.get_position()
+        return type(self)(
+            core_particle=self.core_particle.change_position(self.core_particle.get_position() + position_delta),
+            seed_particle=self.seed_particle.change_position(self.seed_particle.get_position() + position_delta),
+            simulation_density=self.simulation_density
+        )
+    
+    def change_orientation(self, orientation: Vector) -> Self:
+        distance_between_particles = (self.core_particle.get_position() - self.seed_particle.get_position()).mag
+        seed_particle_position = self.get_position() + distance_between_particles * (orientation.unit_vector)
+        return type(self)(
+            core_particle=self.core_particle,
+            seed_particle=self.seed_particle.change_position(seed_particle_position),
+            simulation_density=self.simulation_density
+        )
+    
+    def change_magnetization(self, magnetization: Vector) -> Self:
+        if magnetization.mag == 0:
+            return type(self)(
+                core_particle=self.core_particle.change_magnetization(magnetization),
+                seed_particle=self.seed_particle.change_magnetization(magnetization),
+                simulation_density=self.simulation_density
+            )
+        magnetization_factor = self.core_particle.get_magnetization().mag / magnetization.mag
+
+
+    def change_particle_list(self, particle_list: list[Particle]):
         return Dumbbell(
             _magnetization = self._magnetization,
             _shapes = self._shapes,
@@ -26,13 +81,7 @@ class Dumbbell(ParticleComposite):
     def is_spherical(self) -> bool:
         return False
 
-    @property
-    def seed_particle(self) -> CoreShellParticle:
-        return self.particle_list[1]
-
-    @property
-    def core_particle(self) -> CoreShellParticle:
-        return self.particle_list[0]
+    
 
     @property
     def centre_to_centre_distance(self) -> float:
@@ -73,13 +122,13 @@ class Dumbbell(ParticleComposite):
             return self.core_particle.shell_sld
         return self.solvent_sld
 
-    def get_magnetization(self, relative_position: Vector) -> Vector:
+    ''' def get_magnetization(self, relative_position: Vector) -> Vector:
         position = relative_position + self.position
         if self.seed_particle.core_sphere.is_inside(position):
             return self.seed_particle.magnetization
         if self.core_particle.core_sphere.is_inside(position):
             return self.core_particle.magnetization
-        return Vector.null_vector()
+        return Vector.null_vector()'''
 
     @property
     def magnetization(self) -> Vector:

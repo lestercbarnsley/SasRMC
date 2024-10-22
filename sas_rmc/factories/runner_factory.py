@@ -1,6 +1,7 @@
 #%%
 
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 from collections.abc import Callable
 from typing import Iterable, Iterator, ParamSpec, TypeVar
@@ -10,10 +11,9 @@ import pandas as pd
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 import numpy as np
 
-from sas_rmc import constants, Evaluator, commands, Controller, ControlStep, loggers
+from sas_rmc import constants, Evaluator, commands, Controller, ControlStep, loggers, Particle
 from sas_rmc.scattering_simulation import ScatteringSimulation, SimulationParam
 from sas_rmc.rmc_runner import RmcRunner
-from sas_rmc.particles.particle_core_shell_spherical import CoreShellParticleForm
 from sas_rmc.factories import parse_data, box_factory, particle_factory, command_factory, acceptable_command_factory, evaluator_factory
 from sas_rmc.simulator import Simulator
 
@@ -61,9 +61,13 @@ def particle_box_index_iterator(simulation_state: ScatteringSimulation) -> Itera
             yield box_index, particle_index
 
 
+class ParticleType(Enum):
+    CoreShellParticle = "CoreShellParticle"
+
 @pydantic_dataclass
 class CoreShellRunner:
     simulation_title: str
+    particle_type: ParticleType
     core_radius: float
     core_polydispersity: float
     core_sld: float
@@ -87,17 +91,12 @@ class CoreShellRunner:
     box_dimension_2: float = 0.0
     box_dimension_3: float = 0.0
 
-    def create_particle(self) -> CoreShellParticleForm:
-        return particle_factory.create_core_shell_particle(
-            core_radius=self.core_radius,
-            core_polydispersity=self.core_polydispersity,
-            core_sld=self.core_sld,
-            shell_thickness=self.shell_thickness,
-            shell_polydispersity=self.shell_polydispersity,
-            shell_sld=self.shell_sld,
-            solvent_sld=self.solvent_sld,
-            core_magnetization=self.core_magnetization
-        )
+    def create_particle(self) -> Particle:
+        if self.particle_type == ParticleType.CoreShellParticle:
+            return particle_factory.create_core_shell_particle(**self.__dict__)
+        else:
+            raise TypeError("Do not recognize particle type")
+        
     
     def create_simulation_state(self, default_box_dimensions: list[float] | None = None) -> ScatteringSimulation:
         box_dimensions = [self.box_dimension_1, self.box_dimension_2, self.box_dimension_3]
@@ -175,7 +174,7 @@ def create_core_shell_particle(
     shell_sld: float,
     solvent_sld: float,
     core_magnetization: float,
-) -> CoreShellParticleForm:
+) -> Particle:
     return particle_factory.create_core_shell_particle(
         core_radius=core_radius,
         core_polydispersity=core_polydispersity,
@@ -189,7 +188,7 @@ def create_core_shell_particle(
 
 @coerce_types
 def create_simulation_state(
-        create_particle: Callable[[], CoreShellParticleForm],
+        create_particle: Callable[[], Particle],
         default_box_dimensions: list[float],*,
         box_dimension_1: float = 0.0,
         box_dimension_2: float = 0.0,
@@ -271,10 +270,10 @@ if __name__ == "__main__":
     #config.pop('core_radius')
     state = create_simulation_state(lambda : create_core_shell_particle(**config), [16000, 16000, 16000], **config)
 
-    control_steps = [step for step in create_control_steps(
+    '''control_steps = [step for step in create_control_steps(
         simulation_state=state,
         command_factory=
-    )]
+    )]'''
     print(state.scale_factor)
     print(len(state.box_list))
     print([len(box.particles) for box in state.box_list])

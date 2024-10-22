@@ -2,6 +2,7 @@
 
 from sas_rmc import Vector, constants
 from sas_rmc.particles.particle_core_shell_spherical import CoreShellParticleForm
+from sas_rmc.factories.parse_data import coerce_types
 
 rng = constants.RNG
 
@@ -9,6 +10,7 @@ rng = constants.RNG
 def polydisperse_parameter(loc: float, polyd: float) -> float:
     return rng.normal(loc = loc, scale = loc * polyd)
 
+@coerce_types
 def create_core_shell_particle(
                 core_radius: float,
                 core_polydispersity: float,
