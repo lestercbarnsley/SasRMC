@@ -23,7 +23,7 @@ def numerical_form_array(x_array: np.ndarray, y_array: np.ndarray, sld_sum: np.n
 
 
 @dataclass
-class Dumbbell(Particle):
+class DumbbellParticle(Particle):
     core_particle: CoreShellParticle
     seed_particle: CoreShellParticle
     simulation_lattice_spacing: float

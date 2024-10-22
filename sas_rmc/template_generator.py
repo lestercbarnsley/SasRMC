@@ -1,60 +1,97 @@
 #%%
 
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Tuple
 
 import pandas as pd
 
-from sas_rmc.particles import CoreShellParticle, Dumbbell
+from sas_rmc.particles import CoreShellParticle, DumbbellParticle
+
+@dataclass
+class DataRow:
+    key: str = ""
+    value: str = ""
+    unit_hint: str = ""
+    other_comments: list[str] = field(default_factory=list)
+
+    def to_row(self) -> dict:
+        return {
+            "Parameter Name" : self.key,
+            "Parameter value" : self.value,
+            "Unit hint" : r"# " + self.unit_hint} | {
+                f"Hint {i+1}": r"# " + comment for 
+                i, comment in enumerate(self.other_comments)}
+    
+
+def data_rows_to_df(data_rows: list[DataRow]) -> pd.DataFrame:
+    return pd.DataFrame(data = [data_row.to_row() for data_row in data_rows])
+
+
 
 ALWAYS_PRESENT_DATA = [
-    [None,None,None,None],
-    ["simulation_title","write_title_here",r"# Name of output file",None],
-    [None,None,r'# Cells containing "#" will be ignored by simulation',None],
+    DataRow(),
+    DataRow("simulation_title", "write_title_here",unit_hint="", other_comments=["Name of output file"] ),
+    DataRow("", "", "", other_comments=['Cells containing "#" will be ignored by simulation']),
+    DataRow()
 ]
 
+ANGSTROM_UNIT = "Angstroms"
+FRACTION_UNIT = "Fraction"
+SLD_UNIT = "10E-6 / Angstrom^2"
+FIELD_UNIT = "Amperes/metre"
+
 CORE_SHELL_PARTICLE_DATA = [
-    ["particle_type",CoreShellParticle.__name__,None,None],
-    ["core_radius",None,r"# Angstroms",None],
-    ["core_polydispersity",None,r"# Fraction",None],
-    ["core_sld",None,r"# 10E-6 / Angstrom^2",None],
-    ["shell_thickness",None,r"# Angstroms",None],
-    ["shell_polydispersity",None,r"# Fraction",None],
-    ["shell_sld",None,r"# 10E-6 / Angstrom^2",None],
-    ["solvent_sld",None,r"# 10E-6 / Angstrom^2",None],
-    ["core_magnetization",None,r"# Amperes/metre",None],
+    DataRow("particle_type", CoreShellParticle.__name__, other_comments=["The form factor for this particle type is calculated analytically"]),
+    DataRow("core_radius", unit_hint=ANGSTROM_UNIT),
+    DataRow("core_polydispersity", unit_hint=FRACTION_UNIT),
+    DataRow("core_sld", unit_hint=SLD_UNIT),
+    DataRow("shell_thickness", unit_hint=ANGSTROM_UNIT),
+    DataRow("shell_polydispersity", unit_hint=FRACTION_UNIT),
+    DataRow("shell_sld", unit_hint=SLD_UNIT),
+    DataRow("solvent_sld", unit_hint=SLD_UNIT),
+    DataRow("core_magnetization", value="0.0", unit_hint=FIELD_UNIT, other_comments=["Must be zero for SAXS"]),
+    DataRow(),
 ]
 
 DUMBBELL_PARTICLE_DATA = [
-    ["particle_type",Dumbbell.__name__,None,None],
-    ["core_radius",None,r"# Angstroms",None],
-    ["core_polydispersity",None,r"# Fraction",None],
-    ["core_sld",None,r"# 10E-6 / Angstrom^2",None],
-    ["seed_radius",None,r"# Angstroms",None],
-    ["seed_polydispersity",None,r"# Fraction",None],
-    ["seed_sld",None,r"# 10E-6 / Angstrom^2",None],
-    ["shell_thickness",None,r"# Angstroms",None],
-    ["shell_polydispersity",None,r"# Fraction",None],
-    ["shell_sld",None,r"# 10E-6 / Angstrom^2",None],
-    ["solvent_sld",None,r"# 10E-6 / Angstrom^2",None],
-    ["core_magnetization",None,r"# Amperes/metre",None],
-    ["seed_magnetization",0.0,r"# Amperes/metre",None],
-]
-
+    DataRow("particle_type", DumbbellParticle.__name__, other_comments=["The form factor for this particle type is calculated numerically"]),
+    DataRow("core_radius", unit_hint=ANGSTROM_UNIT),
+    DataRow("core_polydispersity", unit_hint=FRACTION_UNIT),
+    DataRow("core_sld", unit_hint=SLD_UNIT),
+    DataRow("seed_radius", unit_hint=ANGSTROM_UNIT),
+    DataRow("seed_polydispersity", unit_hint=FRACTION_UNIT),
+    DataRow("seed_sld", unit_hint=SLD_UNIT),
+    DataRow("shell_thickness", unit_hint=ANGSTROM_UNIT),
+    DataRow("shell_polydispersity", unit_hint=FRACTION_UNIT),
+    DataRow("shell_sld", unit_hint=SLD_UNIT),
+    DataRow("solvent_sld", unit_hint=SLD_UNIT),
+    DataRow("core_magnetization", value="0.0", unit_hint=FIELD_UNIT, other_comments=["Must be zero for SAXS"]),
+    DataRow("seed_magnetization", value="0.0", unit_hint=FIELD_UNIT, other_comments=["Must be zero for SAXS"]),
+    DataRow()
+    ]
 RELOAD_PARTICLE_DATA = [
-    ["particle_type","Reload old simulation",r"# This line should stay unchanged.",None],
-    ["log_file_source",None,r"# File path", r"# Point to a previously saved log file (.xlsx). Particle configurations and detector data will be loaded directly from the log file. Simulation configurations are loaded from below parameters"],
-]
+    DataRow("particle_type", DumbbellParticle.__name__),
+    DataRow("log_file_source", unit_hint="File path", other_comments=["Point to a previously saved log file (.xlsx). Particle configurations and detector data will be loaded directly from the log file. Simulation configurations are loaded from below parameters"]),
+    DataRow()
+    ]
+
+VOLVOL = "vol/vol"
+INTEGER = "integer"
 
 BOX_DATA = [
-    ["nominal_concentration",None,r"# vol/vol",r"# Put in information for two out of three of nominal_concentration, particle_number and box_number."],
-    ["particle_number",None,r"# integer",r"# If all three are present, nominal_concentration will be ignored"],
-    ["box_number",None,r"# integer",None],
-]
+    DataRow("nominal_concentration", unit_hint=VOLVOL, other_comments=[r"# Put in information for two out of three of nominal_concentration, particle_number and box_number."]),
+    DataRow("particle_number", unit_hint=INTEGER, other_comments=[r"# If all three are present, nominal_concentration will be ignored"]),
+    DataRow("box_number", unit_hint=INTEGER),
+    DataRow()
+    ]
 
 SIMULATION_DATA = [
     [None,None,None,None],
-    ["result_calculator", r"Analytical", r"# Acceptable options: Analytical, Numerical", r"# Type of function to calculate particle form-factor. Take care, as some particle choices are only compatible with one type of calculator"],
+    DataRow("total_cycles", unit_hint=INTEGER),
+    DataRow("annealing_type", "Very fast","Acceptable options: Fast, Very Fast, Greedy" ),
+    DataRow("anneal_start_temp", "10", other_comments=["If uncertain, leave as is"]),
+    DataRow
+            
     ["total_cycles",None,r"# integer",None],
     ["annealing_type",r"Very fast",r"# Acceptable options: Fast, Very Fast, Greedy",None],
     ["anneal_start_temp",10,r"# If uncertain, leave as is",None],
