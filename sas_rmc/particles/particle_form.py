@@ -68,4 +68,5 @@ class ParticleForm(Particle): # This is essentially an abstract wrapper class th
 
     def get_loggable_data(self) -> dict:
         loggable_data = super().get_loggable_data()
-        return self.get_bound_particle().get_loggable_data() | loggable_data
+        return loggable_data | self.get_bound_particle().get_loggable_data()
+        # I think the form particle wrapper should typically be transparent to the logger
