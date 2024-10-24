@@ -10,7 +10,7 @@ from sas_rmc.particles import CoreShellParticle, DumbbellParticle
 @dataclass
 class DataRow:
     key: str = ""
-    value: str = ""
+    value: str | int | float = ""
     unit_hint: str = ""
     other_comments: list[str] = field(default_factory=list)
 
@@ -49,7 +49,7 @@ CORE_SHELL_PARTICLE_DATA = [
     DataRow("shell_polydispersity", unit_hint=FRACTION_UNIT),
     DataRow("shell_sld", unit_hint=SLD_UNIT),
     DataRow("solvent_sld", unit_hint=SLD_UNIT),
-    DataRow("core_magnetization", value="0.0", unit_hint=FIELD_UNIT, other_comments=["Must be zero for SAXS"]),
+    DataRow("core_magnetization", value=0.0, unit_hint=FIELD_UNIT, other_comments=["Must be zero for SAXS"]),
     DataRow(),
 ]
 
@@ -65,8 +65,8 @@ DUMBBELL_PARTICLE_DATA = [
     DataRow("shell_polydispersity", unit_hint=FRACTION_UNIT),
     DataRow("shell_sld", unit_hint=SLD_UNIT),
     DataRow("solvent_sld", unit_hint=SLD_UNIT),
-    DataRow("core_magnetization", value="0.0", unit_hint=FIELD_UNIT, other_comments=["Must be zero for SAXS"]),
-    DataRow("seed_magnetization", value="0.0", unit_hint=FIELD_UNIT, other_comments=["Must be zero for SAXS"]),
+    DataRow("core_magnetization", value=0.0, unit_hint=FIELD_UNIT, other_comments=["Must be zero for SAXS"]),
+    DataRow("seed_magnetization", value=0.0, unit_hint=FIELD_UNIT, other_comments=["Must be zero for SAXS"]),
     DataRow()
     ]
 RELOAD_PARTICLE_DATA = [
@@ -86,12 +86,26 @@ BOX_DATA = [
     ]
 
 SIMULATION_DATA = [
-    [None,None,None,None],
     DataRow("total_cycles", unit_hint=INTEGER),
     DataRow("annealing_type", "Very fast","Acceptable options: Fast, Very Fast, Greedy" ),
-    DataRow("anneal_start_temp", "10", other_comments=["If uncertain, leave as is"]),
-    DataRow
-            
+    DataRow("anneal_start_temp", 10, other_comments=["If uncertain, leave as is"]),
+    DataRow("anneal_fall_rate", 0.1, other_comments=["If uncertain, leave as is"]),
+    DataRow("annealing_stop_cycle_number", other_comments=["Leave this blank to default to 50% of the total cycles"]),
+    DataRow()]
+
+DETECTOR_SETTINGS = [
+    DataRow("detector_smearing", "ON", unit_hint="Acceptable options: ON, OFF"),
+    DataRow("field_direction", "Y", unit_hint="Acceptable options: X, Y, Z, OFF"),
+    DataRow()
+]
+
+RESULT_OPTIONS = [
+    DataRow("force_log_file", "ON", unit_hint="Acceptable options: ON, OFF, Forces log file to be saved, even if simulation ended prematurely"),
+    DataRow("output_plot_format", "PDF", unit_hint="Acceptable options: NONE, PDF, PNG, JPG, Saves collection of images to review after simulation. These are NOT publication quality figures."),
+    DataRow()
+]
+
+'''            
     ["total_cycles",None,r"# integer",None],
     ["annealing_type",r"Very fast",r"# Acceptable options: Fast, Very Fast, Greedy",None],
     ["anneal_start_temp",10,r"# If uncertain, leave as is",None],
@@ -103,35 +117,36 @@ SIMULATION_DATA = [
     ["force_log_file",r"ON",r"# Acceptable options: ON, OFF, Forces log file to be saved, even if simulation ended prematurely",None],
     ["output_plot_format",r"PDF",r"# Acceptable options: NONE, PDF, PNG, JPG, Saves collection of images to review after simulation. These are NOT publication quality figures.",None],
     [None,None,None,None],
-]
+'''
+
 DETECTOR_DATA = [
-    [r"# Information about source for experimental, reduced data, either directly below or in the next tab",None,None,None],
-    [r"# If you are fitting one detector image, you may input information here",None,None,None],
-    [r"# If you are simultaneously fitting multiple detector images, use next tab, and make one row for each detector image (please don't delete headers)",None,None,None],
-    [r"# Resolution parameter: Specify this parameter if detector smearing is ON and instrument resolution isn't included with reduced data",None,None,None],
-    [None,None,None,None],
-    [r"Data Source",None,r"# Either a file path pointing to an ASCII file containing 4 (or more) columns of reduced data or a name of a TAB in this excel file containing reduced data",None],
-    [r"Label",None,r"# Optional, Recommended: A label for detector data used in the output report",None],
-    [r"Polarization",None,r'# Optional: The polarization state used during this measurement, leave blank for "Unpolarized"',None],
-    [r"Wavelength",None,r"# Optional: Angstroms, Resolution parameter",None],
-    [r"Wavelength Spread",None,r"# Optional: Fraction, Resolution parameter",None],
-    [r"Detector distance",None,r"# Optional: Metres, Resolution parameter",None],
-    [r"Detector pixel",None,r"# Optional: Metres, Resolution parameter, if unknown, approximation acceptable",None],
-    [r"Sample aperture",None,r"# Optional: Metre^2, Resolution parameter, if unknown, approximation acceptable",None],
-    [r"Collimation distance",None,r"# Optional: Metres, Resolution parameter",None],
-    [r"Collimation aperture",None,r"# Optional: Metre^2, Resolution parameter, if unknown, approximation acceptable",None],
-    [r"Buffer Source",None,r"# Optional: A file path or a TAB label for buffer data. If buffer was already subtracted during data reduction, leave blank or specify ZERO. Enter numerical value to subtract constant buffer intensity from all pixels",None],
-    [None,None,None,None],
-    [r"# If experimental, reduced data is saved in subsequent TABs in this spreadsheet, the top row must contain headers",None,None,None],
-    [r"# The following three headers are REQUIRED: qX, qY, intensity",None,None,None],
-    [r"# The following headers are SUGGESTED: intensity_error, sigma_perp, sigma_para, shadow",None,None,None],
-    [r"# The following headers may be INCLUDED, but serve no purpose: qZ",None,None,None],
-    [None,None,None,None],
-    [r"# Overwrite box dimensions. Do not do this unless you know what you're doing",None,None,None],
-    [r"box_dimension_1",None,r"# Optional: Angstroms, strongly recommended to leave this blank",None],
-    [r"box_dimension_2",None,r"# Optional: Angstroms, strongly recommended to leave this blank",None],
-    [r"box_dimension_3",None,r"# Optional: Angstroms, strongly recommended to leave this blank",None],
-    ]
+    DataRow(other_comments=["Information about source for experimental, reduced data, either directly below or in the next tab"]),
+    DataRow(other_comments=["If you are fitting one detector image, you may input information here"]),
+    DataRow(other_comments=["If you are simultaneously fitting multiple detector images, use next tab, and make one row for each detector image (please don't delete headers)"]),
+    DataRow(other_comments=["Resolution parameter: Specify this parameter if detector smearing is ON and instrument resolution isn't included with reduced data"]),
+    DataRow(),
+    DataRow("Data Source", unit_hint="Either a file path pointing to an ASCII file containing 4 (or more) columns of reduced data or a name of a TAB in this excel file containing reduced data"),
+    DataRow("Label", unit_hint="Optional, Recommended: A label for detector data used in the output report"),
+    DataRow("Polarization", unit_hint='Optional: The polarization state used during this measurement, leave blank for "Unpolarized"'),
+    DataRow("Wavelength", unit_hint="Optional: Angstroms, Resolution parameter"),
+    DataRow("Wavelength Spread", unit_hint="Optional: Fraction, Resolution parameter"),
+    DataRow("Detector distance", unit_hint="Optional: Metres, Resolution parameter"),
+    DataRow("Detector pixel", unit_hint="Optional: Metres, Resolution parameter, if unknown, approximation acceptable"),
+    DataRow("Sample aperture", unit_hint="Optional: Metre^2, Resolution parameter, if unknown, approximation acceptable"),
+    DataRow("Collimation distance", unit_hint="Optional: Metres, Resolution parameter"),
+    DataRow("Collimation aperture", unit_hint="Optional: Metre^2, Resolution parameter, if unknown, approximation acceptable"),
+    DataRow("Buffer Source", unit_hint="Optional: A file path or a TAB label for buffer data. If buffer was already subtracted during data reduction, leave blank or specify ZERO. Enter numerical value to subtract constant buffer intensity from all pixels"),
+    DataRow(),
+    DataRow(other_comments=["If experimental, reduced data is saved in subsequent TABs in this spreadsheet, the top row must contain headers"]),
+    DataRow(other_comments=["The following three headers are REQUIRED: qX, qY, intensity"]),
+    DataRow(other_comments=["The following headers are SUGGESTED: intensity_error, sigma_perp, sigma_para, shadow"]),
+    DataRow(other_comments=["The following headers may be INCLUDED, but serve no purpose: qZ"]),
+    DataRow(),
+    DataRow("box_dimension_1", unit_hint="Optional: Angstroms, strongly recommended to leave this blank"),
+    DataRow("box_dimension_2", unit_hint="Optional: Angstroms, strongly recommended to leave this blank"),
+    DataRow("box_dimension_3", unit_hint="Optional: Angstroms, strongly recommended to leave this blank"),
+    DataRow()
+]
 
 def generate_normal_template(particle_data: List[List[str]], simulation_data: List[List[str]] = SIMULATION_DATA) -> Tuple[List[pd.DataFrame], List[str]]:
     data_frame_1 = pd.DataFrame(
