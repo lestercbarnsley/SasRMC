@@ -1,16 +1,8 @@
 #%%
 
 from abc import abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
-
-from matplotlib import pyplot as plt, patches, figure, colors as mcolors
-import numpy as np
-import pandas as pd
-
-from sas_rmc.vector import Vector
-from sas_rmc.constants import PI
 
 
 @dataclass
@@ -100,7 +92,7 @@ class LogEventBus(LogCallback):
 
 
 if __name__ == "__main__":
-    import matplotlib.pyplot as plt
+    from matplotlib import pyplot as plt, patches
     import numpy as np
 
     fig, ax = plt.subplots()
