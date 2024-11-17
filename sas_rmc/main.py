@@ -82,7 +82,7 @@ def update(input: Path, output: Path, template: str):
 @click.argument('template-type', type=click.Choice(['coreshell', 'dumbbell'], case_sensitive=False))
 @click.option("-o", "--output", "output", help="Folder to output results.", type = click.Path(), default = DEFAULT_OUTPUT, show_default = True)
 def create(template_type):
-    """Configuration options."""
+    """Create a template file by downloading it from the repository."""
     if template_type == 'coreshell':
         pass
 
