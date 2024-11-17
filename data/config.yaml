@@ -1,14 +1,2 @@
-# SasRMC config file.
-
-input_config_source : CoreShell Simulation Input.xlsx
-
-# The default file type for input_config_source is an Excel spreadsheet that contains the configuration for your simulation.
-# If you need a new, empty config file, you can generate one by running one of the following commands in the terminal (remove the quotation marks):
-# "python main.py generate core shell template" <-- This will make a new template for a core-shell simulation
-# "python main.py generate dumbbell template" <--- This will make a new template for a dumbbell simulation using a semi-analytical approximate form-factor
-# "python main.py generate numerical dumbbell template" <--- This will make a new template for a dumbbell simulation using a fully numerical form-factor
-# "python main.py generate reload template" <--- This will make a template that will allow you to reload a previously completed simulation
-
-output_folder : ./results
-
-# This is the folder where you will find your output and log files after the simulation is over.
+input_config_source: CoreShell Simulation Input.xlsx
+output_folder: ./results

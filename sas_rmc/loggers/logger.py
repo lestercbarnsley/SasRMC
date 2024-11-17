@@ -68,7 +68,7 @@ def clear_line(n=0):
     for _ in range(n):
         print(LINE_UP, end="")
 
-DEFAULT_KEY_LIST = ['Current goodness of fit', 'Cycle', 'Step', 'Acceptance']
+DEFAULT_KEY_LIST = ['Current goodness of fit', 'Cycle', 'Step', 'Acceptance', 'Action', 'temperature']
 
 @dataclass
 class CLILogger(LogCallback):
@@ -84,7 +84,7 @@ class CLILogger(LogCallback):
             return None
         LINE_CLEAR = '\x1b[2K'
         clear_line(self.current_total_lines)
-        doc = {k : v for k, v in document.items() if k in }
+        doc = {k : document[k] for k in self.keys}# {k : v for k, v in document.items() if k in self.keys}
         if 'timestamp' in document:
             doc = doc | {'timestamp' : str(datetime.fromtimestamp(document.get('timestamp', 0)))}
         print('\n'.join(f"{LINE_CLEAR}{k}: {v}" for k, v in doc.items()))
