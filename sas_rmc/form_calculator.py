@@ -108,9 +108,6 @@ def box_intensity(form_results: list[FormResult], box_volume: float, qx: np.ndar
     return 1e8 * rescale_factor * intensity_polarization(fn, fmx, fmy, fmz, polarization, field_direction=field_direction) / box_volume
 
 
-
-
-
 if __name__ == "__main__":
     print(sum_array_list([np.ones((3,3))]))
         

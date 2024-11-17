@@ -1,7 +1,7 @@
 #%%
 
 from abc import abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 
@@ -63,6 +63,37 @@ class QuietLogCallback(LogCallback):
     def stop(self, document: dict | None = None) -> None:
         pass
 
+def clear_line(n=0):
+    LINE_UP = '\033[1A'
+    for _ in range(n):
+        print(LINE_UP, end="")
+
+DEFAULT_KEY_LIST = ['Current goodness of fit', 'Cycle', 'Step', 'Acceptance']
+
+@dataclass
+class CLILogger(LogCallback):
+    current_total_lines: int = 0
+    keys: list[str] = field(default_factory=lambda : DEFAULT_KEY_LIST, init = True, repr = True)
+    
+    def start(self, document: dict | None = None) -> None:
+        print('\033[?25l', end="")
+        self.current_total_lines = 1
+
+    def event(self, document: dict | None = None) -> None:
+        if document is None:
+            return None
+        LINE_CLEAR = '\x1b[2K'
+        clear_line(self.current_total_lines)
+        doc = {k : v for k, v in document.items() if k in }
+        if 'timestamp' in document:
+            doc = doc | {'timestamp' : str(datetime.fromtimestamp(document.get('timestamp', 0)))}
+        print('\n'.join(f"{LINE_CLEAR}{k}: {v}" for k, v in doc.items()))
+        self.current_total_lines = len(doc)
+        
+
+    def stop(self, document: dict | None = None) -> None:
+        print('\033[?25h', end="")
+
 
 @dataclass
 class LogEventBus(LogCallback):
@@ -92,61 +123,6 @@ class LogEventBus(LogCallback):
 
 
 if __name__ == "__main__":
-    from matplotlib import pyplot as plt, patches
-    import numpy as np
-
-    fig, ax = plt.subplots()
-    fig.set_size_inches(4,4)
-    d_0, d_1 = 14000, 14000
-    ax.set_xlim(-d_0 / 2, +d_0 / 2)
-    ax.set_ylim(-d_1 / 2, +d_1 / 2)
-
-    ax.set_aspect("equal")
-
-    ax.set_xlabel(r'X (Angstrom)',fontsize =  14)
-    ax.set_ylabel(r'Y (Angstrom)',fontsize =  14)
-
-    patch_list = [
-            patches.Circle(
-                xy = (0, 0),
-                radius=120,
-                ec = None,
-                fc = 'black'
-            ),
-            patches.Circle(
-                xy = (0, 0),
-                radius=100,
-                ec = None,
-                fc = 'blue'
-            )
-        ]
-
-    patch_list_2 = [
-            patches.Circle(
-                xy = (0,120 + 120),
-                radius=120,
-                ec = None,
-                fc = 'black'
-            ),
-            patches.Circle(
-                xy = (0,120 + 120),
-                radius=100,
-                ec = None,
-                fc = 'blue'
-            )
-        ]
-
-    for patch in patch_list + patch_list_2:
-        #patch.set_snap(False)
-        ax.add_patch(patch)
-
-
-
-    #ax.set_box_aspect(d_1 / d_0)
-
-    #fig.tight_layout()
-    #print(fig.)
-    fig.show()
-    fig.savefig('test.pdf')
+    pass
 
 #%%

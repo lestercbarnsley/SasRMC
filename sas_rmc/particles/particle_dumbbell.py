@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from typing_extensions import Self
 import numpy as np
 
-from sas_rmc import Particle, Vector
-from sas_rmc.particles import CoreShellParticle
+from sas_rmc import Vector
+from sas_rmc.particles import CoreShellParticle, Particle
 from sas_rmc.shapes import Shape
 
 

@@ -13,8 +13,6 @@ PI = constants.PI
 rng = constants.RNG
 
 
-
-
 @dataclass
 class Box:
     '''The Box class is responsible for particle mechanics, determining how and when particles can move. It has no knowledge about anything related to scattering, which is the responsibility of the Simulator class. Special cases of the Box class can be made as their own class that inherit from the Box'''
@@ -26,7 +24,6 @@ class Box:
 
     def __len__(self) -> int:
         return len(self.particles)
-
 
     @property
     def volume(self) -> float:
@@ -76,7 +73,6 @@ class Box:
                 raise ValueError("Box is too dense to resolve")
         return box
         
-
     def force_inside_box(self) -> Self:
         return self.force_new_box(lambda box, p : box.move_inside_box(p))
         

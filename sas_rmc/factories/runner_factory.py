@@ -139,7 +139,7 @@ class CoreShellRunner:
         datetime_string = datetime.now().strftime(DATETIME_FORMAT)
         log_callback = loggers.LogEventBus(
             log_callbacks=[
-                loggers.QuietLogCallback(), 
+                loggers.CLILogger(), 
                 loggers.ExcelCallback(excel_file= results_folder / Path(f'{datetime_string}_{self.simulation_title}.xlsx')),
                 loggers.BoxPlotter(result_folder=results_folder, file_plot_prefix=f'{datetime_string}_{self.simulation_title}'),
                 loggers.DetectorImagePlotter(result_folder=results_folder, file_plot_prefix=f'{datetime_string}_{self.simulation_title}'),

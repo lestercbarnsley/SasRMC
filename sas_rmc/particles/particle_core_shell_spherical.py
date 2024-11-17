@@ -7,7 +7,7 @@ import numpy as np
 from typing_extensions import Self
 
 from sas_rmc.particles import FormResult, Particle
-from sas_rmc.particles.particle_form import ParticleForm
+from sas_rmc.particles.particle_form import ParticleArray
 from sas_rmc.particles.particle_spherical import SphericalParticle
 from sas_rmc import Vector
 from sas_rmc.shapes import Shape, Sphere, collision_detected
@@ -147,7 +147,7 @@ class CoreShellParticle(Particle):
     
 
 @dataclass
-class CoreShellParticleForm(ParticleForm):
+class CoreShellParticleForm(ParticleArray):
     core_shell_particle: CoreShellParticle
 
     @classmethod

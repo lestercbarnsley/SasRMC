@@ -8,12 +8,12 @@ import numpy as np
 from typing_extensions import Self
 
 from sas_rmc import Vector
-from sas_rmc.particles import Particle, FormResult
+from sas_rmc.particles import Particle
 from sas_rmc.shapes import Shape
 
 
 @dataclass
-class ParticleArray(Particle): # This is essentially an abstract wrapper class that is compatible with certain concrete result calculator implementations while still being compatible with the usual scattering simulation
+class ParticleProfile(Particle): # This is essentially an abstract wrapper class that is compatible with certain concrete result calculator implementations while still being compatible with the usual scattering simulation
 
     @abstractmethod
     def get_bound_particle(self) -> Particle:
@@ -63,7 +63,7 @@ class ParticleArray(Particle): # This is essentially an abstract wrapper class t
         return self.change_bound_particle(new_bound_particle)
 
     @abstractmethod
-    def form_result(self, qx_array: np.ndarray, qy_array: np.ndarray) -> FormResult:
+    def form_profile(self, q_profile: np.ndarray) -> np.ndarray:
         pass
 
     def get_loggable_data(self) -> dict:
