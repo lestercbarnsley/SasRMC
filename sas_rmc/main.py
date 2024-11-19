@@ -6,13 +6,28 @@ import yaml
 
 from sas_rmc.factories import runner_factory
 
-CONFIG_FILE = Path(__file__).parent.parent / Path("data") / Path("config.yaml")
+#CONFIG_FILE = Path(__file__).parent.parent / Path("data") / Path("config.yaml")
+CONFIG_FILE = Path(__file__).parent / Path("config.yaml")
+print(CONFIG_FILE)
 
-with open(CONFIG_FILE) as f:
-    current_config = yaml.load(f, Loader=yaml.FullLoader)
+def load_config() -> dict:
+    if not CONFIG_FILE.exists():
+        click.echo("No configuration found.")
+        raise FileNotFoundError("No configuration found.")
+    with open(CONFIG_FILE) as f:
+        current_config = yaml.load(f, Loader=yaml.FullLoader)
+    return current_config
 
-DEFAULT_INPUT = Path(current_config.get('input_config_source'))
-DEFAULT_OUTPUT = Path(current_config.get('output_folder'))
+def save_config(current_config: dict) -> None:
+    with open(CONFIG_FILE, 'w') as f:
+        yaml.dump(current_config, f, Dumper = yaml.Dumper)
+
+
+current_config = load_config()
+
+DEFAULT_INPUT = Path(current_config.get('input_config_source', ''))
+DEFAULT_OUTPUT = Path(current_config.get('output_folder', ''))
+print(DEFAULT_OUTPUT.absolute())
 DEFAULT_TEMPLATE_SOURCE = current_config.get('template_source')
 
 
@@ -42,17 +57,16 @@ def config():
     """Configuration options."""
     pass
 
-def show_settings(settings: dict):
-    for setting in settings:
-        click.echo(f"\t{setting}: {settings[setting]}")
+def show_settings(current_config: dict):
+    for setting in current_config:
+        click.echo(f"\t{setting}: {current_config[setting]}")
 
 @config.command()
 def show():
     """Show the current configuration."""
-    if not CONFIG_FILE.exists():
-        click.echo("No configuration found.")
-        return
-
+    current_config = load_config()
+    if not current_config:
+        return None
     show_settings(current_config)
 
 
@@ -63,16 +77,17 @@ def show():
 @click.confirmation_option(prompt='Are you sure you want to update the config?')
 def update(input: Path, output: Path, template: str):
     """Update the current configuration."""
+    current_config = load_config()
+    if current_config is None:
+        return None
+    
     if input != DEFAULT_INPUT:
         current_config["input_config_source"] = str(input)
     if output != DEFAULT_OUTPUT:
         current_config["output_folder"] = str(output)
     if template != DEFAULT_TEMPLATE_SOURCE:
         current_config["template_source"] = str(output)
-
-    with open(CONFIG_FILE, 'w') as f:
-        yaml.dump(current_config, f, Dumper = yaml.Dumper)
-
+    
     click.echo(f"Config updated.")
 
     show_settings(current_config)
