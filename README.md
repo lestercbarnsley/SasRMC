@@ -20,7 +20,7 @@ SasRMC can be used as a command-line tool or installed as a project dependency. 
     `$ python3.x pipx.pyz install git+https://github.com/lestercbarnsley/SasRMC.git --verbose`  
     `$ python3.x pipx.pyz ensurepath`  
 where `3.x` is the Python version you wish to use. (Please use 3.10 or greater). Restarting your terminal may be required.  
-4. Run `$ sasrmc --version` to validate the installation. Run `$ sasrmc --help` at any time for assistance.  
+4. Run `$ sasrmc --version` to validate the installation. Run `$ sasrmc --help` at any time for assistance. Refer to the Troubleshooting section below if these commands fail.  
 5. Run `$ sasrmc config show` to see the current configuration.  
 6. Run `$ sasrmc config -o [Output Folder]` to set a default output folder were the results of simulations will be saved.  
 7. Run `$ sasrmc config -i [Input Spreadsheet File]` to set a default input *.xlsx file for simulations to use.  
@@ -53,7 +53,7 @@ Most configuration for SasRMC is done using Excel spreadsheets. You can use SasR
 4. When the simulation is complete, you can find all outputs in the specified `Output Folder`.  
 5. A simulation can be finished early at any time with the keyboard shortcut `Ctrl+C`.  
 
-## Terms of Use
+### Terms of Use
 
 SasRMC is released for free under the MIT license. An associated publication is available here:
 
@@ -65,8 +65,12 @@ If you find that using SasRMC has added value to your scientific research, the a
 ## Updating
 
 Modifications to the installation can be managed using **pipx**. Some general guidance on how to manage your installation can be found here: https://realpython.com/python-pipx/.
-Updates to the package can be performed using `pipx upgrade install git+https://github.com/lestercbarnsley/SasRMC.git --verbose`.  
-The specific Python version can also be changed at any time using **pipx** (search for `pipx reinstall`). Any version of Python newer than 3.10 should be OK, but Python versions ending in `.0` (i.e. 3.xx.0) can be quite bleeding edge. It could be advisable to stick to an older release until a more battle-hardened version is available.
+Updates to the package can be performed using `pipx upgrade sas-rmc --verbose`.  
+The specific Python version can also be changed at any time using **pipx** (search for `pipx reinstall`). Any version of Python newer than 3.10 should be OK, but Python versions ending in `.0` (i.e. 3.xx.0) can be quite bleeding edge. It is often advisable to stay with an older version until a more battle-hardened release is available.
+
+# Troubleshooting
+
+Some issues relating to the installation of SasRMC using **pipx** arise from a misconfigured PATH environment variable. If `pipx ensurepath` does not work, find the folder that contains the `sasrmc.exe` executeable (usually %USERPROFILE%\.local\bin on Windows) and add it to PATH as a user environment variable. If you're not comfortable appending to your PATH variable, you can find the folder that contains the Script file (usually %USERPROFILE%\pipx\venvs\sas-rmc\Scripts on Windows), navigate to there in your terminal, and run `$ .\sasrmc.exe` with any available command from there. 
 
 ## Advanced Usage
 
