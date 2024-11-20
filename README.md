@@ -6,7 +6,7 @@ SasRMC is a Python library for numerical modelling of small-angle scattering dat
 
 **SasRMC will use Python 3.11 after the next push to main. Upgrade your Python installation today!**  
 SasRMC is compatible with Python 3.10 and newer. An upgrade to Python 3.11 is planned for very soon. Support for Python 3.11 is planned until the end of 2025.  
-SasRMC is dropping support for **conda**. Dependency management using **poetry** will be the preferred way going forward. Find out more here: https://python-poetry.org/  
+SasRMC is dropping support for **conda**. Dependency management using **poetry** and **pipx** will be the preferred way going forward. Find out more here: https://python-poetry.org/  
 
 ## Installation as a command-line tool
 
@@ -36,6 +36,8 @@ This is more for developers who want to integrate SasRMC into their own projects
     `(venv)$ poetry add git+https://github.com/lestercbarnsley/SasRMC.git`  
 
 ## Getting simulation input files  
+
+Templates can be downloaded directly from the `/data` folder of this repository. The `$ sasrmc create` command also lets you download templates.
  
 1. Run `$ sasrmc create --help` at any time for assistance. A full list of currently available templates will be listed here.  
 2. Run `$ sasrmc create [template-type]` to download a specific type of template. Use the `-o [Output Folder]` tag if you want to save the template into a different folder than the default output folder.  
@@ -70,7 +72,7 @@ The specific Python version can also be changed at any time using **pipx** (sear
 
 # Troubleshooting
 
-Some issues relating to the installation of SasRMC using **pipx** arise from a misconfigured PATH environment variable. If `pipx ensurepath` does not work, find the folder that contains the `sasrmc.exe` executeable (usually %USERPROFILE%\.local\bin on Windows) and add it to PATH as a user environment variable. If you're not comfortable appending to your PATH variable, you can find the folder that contains the Script file (usually %USERPROFILE%\pipx\venvs\sas-rmc\Scripts on Windows), navigate to there in your terminal, and run `$ .\sasrmc.exe` with any available command from there. 
+Some issues relating to the installation of SasRMC using **pipx** arise from a misconfigured PATH environment variable. If `pipx ensurepath` does not work, find the folder that contains the `sasrmc.exe` executeable (usually %USERPROFILE%\ .local\bin on Windows) and add it to PATH as a user environment variable. If you're not comfortable appending to your PATH variable, you can find the folder that contains the Script file (usually %USERPROFILE%\pipx\venvs\sas-rmc\Scripts on Windows), navigate to there in your terminal, and run `$ .\sasrmc.exe` with any available command from there. 
 
 ## Advanced Usage
 
