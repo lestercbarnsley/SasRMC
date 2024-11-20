@@ -1,5 +1,6 @@
 #%%
 from pathlib import Path
+import shutil
 
 import click
 import yaml
@@ -12,6 +13,8 @@ CONFIG_FILE = Path(__file__).parent / Path("data") / Path("config.yaml")
 
 
 def load_config() -> dict:
+    if not CONFIG_FILE.exists():
+        shutil.copyfile(CONFIG_FILE.parent / Path("config_template.yaml"), CONFIG_FILE)
     if not CONFIG_FILE.exists():
         click.echo("No configuration found.")
         raise FileNotFoundError("No configuration found.")
@@ -90,6 +93,13 @@ def update(input: Path, output: Path, template: str):
     click.echo(f"Config updated.")
 
     show_settings(current_config)
+
+@config.command()
+@click.confirmation_option(prompt='Are you sure you want to reset the config?')
+def clear():
+    """Factory reset all configs."""
+
+    CONFIG_FILE.unlink()
 
 
 @cli.command()
