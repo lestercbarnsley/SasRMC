@@ -93,7 +93,7 @@ def update(input: Path, output: Path, template: str):
 
 
 @cli.command()
-@click.argument('template-type', type=click.Choice(['coreshell-1d', 'coreshell-2d','particle-1d', 'particle-2d', 'cylinder-1d', 'dumbbell-2d'], case_sensitive=False))
+@click.argument('template-type', type=click.Choice(['coreshell-1d', 'coreshell-2d','particle-1d', 'particle-2d', 'cylinder-1d', 'dumbbell-2d','example'], case_sensitive=False))
 @click.option("-o", "--output", "output", help="Folder where the template will be saved.", type = click.Path(), default = DEFAULT_OUTPUT, show_default = True)
 def create(template_type: str, output: Path):
     """Create a template file by downloading it from the repository. Specify a template type from one of the available choices."""

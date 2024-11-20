@@ -44,21 +44,29 @@ This is more for developers who want to integrate SasRMC into their own projects
 The example will download a file `CoreShell_F20_pol.xlsx` which contains data described in the associated publication, and shows an example for how a simulation for a SANSPol measurement across 3 detector configurations and 2 polarization states can be set out.  
 
 ## Usage
+
 Most configuration for SasRMC is done using Excel spreadsheets. You can use SasRMC without needing to edit any Python code.  
 
 1. Run `$ sasrmc run --help` at any time for assistance.  
-2. Fill in the simulation input file. Template files contain hints and documentation for how the cells should be filled out. Make a new Sheet for each new experimental dataset you want to include in your simulation.  
-3. Save your spreadsheet and run `$ sasrmc run -i [input1.xlsx] -i [input2.xlsx]` for each simulation you want to run. Use the `-o [Output Folder]` tag if you want to save the template into a different folder than the default output folder.  
-4. When the simulation is complete, you can find all outputs in the specified `output_folder`.  
+2. Fill in the simulation input file. Template files contain hints and documentation for how the cells should be filled out. Make a new Sheet for each new experimental dataset you want to include in your simulation.
+3. After saving your spreadsheet(s), navigate to the location of your spreadsheet(s) and run `$ sasrmc run -i [input1.xlsx] -i [input2.xlsx]` for each simulation you want to run. Use the `-o [Output Folder]` tag if you want to save the simulation results into a different folder than the default output folder.  
+4. When the simulation is complete, you can find all outputs in the specified `Output Folder`.  
 5. A simulation can be finished early at any time with the keyboard shortcut `Ctrl+C`.  
 
 ## Terms of Use
+
 SasRMC is released for free under the MIT license. An associated publication is available here:
 
 Barnsley, L.C., Nandakumaran, N., Feoktystov, A., Dulle, M., Fruhner, L. & Feygenson, M. (2022). J. Appl. Cryst. 55,
 https://doi.org/10.1107/S1600576722009219.
 
 If you find that using SasRMC has added value to your scientific research, the authors would like to ask you to consider including a reference to the above work in your publication.
+
+## Updating
+
+Modifications to the installation can be managed using **pipx**. Some general guidance on how to manage your installation can be found here: https://realpython.com/python-pipx/.
+Updates to the package can be performed using `pipx upgrade install git+https://github.com/lestercbarnsley/SasRMC.git --verbose`.  
+The specific Python version can also be changed at any time using **pipx** (search for `pipx reinstall`). Any version of Python newer than 3.10 should be OK, but Python versions ending in `.0` (i.e. 3.xx.0) can be quite bleeding edge. It could be advisable to stick to an older release until a more battle-hardened version is available.
 
 ## Advanced Usage
 
