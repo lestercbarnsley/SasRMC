@@ -5,14 +5,14 @@ SasRMC is a Python library for numerical modelling of small-angle scattering dat
 ## Requirements
 
 **SasRMC will use Python 3.11 after the next push to main. Upgrade your Python installation today!**  
-SasRMC is compatible with Python 3.10 and newer. An upgrade to Python 3.11 is planned for very soon. Support for Python3.11 is planned until the end of 2025.  
-SaSRMC is dropping support for **conda**. Dependency management using **poetry** will be the preferred way going forward. Find out more here: https://python-poetry.org/  
+SasRMC is compatible with Python 3.10 and newer. An upgrade to Python 3.11 is planned for very soon. Support for Python 3.11 is planned until the end of 2025.  
+SasRMC is dropping support for **conda**. Dependency management using **poetry** will be the preferred way going forward. Find out more here: https://python-poetry.org/  
 
 ## Installation as a command-line tool
 
 SasRMC can be used as a command-line tool or installed as a project dependency. Installation as a command-line tool is recommended using **pipx**.
 
-1. The **pipx** package can either be installed using a package manager (see: https://pipx.pypa.io/stable/installation/), or downloaded as a stand-alone executable (https://github.com/pypa/pipx/releases). Using the stand-alone executable may be easier for Windows users.
+1. The **pipx** package can either be installed using a package manager (see: https://pipx.pypa.io/stable/installation/), or downloaded as a stand-alone executable (download 'pipx.pyz' from https://github.com/pypa/pipx/releases). Using the stand-alone executable may be easier for Windows users.
 2. If **pipx** has been installed, run:  
     `$ pipx install git+https://github.com/lestercbarnsley/SasRMC.git --verbose`  
     `$ pipx ensurepath`  
@@ -35,29 +35,22 @@ This is more for developers who want to integrate SasRMC into their own projects
 3. If you're using **poetry**, run:  
     `(venv)$ poetry add git+https://github.com/lestercbarnsley/SasRMC.git`  
 
-## Getting simulation files  
+## Getting simulation input files  
  
+1. Run `$ sasrmc create --help` at any time for assistance. A full list of currently available templates will be listed here.  
+2. Run `$ sasrmc create [template-type]` to download a specific type of template. Use the `-o [Output Folder]` tag if you want to save the template into a different folder than the default output folder.  
+3. Run `$ sasrmc create example` to download an example of how a simulation input file should be configured.  
 
+The example will download a file `CoreShell_F20_pol.xlsx` which contains data described in the associated publication, and shows an example for how a simulation for a SANSPol measurement across 3 detector configurations and 2 polarization states can be set out.  
 
 ## Usage
-Most configuration for SasRMC is done using Excel spreadsheets. You can use SasRMC without needing to edit any Python code.
+Most configuration for SasRMC is done using Excel spreadsheets. You can use SasRMC without needing to edit any Python code.  
 
-1. In your text editor of choice, open `data/config.yaml`
-2. Next to `input_config_source` specify an Excel spreadsheet that will contain configuration data for your simulation. Your excel file should be in the same folder as the `config.yaml` file.
-3. Next to `output_folder` specify the folder that you want the output and log files to be saved to.
-4. The `data` folder contains templates for how a typical simulation should be configured.
-5. A new template Excel spreadsheet can be generated from the terminal by running one of the following commands:
-    `(myenv)$ python main.py generate core shell template`
-    `(myenv)$ python main.py generate dumbbell template`
-    `(myenv)$ python main.py generate reload template`
-More templates will be available in future versions.
-6. Edit and save all config files. Please notice that Excel spreadsheets have multiple tabs for additional options.
-7. In the terminal, run
-    `(myenv)$ python main.py`
-8. When the simulation is complete, you can find all outputs in the specified `output_folder`
-9. A simulation can be finished early at any time with the keyboard shortcut `Ctrl+C`
-
-The `/data` folder contains a file `CoreShell_F20_pol.xlsx` which contains data described in the associated publication, and shows an example for how a simulation for a SANSPol measurement across 3 detector configurations and 2 polarization states can be set out.
+1. Run `$ sasrmc run --help` at any time for assistance.  
+2. Fill in the simulation input file. Template files contain hints and documentation for how the cells should be filled out. Make a new Sheet for each new experimental dataset you want to include in your simulation.  
+3. Save your spreadsheet and run `$ sasrmc run -i [input1.xlsx] -i [input2.xlsx]` for each simulation you want to run. Use the `-o [Output Folder]` tag if you want to save the template into a different folder than the default output folder.  
+4. When the simulation is complete, you can find all outputs in the specified `output_folder`.  
+5. A simulation can be finished early at any time with the keyboard shortcut `Ctrl+C`.  
 
 ## Terms of Use
 SasRMC is released for free under the MIT license. An associated publication is available here:
