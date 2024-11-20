@@ -12,11 +12,15 @@ SasRMC can be used as a command-line tool or installed as a project dependency. 
 
 1. The **pipx** package can either be installed using a package manager (see: https://pipx.pypa.io/stable/installation/), or downloaded as a stand-alone executable (https://github.com/pypa/pipx/releases). Using the stand-alone executable may be easier for Windows users.
 2. If **pipx** has been installed, run: 
+
     '$ pipx install git+https://github.com/lestercbarnsley/SasRMC.git --verbose'
     '$ pipx ensurepath'
+
 3. If **pipx** has been downloaded, navigate to the folder where pipx.pyz has been saved and run:
+
     '$ python3.x pipx.pyz install git+https://github.com/lestercbarnsley/SasRMC.git --verbose'
     '$ python3.x pipx.pyz ensurepath'
+    
 where 3.x is the Python version you wish to use. (Please use 3.10 or greater). Restarting your terminal may be required.
 4. Run '$ sasrmc --version' to validate the installation. Run '$ sasrmc --help' at any time for assistance.
 5. Run '$ sasrmc config show' to see the current configuration.
