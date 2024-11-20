@@ -178,7 +178,6 @@ tests/dumbbell_test.py
 sas_rmc/particles/__pycache__/
 sas_rmc/shapes/__pycache__/
 sas_rmc/factories/__pycache__/
-*.yaml
 dev_config.txt
 Untitled.ipynb
 .ipynb_checkpoints/Untitled-checkpoint.ipynb
@@ -186,3 +185,5 @@ Untitled1.ipynb
 .ipynb_checkpoints/
 
 sas_rmc/test.pdf
+data/*.yaml
+sas_rmc/data/results/

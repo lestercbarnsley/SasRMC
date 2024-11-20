@@ -7,7 +7,7 @@ import yaml
 from sas_rmc.factories import runner_factory
 
 #CONFIG_FILE = Path(__file__).parent.parent / Path("data") / Path("config.yaml")
-CONFIG_FILE = Path(__file__).parent / Path("config.yaml")
+CONFIG_FILE = Path(__file__).parent / Path("data") / Path("config.yaml")
 print(CONFIG_FILE)
 
 def load_config() -> dict:
