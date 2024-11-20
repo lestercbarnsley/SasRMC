@@ -1,3 +1,3 @@
 input_config_source: CoreShell Simulation Input.xlsx
-output_folder: ./results
-template_source: https://github.com/lestercbarnsley/SasRMC/tree/master
+output_folder: ./data/results
+template_source: https://github.com/lestercbarnsley/SasRMC/raw/refs/heads/master

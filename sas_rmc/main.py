@@ -3,12 +3,13 @@ from pathlib import Path
 
 import click
 import yaml
+import requests
 
 from sas_rmc.factories import runner_factory
 
-#CONFIG_FILE = Path(__file__).parent.parent / Path("data") / Path("config.yaml")
+
 CONFIG_FILE = Path(__file__).parent / Path("data") / Path("config.yaml")
-print(CONFIG_FILE)
+
 
 def load_config() -> dict:
     if not CONFIG_FILE.exists():
@@ -27,7 +28,6 @@ current_config = load_config()
 
 DEFAULT_INPUT = Path(current_config.get('input_config_source', ''))
 DEFAULT_OUTPUT = Path(current_config.get('output_folder', ''))
-print(DEFAULT_OUTPUT.absolute())
 DEFAULT_TEMPLATE_SOURCE = current_config.get('template_source')
 
 
@@ -44,13 +44,12 @@ def cli(ctx: click.Context):
 @click.pass_context
 def run(ctx: click.Context, inputs: list[Path], output: Path) -> None:
     '''Run a simulation with given inputs and output. If options aren't specified, defaults are looked-up from data/config.yaml'''
-    abs_output = CONFIG_FILE.parent / output
+    abs_output = output if output.exists() else Path.cwd() / output
     for input_ in inputs:
         abs_input = Path.cwd() / input_
         click.echo(f"Loading configuration from {abs_input}, please wait a moment...")
         runner = runner_factory.create_runner(abs_input, abs_output)
         runner.run()
-
 
 @click.group()
 def config():
@@ -73,7 +72,7 @@ def show():
 @config.command()
 @click.option("-i", "--input", "input", type=click.Path(), help="Update the default .xlsx file to run when otherwise unspecified.", default = DEFAULT_INPUT, show_default = True)
 @click.option("-o", "--output", "output", type = click.Path(), help="Update the default folder where the output is written.", default = DEFAULT_OUTPUT, show_default = True)
-@click.option("-t", "--template", "template", type = click.STRING, help="Update the repository for downloading template files.", default = DEFAULT_TEMPLATE_SOURCE, show_default = True)
+@click.option("-t", "--template", "template", type = click.STRING, help="Update the repository for downloading template files.", default = DEFAULT_TEMPLATE_SOURCE, show_default = False)
 @click.confirmation_option(prompt='Are you sure you want to update the config?')
 def update(input: Path, output: Path, template: str):
     """Update the current configuration."""
@@ -93,22 +92,34 @@ def update(input: Path, output: Path, template: str):
     show_settings(current_config)
 
 
-@click.group()
-@click.argument('template-type', type=click.Choice(['coreshell', 'dumbbell'], case_sensitive=False))
-@click.option("-o", "--output", "output", help="Folder to output results.", type = click.Path(), default = DEFAULT_OUTPUT, show_default = True)
-def create(template_type):
-    """Create a template file by downloading it from the repository."""
-    if template_type == 'coreshell':
-        pass
+@cli.command()
+@click.argument('template-type', type=click.Choice(['coreshell-1d', 'coreshell-2d','particle-1d', 'particle-2d', 'cylinder-1d', 'dumbbell-2d'], case_sensitive=False))
+@click.option("-o", "--output", "output", help="Folder where the template will be saved.", type = click.Path(), default = DEFAULT_OUTPUT, show_default = True)
+def create(template_type: str, output: Path):
+    """Create a template file by downloading it from the repository. Specify a template type from one of the available choices."""
+    
+    abs_output = output if output.exists() else Path.cwd() / output
+    click.echo(f"Downloading {template_type}")
+    template_source = load_config().get('template_source' , '')
+    if template_type == 'coreshell-2d':
+        url = template_source + '/data/CoreShell_Simulation_Input.xlsx'
+        response = requests.get(url)
+        save_destination = abs_output / Path("CoreShell_Simulation_Input.xlsx")
+        if save_destination.exists():
+            click.confirm(f'File already exists at {save_destination.absolute()}. Are you sure you want to continue?', abort=True)
+        with open(save_destination, mode = 'wb') as f:
+            f.write(response.content)
+        click.echo(f"Template {template_type} has been saved to {save_destination.absolute()}")
 
 #@
 
 
 cli.add_command(run)
 cli.add_command(config)
+#cli.add_command(create)
     
 
 if __name__ == "__main__":
-    print(config)
+    pass
     
 #%%
