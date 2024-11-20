@@ -110,10 +110,10 @@ def download_and_save_file(url_source: str, save_destination: Path, template_typ
     click.echo(f"Template {template_type} has been saved to {save_destination.absolute()}")
 
 @cli.command()
-@click.argument('template-type', type=click.Choice(['coreshell-1d', 'coreshell-2d','particle-1d', 'particle-2d', 'cylinder-1d', 'dumbbell-2d','example'], case_sensitive=False))
+@click.argument('template-type', type=click.Choice(['coreshell-1d', 'coreshell-2d','spherical-1d', 'spherical-2d', 'cylinder-1d', 'dumbbell-2d','example'], case_sensitive=False))
 @click.option("-o", "--output", "output", help="Folder where the template will be saved.", type = click.Path(), default = DEFAULT_OUTPUT, show_default = True)
 def create(template_type: str, output: Path) -> None:
-    """Create a template file by downloading it from the repository. Specify a template type from one of the available choices."""
+    """Create a template file by downloading it from the repository. Specify a template type from one of the available choices. WARNING: Due to testing and maintenance, only coreshell-2d is currently available. Other types will be back online soon."""
     
     abs_output = output if output.exists() else Path.cwd() / output
     if not abs_output.exists():
@@ -126,6 +126,8 @@ def create(template_type: str, output: Path) -> None:
             save_destination=abs_output / Path("CoreShell_Simulation_Input.xlsx"),
             template_type=template_type
         )
+    else:
+        click.echo("Sorry, this template type is currently not available.")
 
 #@
 
