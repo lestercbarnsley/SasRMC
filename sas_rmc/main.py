@@ -48,6 +48,8 @@ def cli(ctx: click.Context):
 def run(ctx: click.Context, inputs: list[Path], output: Path) -> None:
     '''Run a simulation with given inputs and output. If options aren't specified, defaults are looked-up from data/config.yaml'''
     abs_output = output if output.exists() else Path.cwd() / output
+    if not abs_output.exists():
+        abs_output.mkdir(parents=True)
     for input_ in inputs:
         abs_input = Path.cwd() / input_
         click.echo(f"Loading configuration from {abs_input}, please wait a moment...")
@@ -74,14 +76,12 @@ def show():
 
 @config.command()
 @click.option("-i", "--input", "input", type=click.Path(), help="Update the default .xlsx file to run when otherwise unspecified.", default = DEFAULT_INPUT, show_default = True)
-@click.option("-o", "--output", "output", type = click.Path(), help="Update the default folder where the output is written.", default = DEFAULT_OUTPUT, show_default = True)
+@click.option("-o", "--output", "output", type = click.Path(), help="Update the default folder where the output is written. If unsure, specify an absolute folder location.", default = DEFAULT_OUTPUT, show_default = True)
 @click.option("-t", "--template", "template", type = click.STRING, help="Update the repository for downloading template files.", default = DEFAULT_TEMPLATE_SOURCE, show_default = False)
 @click.confirmation_option(prompt='Are you sure you want to update the config?')
 def update(input: Path, output: Path, template: str):
     """Update the current configuration."""
     current_config = load_config()
-    if current_config is None:
-        return None
     
     if input != DEFAULT_INPUT:
         current_config["input_config_source"] = str(input)
@@ -89,9 +89,9 @@ def update(input: Path, output: Path, template: str):
         current_config["output_folder"] = str(output)
     if template != DEFAULT_TEMPLATE_SOURCE:
         current_config["template_source"] = str(output)
-    
-    click.echo(f"Config updated.")
 
+    save_config(current_config)
+    click.echo(f"Config updated.")
     show_settings(current_config)
 
 @config.command()
@@ -101,25 +101,31 @@ def clear():
 
     CONFIG_FILE.unlink()
 
+def download_and_save_file(url_source: str, save_destination: Path, template_type: str) -> None:
+    response = requests.get(url_source)
+    if save_destination.exists():
+        click.confirm(f'File already exists at {save_destination.absolute()}. Are you sure you want to continue?', abort=True)
+    with open(save_destination, mode = 'wb') as f:
+        f.write(response.content)
+    click.echo(f"Template {template_type} has been saved to {save_destination.absolute()}")
 
 @cli.command()
 @click.argument('template-type', type=click.Choice(['coreshell-1d', 'coreshell-2d','particle-1d', 'particle-2d', 'cylinder-1d', 'dumbbell-2d','example'], case_sensitive=False))
 @click.option("-o", "--output", "output", help="Folder where the template will be saved.", type = click.Path(), default = DEFAULT_OUTPUT, show_default = True)
-def create(template_type: str, output: Path):
+def create(template_type: str, output: Path) -> None:
     """Create a template file by downloading it from the repository. Specify a template type from one of the available choices."""
     
     abs_output = output if output.exists() else Path.cwd() / output
+    if not abs_output.exists():
+        abs_output.mkdir(parents=True)
     click.echo(f"Downloading {template_type}")
     template_source = load_config().get('template_source' , '')
     if template_type == 'coreshell-2d':
-        url = template_source + '/data/CoreShell_Simulation_Input.xlsx'
-        response = requests.get(url)
-        save_destination = abs_output / Path("CoreShell_Simulation_Input.xlsx")
-        if save_destination.exists():
-            click.confirm(f'File already exists at {save_destination.absolute()}. Are you sure you want to continue?', abort=True)
-        with open(save_destination, mode = 'wb') as f:
-            f.write(response.content)
-        click.echo(f"Template {template_type} has been saved to {save_destination.absolute()}")
+        return download_and_save_file(
+            url_source=template_source + '/data/CoreShell_Simulation_Input.xlsx',
+            save_destination=abs_output / Path("CoreShell_Simulation_Input.xlsx"),
+            template_type=template_type
+        )
 
 #@
 
