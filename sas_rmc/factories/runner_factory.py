@@ -183,17 +183,18 @@ def create_runner(input_config_path: Path, result_folder: Path) -> RmcRunner:
 if __name__ == "__main__":
     #data_params = create_runner(r"E:\Programming\SasRMC\data\CoreShell_F20_pol.xlsx")
     spreadsheet = Path(__file__).parent.parent.parent / Path("data") / Path("CoreShell Simulation Input - Copy - Copy.xlsx")
+    spreadsheet = Path(__file__).parent.parent.parent / Path("data") / Path("CoreShell SAXS v2.xlsx")
     #spreadsheet = Path(__file__).parent.parent.parent / Path("data") / Path("CoreShell_F20_pol - Copy.xlsx")
-    #runner = create_runner(spreadsheet)
-    #runner.run()
-    dataframes = pd.read_excel(
+    runner = create_runner(spreadsheet, spreadsheet.parent / Path("results"))
+    runner.run()
+    ''' dataframes = pd.read_excel(
         spreadsheet,
         dtype = str,
         sheet_name = None,
         keep_default_na=False,
         )
     value_frame = list(dataframes.values())[0]
-    config = parse_data.parse_value_frame(value_frame)
+    config = parse_data.parse_value_frame(value_frame)'''
     #config.pop('core_radius')
     
     '''import cProfile

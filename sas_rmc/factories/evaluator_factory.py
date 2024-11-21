@@ -33,7 +33,7 @@ def create_smearing_fitter_from_experimental_detector(detector: DetectorImage, d
     )
 
 def create_evaluator_with_smearing(dataframes: dict[str, pd.DataFrame]) -> EvaluatorWithFitter:
-    detector_list = detector_builder.create_detector_images(dataframes)
+    detector_list = detector_builder.create_detector_images_with_smearing(dataframes)
     density_factor = 1.4
     field_direction = FieldDirection.Y
     return EvaluatorWithFitter(
@@ -47,7 +47,7 @@ def create_evaluator_with_smearing(dataframes: dict[str, pd.DataFrame]) -> Evalu
     )
 
 def create_evaluator_no_smearing(dataframes: dict[str, pd.DataFrame]) -> EvaluatorWithFitter:
-    detector_list = detector_builder.create_detector_images(dataframes)
+    detector_list = detector_builder.create_detector_images_no_smearing(dataframes)
     field_direction = FieldDirection.Y
     return EvaluatorWithFitter(
         fitter=FitterMultiple(

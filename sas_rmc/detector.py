@@ -28,8 +28,7 @@ SIMUATED_INTENSITY_ERR = 'simulated_intensity_err'
 POLARIZATION = "Polarization"
 
     
-def area_to_radius(area: float) -> float: # I made this not anonymous so I can write a docstring later if needed
-    return np.sqrt(area / PI)
+
 
 class Polarization(Enum):
     UNPOLARIZED = "unpolarized"
@@ -41,32 +40,6 @@ class Polarization(Enum):
     PLUS_PLUS = "plus_plus"
 
 
-@dataclass
-class DetectorConfig:
-    detector_distance_in_m: float
-    collimation_distance_in_m: float
-    collimation_aperture_area_in_m2: float
-    sample_aperture_area_in_m2: float
-    detector_pixel_size_in_m: float
-    wavelength_in_angstrom: float
-    wavelength_spread: float = 0.1
-    polarization: Polarization = Polarization.UNPOLARIZED
-
-    def get_sigma_geometric(self) -> float:
-        k_mag = 2 * PI / self.wavelength_in_angstrom
-        l1, l2 = self.collimation_distance_in_m, self.detector_distance_in_m
-        r1, r2 = area_to_radius(self.collimation_aperture_area_in_m2), area_to_radius(self.sample_aperture_area_in_m2)
-        l_dash = 1 / ((1 / l1) + (1 / l2))
-        delta_d = self.detector_pixel_size_in_m
-        geometric_term = 3 * ((r1 / l1)**2) + 3 * ((r2 / l_dash)**2) + ((delta_d / l2)**2)
-        sigma_geom =  np.sqrt(((k_mag ** 2) / 12) * geometric_term)
-        return sigma_geom
-
-    def get_sigma_parallel(self, qx: float, qy: float) -> float:
-        sigma_geom = self.get_sigma_geometric()
-        q = np.sqrt(qx**2 + qy**2)
-        sigma_para = np.sqrt((q * (self.wavelength_spread / 2))**2 + sigma_geom**2)
-        return sigma_para
     
 
 

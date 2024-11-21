@@ -4,8 +4,8 @@ SasRMC is a Python library for numerical modelling of small-angle scattering dat
 
 ## Requirements
 
-**SasRMC will use Python 3.11 after the next push to main. Upgrade your Python installation today!**  
-SasRMC is compatible with Python 3.10 and newer. An upgrade to Python 3.11 is planned for very soon after Jan 1, 2025. Support for Python 3.11 is planned until the end of 2025.  
+**SasRMC will use Python 3.11 soon after the next push to main. Upgrade your Python installation today!**  
+SasRMC is compatible with Python 3.10 and newer. An upgrade to Python 3.11 is planned for very soon after 1 Jan, 2025. Support for Python 3.11 is planned until the end of 2025.  
 SasRMC is dropping support for **conda**. Dependency management using **poetry** and **pipx** will be the preferred way going forward. Find out more here: https://python-poetry.org/  
 
 ## Installation as a command-line tool

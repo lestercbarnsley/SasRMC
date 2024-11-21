@@ -158,6 +158,7 @@ class FitterMultiple(Fitter):
                 for i, fitter 
                 in enumerate(self.fitter_list)}
 
+
 @dataclass
 class EvaluatorWithFitter(Evaluator):
     fitter: Fitter

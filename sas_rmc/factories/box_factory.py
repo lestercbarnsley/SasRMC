@@ -2,10 +2,10 @@
 from collections.abc import Callable
 from typing import Iterator, Sequence
 
-
 from sas_rmc import Particle, Vector
 from sas_rmc.box_simulation import Box
 from sas_rmc.shapes import Cube
+
 
 def create_cube(dimensions: Sequence[float]) -> Cube:
     return Cube(
@@ -18,7 +18,7 @@ def create_cube(dimensions: Sequence[float]) -> Cube:
 
 def create_box_list_without_concentration(box_number: int, particle_number: int, particle_factory: Callable[[], Particle], dimensions: Sequence[float]):
     return [Box(
-        particles = [particle_factory() for _ in range(particle_number)], 
+        particles = [particle_factory() for _ in range(int(particle_number / box_number))], 
         cube=create_cube(dimensions),
         ).force_to_plane() for _ in range(box_number)]
 
