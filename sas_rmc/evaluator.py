@@ -59,7 +59,7 @@ class Fitter(ABC):
 
 def calculate_goodness_of_fit(simulated_intensity: np.ndarray, experimental_detector: DetectorImage) -> float:
     experimental_intensity = experimental_detector.intensity
-    uncertainty = experimental_detector.intensity_err
+    uncertainty = np.where(experimental_detector.intensity_err == 0, 1, experimental_detector.intensity_err)
     return ((experimental_intensity - simulated_intensity)**2 / uncertainty**2)[experimental_detector.shadow_factor].mean()
 
 def qXqY_delta(detector: DetectorImage) -> tuple[float, float]:

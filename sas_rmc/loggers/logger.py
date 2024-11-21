@@ -63,10 +63,12 @@ class QuietLogCallback(LogCallback):
     def stop(self, document: dict | None = None) -> None:
         pass
 
+
+import click
+
 def clear_line(n=0):
-    LINE_UP = '\033[1A'
-    for _ in range(n):
-        print(LINE_UP, end="")
+    LINE_UP = f'\033[{n}A'
+    click.echo(LINE_UP)
 
 DEFAULT_KEY_LIST = ['Current goodness of fit', 'Cycle', 'Step', 'Acceptance', 'Action', 'temperature']
 
@@ -76,8 +78,10 @@ class CLILogger(LogCallback):
     keys: list[str] = field(default_factory=lambda : DEFAULT_KEY_LIST, init = True, repr = True)
     
     def start(self, document: dict | None = None) -> None:
-        print('\033[?25l', end="")
-        self.current_total_lines = 1
+        HIDE_CURSOR = '\033[?25l'
+        click.echo(HIDE_CURSOR + '\n')
+        click.echo('Event data logger:\n')
+        self.current_total_lines = 0
 
     def event(self, document: dict | None = None) -> None:
         if document is None:
@@ -87,12 +91,13 @@ class CLILogger(LogCallback):
         doc = {k : document[k] for k in self.keys}# {k : v for k, v in document.items() if k in self.keys}
         if 'timestamp' in document:
             doc = doc | {'timestamp' : str(datetime.fromtimestamp(document.get('timestamp', 0)))}
-        print('\n'.join(f"{LINE_CLEAR}{k}: {v}" for k, v in doc.items()))
-        self.current_total_lines = len(doc)
+        click.echo('\n'.join(f"{LINE_CLEAR}\t{k}: {v}" for k, v in doc.items()))
+        self.current_total_lines = len(doc) + 1
         
 
     def stop(self, document: dict | None = None) -> None:
-        print('\033[?25h', end="")
+        UNHIDE_CURSOR = '\033[?25h'
+        click.echo(UNHIDE_CURSOR + '\n')
 
 
 @dataclass
