@@ -79,7 +79,7 @@ class CLILogger(LogCallback):
     
     def start(self, document: dict | None = None) -> None:
         HIDE_CURSOR = '\033[?25l'
-        click.echo(HIDE_CURSOR + '\n')
+        click.echo(HIDE_CURSOR + '\n') ## I think this needs to be styled in click
         click.echo('Event data logger:\n')
         self.current_total_lines = 0
 
