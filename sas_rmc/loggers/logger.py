@@ -66,6 +66,9 @@ class QuietLogCallback(LogCallback):
 
 import click
 
+from colorama import just_fix_windows_console
+just_fix_windows_console()
+
 def clear_line(n=0):
     LINE_UP = f'\033[{n}A'
     click.echo(LINE_UP)
@@ -79,8 +82,8 @@ class CLILogger(LogCallback):
     
     def start(self, document: dict | None = None) -> None:
         HIDE_CURSOR = '\033[?25l'
-        click.echo(HIDE_CURSOR + '\n') ## I think this needs to be styled in click
-        click.echo('Event data logger:\n')
+        click.echo(HIDE_CURSOR) ## I think this needs to be styled in click
+        click.echo('Event data logger:', nl=True)
         self.current_total_lines = 0
 
     def event(self, document: dict | None = None) -> None:
@@ -97,7 +100,7 @@ class CLILogger(LogCallback):
 
     def stop(self, document: dict | None = None) -> None:
         UNHIDE_CURSOR = '\033[?25h'
-        click.echo(UNHIDE_CURSOR + '\n')
+        click.echo(UNHIDE_CURSOR, nl  = True)
 
 
 @dataclass
