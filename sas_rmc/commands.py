@@ -22,11 +22,11 @@ def small_angle_change(vector: Vector, angle_change: float, reference_vector: Ve
 class Command(ABC):
     
     @abstractmethod
-    def execute(self, scattering_simulation: ScatteringSimulation | None = None) -> ScatteringSimulation:
+    def execute(self, scattering_simulation: ScatteringSimulation) -> ScatteringSimulation:
         pass
 
     @abstractmethod
-    def execute_and_get_document(self, scattering_simulation: ScatteringSimulation | None = None) -> tuple[ScatteringSimulation, dict]:
+    def execute_and_get_document(self, scattering_simulation: ScatteringSimulation) -> tuple[ScatteringSimulation, dict]:
         pass
 
 
@@ -62,10 +62,10 @@ class ParticleCommand(Command):
 class GroupCommand(Command):
     command_list: list[Command]
 
-    def execute(self, scattering_simulation: ScatteringSimulation | None = None) -> ScatteringSimulation:
+    def execute(self, scattering_simulation: ScatteringSimulation) -> ScatteringSimulation:
         return super().execute(scattering_simulation)
 
-    def execute_and_get_document(self, scattering_simulation: ScatteringSimulation | None = None) -> tuple[ScatteringSimulation, dict]:
+    def execute_and_get_document(self, scattering_simulation: ScatteringSimulation) -> tuple[ScatteringSimulation, dict]:
         if scattering_simulation is None:
             raise ValueError("scattering_simulation is not optional for this class")
         document = {"Action" : type(self).__name__}
@@ -126,21 +126,6 @@ class JumpParticleTo(ParticleCommand):
                 jump_vector = jump_vector if jump_vector.mag < jump_vector_new.mag else jump_vector_new
         particle_move_command = MoveParticleBy(self.box_index, self.particle_index, position_delta=jump_vector)
         return particle_move_command.execute(scattering_simulation)
-
-
-def jump_by_vector(position_1: Vector, position_2: Vector, fixed_distance: float) -> Vector:
-    pointing_vector = position_2 - position_1
-    return pointing_vector - (fixed_distance * pointing_vector.unit_vector)
-
-
-def rotate_vector(vector: Vector, angle: float) -> Vector: # mark for deletion
-    x, y, z = vector.to_tuple()
-    if z:
-        raise ValueError("remember, no z")
-    return Vector(
-        x = x * np.cos(angle) - y * np.sin(angle),
-        y = x * np.sin(angle) + y * np.cos(angle)
-    )
 
 
 @dataclass
