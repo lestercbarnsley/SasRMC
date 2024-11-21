@@ -5,7 +5,9 @@ SasRMC is a Python library for numerical modelling of small-angle scattering dat
 ## Requirements
 
 **SasRMC will use Python 3.11 soon after the next push to main. Upgrade your Python installation today!**  
+
 SasRMC is compatible with Python 3.10 and newer. An upgrade to Python 3.11 is planned for very soon after 1 Jan, 2025. Support for Python 3.11 is planned until the end of 2025.  
+
 SasRMC is dropping support for **conda**. Dependency management using **poetry** and **pipx** will be the preferred way going forward. Find out more here: https://python-poetry.org/  
 
 ## Installation as a command-line tool
@@ -22,7 +24,7 @@ SasRMC can be used as a command-line tool or installed as a project dependency. 
 where `3.x` is the Python version you wish to use. (Please use 3.10 or greater). Restarting your terminal may be required.  
 4. Run `$ sasrmc --version` to validate the installation. Run `$ sasrmc --help` at any time for assistance. Refer to the Troubleshooting section below if these commands fail.  
 5. Run `$ sasrmc config show` to see the current configuration.  
-6. Run `$ sasrmc config -o <output-folder>` to set a default output folder were the results of simulations will be saved.  
+6. Run `$ sasrmc config -o <output-folder>` to set a default output folder where the results of simulations will be saved.  
 7. Run `$ sasrmc config -i <input-spreadsheet-file>` to set a default input *.xlsx file for simulations to use.  
 
 ## Installation as a Python dependency  
@@ -43,7 +45,9 @@ Templates can be downloaded directly from the `/data` folder of this repository.
 2. Run `$ sasrmc create <template-type>` to download a specific type of template. Use the `-o <output-folder>` tag if you want to save the template into a different folder than the default output folder.  
 3. Run `$ sasrmc create example` to download an example of how a simulation input file should be configured.  
 
-The example will download a file `CoreShell_F20_pol.xlsx` which contains data described in the associated publication, and shows an example for how a simulation for a SANSPol measurement across 3 detector configurations and 2 polarization states can be set out.  
+The example will download a file `CoreShell_F20_pol.xlsx` which contains data described in the associated publication, and shows an example for how a simulation for a SANSPol measurement across 3 detector configurations and 2 polarization states can be set out.
+
+(WARNING: As of SasRMC v0.2.1, some of these features are temporarily disabled while they undergo testing. Features will be reenabled once they have been properly tested. Use the `--help` flag to see specific details.)
 
 ## Usage
 
@@ -51,7 +55,7 @@ Most configuration for SasRMC is done using Excel spreadsheets. You can use SasR
 
 1. Run `$ sasrmc run --help` at any time for assistance.  
 2. Fill in the simulation input file. Template files contain hints and documentation for how the cells should be filled out. Make a new Sheet for each new experimental dataset you want to include in your simulation.
-3. After saving your spreadsheet(s), navigate to the location of your spreadsheet(s) and run `$ sasrmc run -i <input1.xlsx> -i <input2.xlsx>` for each simulation you want to run. Use the `-o <output-folder>` tag if you want to save the simulation results into a different folder than the default output folder.  
+3. After saving your spreadsheet(s), navigate to the location of your spreadsheet(s) and run `$ sasrmc run -i <input1.xlsx> -i <input2.xlsx>` for each simulation you want to run. Use the `-o <output-folder>` flag if you want to save the simulation results into a different folder than the default output folder.  
 4. When the simulation is complete, you can find all outputs in the specified output folder.  
 5. A simulation can be finished early at any time with the keyboard shortcut `Ctrl+C`.  
 
@@ -68,7 +72,7 @@ If you find that using SasRMC has added value to your scientific research, the a
 
 Modifications to the installation can be managed using **pipx**. Some general guidance on how to manage your installation can be found here: https://realpython.com/python-pipx/.
 Updates to the package can be performed using `$ pipx upgrade sas-rmc --verbose`.  
-The specific Python version can also be changed at any time using **pipx** (search for `pipx reinstall`). Any version of Python newer than 3.10 should be OK, but Python versions ending in `.0` (i.e. 3.xx.0) can be quite bleeding edge. It is often advisable to stay with an older version until a more battle-hardened release is available.
+The specific Python version can also be changed at any time using **pipx** (search for `pipx reinstall`). Any version of Python newer than 3.10 should be OK, but Python versions ending in `.0` (i.e. 3.xx.0) can be quite bleeding edge. It is often advisable to stay with a slightly older version until a more battle-hardened release is available.
 
 # Troubleshooting
 
