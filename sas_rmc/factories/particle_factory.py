@@ -1,45 +1,36 @@
 #%%
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import Callable
-
-import numpy as np
-
-from .command_factory import CommandFactory
-from ..box_simulation import Box
-from ..particles import Particle
-from ..commands import Command
-from ..scattering_simulation import SimulationParams
-from .. import constants
+from sas_rmc import Vector, constants
+from sas_rmc.particles.particle_core_shell_spherical import CoreShellParticleForm
+from sas_rmc.factories.parse_data import coerce_types
 
 rng = constants.RNG
 
 
-def polydisperse_parameter(loc: float, polyd: float, dispersity_fn: Callable[[float, float], float] = None) -> float:
-    poly_fn = dispersity_fn if dispersity_fn else (lambda l, s: rng.normal(loc = l, scale = s)) # I only want to write out the lambda expression like this so I can be explicit about the kwargs
-    return poly_fn(loc, loc * polyd)
+def polydisperse_parameter(loc: float, polyd: float) -> float:
+    return rng.normal(loc = loc, scale = loc * polyd)
+
+@coerce_types
+def create_core_shell_particle(
+                core_radius: float,
+                core_polydispersity: float,
+                core_sld: float,
+                shell_thickness: float,
+                shell_polydispersity: float,
+                shell_sld: float,
+                solvent_sld: float,
+                core_magnetization: float,
+                ) -> CoreShellParticleForm:
+    return CoreShellParticleForm.gen_from_parameters(
+        position=Vector.null_vector(),
+        magnetization=core_magnetization * Vector.random_vector_xy(),
+        core_radius=polydisperse_parameter(core_radius, core_polydispersity),
+        thickness=polydisperse_parameter(shell_thickness, shell_polydispersity),
+        core_sld=core_sld,
+        shell_sld=shell_sld,
+        solvent_sld=solvent_sld
+    )
     
-
-@dataclass
-class ParticleFactory(ABC):
-    command_factory: CommandFactory
-
-    @abstractmethod
-    def create_particle(self) -> Particle:
-        pass
-
-    def calculate_effective_volume(self, particle_test_number: int = 100000) -> float:
-        return np.average([self.create_particle().volume for _ in range(particle_test_number)])
-
-    def create_command(self, box: Box, particle_index: int, simulation_params: SimulationParams = None) -> Command:
-        return self.command_factory.create_command(box, particle_index, simulation_params)
-
-    @classmethod
-    @abstractmethod
-    def gen_from_dict(cls, d: dict):
-        pass
-     
 
 
 #%%

@@ -9,7 +9,7 @@ import numpy as np
 import sas_rmc
 from sas_rmc.box_simulation import Box
 from sas_rmc.controller import Controller
-from sas_rmc.particles import CoreShellParticle, Dumbbell, Particle
+from sas_rmc.particles import CoreShellParticle, DumbbellParticle, Particle
 from sas_rmc.scattering_simulation import ScatteringSimulation
 from sas_rmc import Vector, SimulatedDetectorImage, Polarization, DetectorConfig, commands
 from sas_rmc.fitter import Fitter2D
@@ -47,10 +47,10 @@ def structure_box(box: Box) -> None:
 
 
 
-def default_dumbbell_particles(particle_number = 20) -> List[Dumbbell]:
+def default_dumbbell_particles(particle_number = 20) -> List[DumbbellParticle]:
     p1_radius = 30
     p2_radius = 50
-    return [Dumbbell.gen_from_parameters(
+    return [DumbbellParticle.gen_from_parameters(
         core_radius=p1_radius,
         seed_radius=p2_radius,
         shell_thickness = 10,
@@ -471,7 +471,7 @@ def test_controller_acceptance_independence():
 
 def test_dumbbell_rotation():
     for _ in range(50):
-        dumbbell = Dumbbell.gen_from_parameters(50, 50, 10, 4, 6, 1, 0)
+        dumbbell = DumbbellParticle.gen_from_parameters(50, 50, 10, 4, 6, 1, 0)
         distance_calc = lambda db : db.particle_list[0].position.distance_from_vector(db.particle_list[1].position)
         orientation_calc = lambda db : db.orientation
         old_distance = distance_calc(dumbbell)

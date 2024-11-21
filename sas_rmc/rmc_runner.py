@@ -2,8 +2,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from .simulator import Simulator
-from .logger import Logger
+from sas_rmc.simulator import Simulator
 
 
 @dataclass
@@ -16,19 +15,17 @@ class Runner(ABC):
 
 @dataclass
 class RmcRunner(Runner):
-    logger: Logger
     simulator: Simulator
     force_log: bool = True
 
-
     def run_force_log(self) -> None:
-        with self.logger:
-            self.simulator.simulate()
+        with self.simulator as simulator:
+            simulator.simulate()
 
     def run_not_forced_log(self) -> None:
-        self.logger.before_event()
+        self.simulator.start()
         self.simulator.simulate()
-        self.logger.after_event()
+        self.simulator.stop()
 
     def run(self) -> None:
         if self.force_log:

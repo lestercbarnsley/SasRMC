@@ -1,49 +1,66 @@
 # SasRMC
-SasRMC is a Python library for numerical modelling of small-angle scattering data. 
 
-## Setup
-**SasRMC will use Python 3.10 after the next push to main. Upgrade your virtual environment today!**
-SasRMC is compatible with Python 3.8 and newer. An upgrade to Python 3.10 is planned.
+SasRMC is a Python library for numerical modelling of small-angle scattering data.  
 
-1. Download source files from https://github.com/lestercbarnsley/SasRMC -> `Code` -> `Download ZIP`
-2. If you have an existing virtual environment or conda environment you wish to use, activate it in the usual way and jump to step 9.
-3. If you wish to create a new Python virtual environment, follow steps 4 and 5. If you wish to create a new conda environment follow steps 6-8.
-4. Navigate to where you wish to create a **venv** virtual environment and create it with
-    `$ python -m venv .myvenv`
-where `myvenv` is the name of your **venv**
-5. Activate the virtual environment with 
-    `$ .\.myvenv\Scripts\activate`
-6. I recommend **conda** for scientists using Windows who are new to Python. Please consult with your local Pythonista for their advice. Installation instructions for conda can be found online: https://docs.conda.io/projects/conda/en/latest/user-guide/install/download.html
-7. After installing conda, in a terminal, create an environment with
-    `$ conda create -n myenv python=3.x --channel=conda-forge`
-where `myenv` is the name of your conda environment and `3.x` is the Python version you wish to use. (Please use 3.10 or greater).
-8. Activate the conda environment with
-    `$ conda activate myenv`
-9. In the terminal, navigate to the directory containing `setup.py`
-10. Install all dependencies with
-    `(myenv)$ pip install -e .`
+## Requirements
+
+**SasRMC will use Python 3.11 soon after the next push to main. Upgrade your Python installation today!**  
+
+SasRMC is compatible with Python 3.10 and newer. An upgrade to Python 3.11 is planned for very soon after 1 Jan, 2025. Support for Python 3.11 is planned until the end of 2025.  
+
+SasRMC is dropping support for **conda**. Dependency management using **poetry** and **pipx** will be the preferred way going forward. Find out more here: https://python-poetry.org/  
+
+## Installation as a command-line tool
+
+SasRMC can be used as a command-line tool or installed as a project dependency. Installation as a command-line tool is recommended using **pipx**.
+
+1. The **pipx** package can either be installed using a package manager (see: https://pipx.pypa.io/stable/installation/), or downloaded as a stand-alone executable (download 'pipx.pyz' from https://github.com/pypa/pipx/releases). Using the stand-alone executable may be easier for Windows users.
+2. If **pipx** has been installed, run:  
+    `$ pipx install git+https://github.com/lestercbarnsley/SasRMC.git --verbose`  
+    `$ pipx ensurepath`  
+3. If **pipx** has been downloaded, navigate to the folder where pipx.pyz has been saved and run:  
+    `$ python3.x pipx.pyz install git+https://github.com/lestercbarnsley/SasRMC.git --verbose`  
+    `$ python3.x pipx.pyz ensurepath`  
+where `3.x` is the Python version you wish to use. (Please use 3.10 or greater). Restarting your terminal may be required.  
+4. Run `$ sasrmc --version` to validate the installation. Run `$ sasrmc --help` at any time for assistance. Refer to the Troubleshooting section below if these commands fail.  
+5. Run `$ sasrmc config show` to see the current configuration.  
+6. Run `$ sasrmc config -o <output-folder>` to set a default output folder where the results of simulations will be saved.  
+7. Run `$ sasrmc config -i <input-spreadsheet-file>` to set a default input *.xlsx file for simulations to use.  
+
+## Installation as a Python dependency  
+
+This is more for developers who want to integrate SasRMC into their own projects.
+
+1. Make an isolated Python project in your usual way.  
+2. If you're using **pip**, run:  
+    `(venv)$ pip install git+https://github.com/lestercbarnsley/SasRMC.git`  
+3. If you're using **poetry**, run:  
+    `(venv)$ poetry add git+https://github.com/lestercbarnsley/SasRMC.git`  
+
+## Getting simulation input files  
+
+Templates can be downloaded directly from the `/data` folder of this repository. The `$ sasrmc create` command also lets you download templates.
+ 
+1. Run `$ sasrmc create --help` at any time for assistance. A full list of currently available templates will be listed here.  
+2. Run `$ sasrmc create <template-type>` to download a specific type of template. Use the `-o <output-folder>` tag if you want to save the template into a different folder than the default output folder.  
+3. Run `$ sasrmc create example` to download an example of how a simulation input file should be configured.  
+
+The example will download a file `CoreShell_F20_pol.xlsx` which contains data described in the associated publication, and shows an example for how a simulation for a SANSPol measurement across 3 detector configurations and 2 polarization states can be set out.
+
+(WARNING: As of SasRMC v0.2.1, some of these features are temporarily disabled while they undergo testing. Features will be reenabled once they have been properly tested. Use the `--help` flag to see specific details.)
 
 ## Usage
-Most configuration for SasRMC is done using Excel spreadsheets. You can use SasRMC without needing to edit any Python code.
 
-1. In your text editor of choice, open `data/config.yaml`
-2. Next to `input_config_source` specify an Excel spreadsheet that will contain configuration data for your simulation. Your excel file should be in the same folder as the `config.yaml` file.
-3. Next to `output_folder` specify the folder that you want the output and log files to be saved to.
-4. The `data` folder contains templates for how a typical simulation should be configured.
-5. A new template Excel spreadsheet can be generated from the terminal by running one of the following commands:
-    `(myenv)$ python main.py generate core shell template`
-    `(myenv)$ python main.py generate dumbbell template`
-    `(myenv)$ python main.py generate reload template`
-More templates will be available in future versions.
-6. Edit and save all config files. Please notice that Excel spreadsheets have multiple tabs for additional options.
-7. In the terminal, run
-    `(myenv)$ python main.py`
-8. When the simulation is complete, you can find all outputs in the specified `output_folder`
-9. A simulation can be finished early at any time with the keyboard shortcut `Ctrl+C`
+Most configuration for SasRMC is done using Excel spreadsheets. You can use SasRMC without needing to edit any Python code.  
 
-The `/data` folder contains a file `CoreShell_F20_pol.xlsx` which contains data described in the associated publication, and shows an example for how a simulation for a SANSPol measurement across 3 detector configurations and 2 polarization states can be set out.
+1. Run `$ sasrmc run --help` at any time for assistance.  
+2. Fill in the simulation input file. Template files contain hints and documentation for how the cells should be filled out. Make a new Sheet for each new experimental dataset you want to include in your simulation.
+3. After saving your spreadsheet(s), navigate to the location of your spreadsheet(s) and run `$ sasrmc run -i <input1.xlsx> -i <input2.xlsx>` for each simulation you want to run. Use the `-o <output-folder>` flag if you want to save the simulation results into a different folder than the default output folder.  
+4. When the simulation is complete, you can find all outputs in the specified output folder.  
+5. A simulation can be finished early at any time with the keyboard shortcut `Ctrl+C`.  
 
-## Terms of Use
+### Terms of Use
+
 SasRMC is released for free under the MIT license. An associated publication is available here:
 
 Barnsley, L.C., Nandakumaran, N., Feoktystov, A., Dulle, M., Fruhner, L. & Feygenson, M. (2022). J. Appl. Cryst. 55,
@@ -51,8 +68,18 @@ https://doi.org/10.1107/S1600576722009219.
 
 If you find that using SasRMC has added value to your scientific research, the authors would like to ask you to consider including a reference to the above work in your publication.
 
+## Updating
+
+Modifications to the installation can be managed using **pipx**. Some general guidance on how to manage your installation can be found here: https://realpython.com/python-pipx/.
+Updates to the package can be performed using `$ pipx upgrade sas-rmc --verbose`.  
+The specific Python version can also be changed at any time using **pipx** (search for `pipx reinstall`). Any version of Python newer than 3.10 should be OK, but Python versions ending in `.0` (i.e. 3.xx.0) can be quite bleeding edge. It is often advisable to stay with a slightly older version until a more battle-hardened release is available.
+
+# Troubleshooting
+
+Some issues relating to the installation of SasRMC using **pipx** arise from a misconfigured PATH environment variable. If `$ pipx ensurepath` does not work, find the folder that contains the `sasrmc.exe` executeable (usually %USERPROFILE%\ .local\bin on Windows) and add it to PATH as a user environment variable. If you're not comfortable appending to your PATH variable, you can find the folder that contains the Script file (usually %USERPROFILE%\pipx\venvs\sas-rmc\Scripts on Windows), navigate to there in your terminal, and run `$ .\sasrmc.exe` with any available command from there. 
+
 ## Advanced Usage
 
-1. Open a new .py file
+1. See instructions about "Installation as a Python dependency" 
 2. Type: `import sas_rmc`
 3. More documentation coming soon...

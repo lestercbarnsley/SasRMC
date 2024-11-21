@@ -9,7 +9,7 @@ from scipy import special, integrate
 
 from .particle import Particle, modulus_array
 from ..vector import Vector, broadcast_to_numpy_array
-from ..shapes.shapes import Shape, Cylinder
+from ..shapes.shape import Shape, Cylinder
 from .. import constants
 
 #def long_cylinder_average_fraction(cylinder_radius: float, radius: float) -> float:

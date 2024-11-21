@@ -1,114 +1,212 @@
 #%%
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Callable
+
 from datetime import datetime
+from enum import Enum
+from pathlib import Path
+from collections.abc import Callable
+from typing import Iterable, Iterator, ParamSpec, TypeVar
+import random
 
 import pandas as pd
-import yaml
+from pydantic.dataclasses import dataclass as pydantic_dataclass
+import numpy as np
 
-from .acceptable_command_factory import MetropolisAcceptanceFactory
-from . import box_factory, particle_factory, particle_factory_spherical, simulation_factory, controller_factory, simulator_factory, detector_builder, parse_data
-from ..rmc_runner import Runner, RmcRunner
-from ..logger import BoxPlotter, Logger, ExcelCallback, DetectorPlotter, ProfilePlotter
+from sas_rmc import constants, Evaluator, commands, Controller, ControlStep, loggers, Particle
+from sas_rmc.scattering_simulation import ScatteringSimulation, SimulationParam
+from sas_rmc.rmc_runner import RmcRunner
+from sas_rmc.factories import parse_data, box_factory, particle_factory, command_factory, acceptable_command_factory, evaluator_factory
+from sas_rmc.simulator import Simulator
 
 
-@dataclass
-class RunnerFactory(ABC):
+rng = constants.RNG
+DATETIME_FORMAT = '%Y%m%d%H%M%S'
+
+
+def polydisperse_parameter(loc: float, polyd: float) -> float:
+    return rng.normal(loc = loc, scale = loc * polyd)
+
+
+P = ParamSpec('P')
+R = TypeVar('R')
+
+def create_command_if_acceptable_command(command_factory: Callable[P, R], command_types: Iterable[type]) -> Callable[P, R]:
+
+    def new_command_factory(*args: P.args, **kwargs: P.kwargs) -> R:
+        for _ in range(2_000_000):
+            command = command_factory(*args, **kwargs)
+            if type(command) in command_types:
+                return command
+        raise TypeError(f"Factory function {command_factory.__name__} is incompatible with command_types")
+    return new_command_factory
+
+
+core_shell_commands = {
+    commands.MoveParticleBy,
+    commands.MoveParticleTo,
+    commands.JumpParticleTo,
+    commands.OrbitParticle,
+    commands.MagnetizeParticle,
+    commands.RescaleMagnetization,
+    commands.RotateMagnetization,
+    commands.RescaleCommand,
+    commands.RelativeRescale,
     
-    @abstractmethod
-    def create_runner(self, input_config_source: Path, output_path: Path) -> Runner:
-        pass
-
-
-
-def generate_save_file(datetime_string: str, output_folder: Path, description: str = "", comment: str = "", file_format: str = "xlsx") -> Path:
-    return output_folder / Path(f"{datetime_string}_{description}{comment}.{file_format}")
-
-def generate_file_path_maker(output_folder: Path, description: str = "") -> Callable[[str, str], Path]:
-    datetime_format = '%Y%m%d%H%M%S'
-    datetime_string = datetime.now().strftime(datetime_format)
-    return lambda comment, file_format: generate_save_file(datetime_string, output_folder, description, comment, file_format)
-
-
-
-
-PARTICLE_TYPE_DICT = {
-    "CoreShellParticle" : particle_factory_spherical.CoreShellParticleFactory
 }
 
-def dict_to_particle_factory(d: dict) -> particle_factory.ParticleFactory:
-    particle_type = PARTICLE_TYPE_DICT[d.get("particle_type")]
-    return particle_type.gen_from_dict(d)
+create_core_shell_command = create_command_if_acceptable_command(command_factory.create_command, core_shell_commands)
 
-RESULT_MAKER_DICT = {
-    "Analytical" : lambda particle_factory : detector_builder.AnalyticalResultMakerFactory(),
-    "Numerical" : lambda particle_factory : detector_builder.NumericalResultMakerFactory(particle_factory)
-}
-
-def dict_to_result_maker_factory(d: dict, particle_factory: particle_factory.ParticleFactory) -> detector_builder.ResultMakerFactory:
-    return RESULT_MAKER_DICT[d.get("calculator_type","Analytical")](particle_factory)
+def particle_box_index_iterator(simulation_state: ScatteringSimulation) -> Iterator[tuple[int, int]]:
+    for box_index, box in enumerate(simulation_state.box_list):
+        for particle_index, _ in enumerate(box.particles):
+            yield box_index, particle_index
 
 
+class ParticleType(Enum):
+    CoreShellParticle = "CoreShellParticle"
 
+@pydantic_dataclass
+class CoreShellRunner:
+    simulation_title: str
+    particle_type: ParticleType
+    core_radius: float
+    core_polydispersity: float
+    core_sld: float
+    shell_thickness: float
+    shell_polydispersity: float
+    shell_sld: float
+    solvent_sld: float
+    core_magnetization: float
+    total_cycles: int
+    annealing_type: str
+    anneal_start_temp: float
+    anneal_fall_rate: float
+    detector_smearing: bool
+    field_direction: str
+    force_log_file: bool
+    annealing_stop_cycle_number: int = -1
+    nominal_concentration: float = 0.0
+    particle_number: int = 0
+    box_number: int = 0
+    box_dimension_1: float = 0.0
+    box_dimension_2: float = 0.0
+    box_dimension_3: float = 0.0
 
-
-@dataclass
-class RMCRunnerFactory(RunnerFactory):
-
-    def create_runner(self, input_config_source: Path, output_path: Path) -> RmcRunner:
+    def create_particle(self) -> Particle:
+        if self.particle_type == ParticleType.CoreShellParticle:
+            return particle_factory.create_core_shell_particle(**self.__dict__)
+        else:
+            raise TypeError("Do not recognize particle type")
         
-        print(f"Loading configuration from {input_config_source}, please wait a moment...")
-        dataframes = pd.read_excel(
-            input_config_source,
-            dtype = str,
-            sheet_name = None,
-            keep_default_na=False,
-            )
-        dataframe = list(dataframes.values())[0]
-        config_dict = parse_data.dataframe_to_config_dict(dataframe)
-        detector_list = detector_builder.MultipleDetectorBuilder(dataframes, config_dict).build_detector_images()
-        p_factory = dict_to_particle_factory(config_dict)
-        cont_factory = controller_factory.gen_from_dict(config_dict, p_factory=p_factory, acceptable_command_factory=MetropolisAcceptanceFactory())
-        boxfactory = box_factory.gen_from_dict(config_dict, detector_list)
-        box_list_factory = box_factory.gen_list_factory_from_dict(config_dict)
-        box_list = box_list_factory.create_box_list(boxfactory, p_factory)
-        result_calculator_maker_factory = dict_to_result_maker_factory(config_dict, p_factory)
-        sim_factory = simulation_factory.gen_from_dict(config_dict, result_calculator_maker_factory.create_result_maker())
-        simulation = sim_factory.create_simulation(detector_list, box_list)
-        controller = cont_factory.create_controller(simulation.simulation_params, box_list)
-        simulator = simulator_factory.MemorizedSimulatorFactory(controller, simulation, box_list).create_simulator()
-        # This should be a builder, not a factory
-        save_path_maker = generate_file_path_maker(output_path, config_dict.get("simulation_title", ""))
-        file_format = config_dict.get("output_plot_format", "PDF").lower()
-        excel_callback = ExcelCallback(save_path_maker, box_list, detector_list, controller )
-        detector_plotter = DetectorPlotter(save_path_maker, detector_list, format=file_format, make_initial=False)
-        profile_plotter= ProfilePlotter(save_path_maker, detector_list, format=file_format, make_initial=False)
-        box_plotter = BoxPlotter(save_path_maker, box_list, format = file_format, make_initial=False)
-        return RmcRunner(
-            logger=Logger(callback_list=[excel_callback, detector_plotter, profile_plotter, box_plotter]),
-            simulator=simulator,
-            force_log=config_dict.get("force_log_file", True)
+    def create_simulation_state(self, default_box_dimensions: list[float] | None = None) -> ScatteringSimulation:
+        box_dimensions = [self.box_dimension_1, self.box_dimension_2, self.box_dimension_3]
+        if np.prod(box_dimensions) == 0:
+            box_dimensions = default_box_dimensions
+        if box_dimensions is None:
+            raise ValueError("Box dimensions are missing.")
+        return ScatteringSimulation(
+            scale_factor=SimulationParam( 1.0, name = "scale_factor", bounds = (0, np.inf)),
+            box_list=box_factory.create_box_list(self.create_particle, box_dimensions, self.particle_number, self.box_number, self.nominal_concentration )
         )
-
-
-def load_config(config_file: str) -> Runner:
-    config_file_path = Path(config_file)
-    with open(config_file_path, "r") as f:
-        configs = yaml.load(f, Loader = yaml.FullLoader)
-    input_config_source = configs['input_config_source']
     
-    input_config_path = Path(input_config_source)
-    if not input_config_path.exists():
-        input_config_path = config_file_path.parent / input_config_path
-    output_path = configs["output_folder"]
-    if r'./' in output_path:
-        output_path = config_file_path.parent / Path(output_path.replace(r'./', ''))
-    runner_factory = RMCRunnerFactory()
-    return runner_factory.create_runner(input_config_source = input_config_path, output_path=output_path)
+    def create_control_steps(self, simulation_state: ScatteringSimulation) -> Iterator[ControlStep]:
+        annealing_stop_cycle = self.annealing_stop_cycle_number if self.annealing_stop_cycle_number > 0 else int(self.total_cycles / 2)
+        temperature = self.anneal_start_temp
+        if self.annealing_type.lower() == "greedy".lower():
+            temperature = 0
+        for cycle in range(self.total_cycles):
+            if cycle > annealing_stop_cycle:
+                temperature = 0
+            particle_box_indices = list(particle_box_index_iterator(simulation_state))
+            for step, (box_index, particle_index) in enumerate(random.sample(particle_box_indices, len(particle_box_indices))):
+                box = simulation_state.box_list[box_index]
+                command = create_core_shell_command(
+                    box_index = box_index,
+                    particle_index=particle_index,
+                    move_by_distance=self.core_radius,
+                    cube = box.cube,
+                    total_particle_number=len(box.particles),
+                    nominal_magnetization=self.core_magnetization
+                )
+                acceptance_scheme = acceptable_command_factory.create_metropolis_acceptance(temperature, cycle, step)
+                yield ControlStep(command, acceptance_scheme)
+            temperature = temperature * (1- self.anneal_fall_rate)
+            if "very".lower() not in self.annealing_type.lower():
+                temperature = self.anneal_start_temp / (1 + cycle)
+    
+    def create_runner(self, evaluator: Evaluator, results_folder: Path) -> RmcRunner:
+        state = self.create_simulation_state(default_box_dimensions=evaluator.default_box_dimensions())
+        datetime_string = datetime.now().strftime(DATETIME_FORMAT)
+        log_callback = loggers.LogEventBus(
+            log_callbacks=[
+                loggers.CLIckLogger(), 
+                loggers.ExcelCallback(excel_file= results_folder / Path(f'{datetime_string}_{self.simulation_title}.xlsx')),
+                loggers.BoxPlotter(result_folder=results_folder, file_plot_prefix=f'{datetime_string}_{self.simulation_title}'),
+                loggers.DetectorImagePlotter(result_folder=results_folder, file_plot_prefix=f'{datetime_string}_{self.simulation_title}'),
+                loggers.ProfilePlotter(result_folder=results_folder, file_plot_prefix=f'{datetime_string}_{self.simulation_title}')
+                ]
+        )
+        return RmcRunner(
+            simulator=Simulator(
+                controller=Controller(ledger=[step for step in self.create_control_steps(state)]),
+                state = state,
+                evaluator=evaluator,
+                log_callback=log_callback
+                )
+
+            )
+    
+    @classmethod
+    def create_from_dataframe(cls, dataframe: pd.DataFrame):
+        d = parse_data.parse_value_frame(dataframe)
+        return cls(**d)
+
+
+
+
+def create_runner(input_config_path: Path, result_folder: Path) -> RmcRunner:
+
+    dataframes = pd.read_excel(
+        input_config_path,
+        dtype = str,
+        sheet_name = None,
+        keep_default_na=False,
+        )
+    value_frame = list(dataframes.values())[0]
+    runner_factory = CoreShellRunner.create_from_dataframe(value_frame)
+    evaluator = (evaluator_factory.create_evaluator_with_smearing(dataframes) 
+                 if runner_factory.detector_smearing 
+                 else evaluator_factory.create_evaluator_no_smearing(dataframes))
+    return runner_factory.create_runner(evaluator, result_folder)
+    
 
 
 if __name__ == "__main__":
-    pass
+    #data_params = create_runner(r"E:\Programming\SasRMC\data\CoreShell_F20_pol.xlsx")
+    spreadsheet = Path(__file__).parent.parent.parent / Path("data") / Path("CoreShell Simulation Input - Copy - Copy.xlsx")
+    spreadsheet = Path(__file__).parent.parent.parent / Path("data") / Path("CoreShell SAXS v2.xlsx")
+    #spreadsheet = Path(__file__).parent.parent.parent / Path("data") / Path("CoreShell_F20_pol - Copy.xlsx")
+    runner = create_runner(spreadsheet, spreadsheet.parent / Path("results"))
+    runner.run()
+    ''' dataframes = pd.read_excel(
+        spreadsheet,
+        dtype = str,
+        sheet_name = None,
+        keep_default_na=False,
+        )
+    value_frame = list(dataframes.values())[0]
+    config = parse_data.parse_value_frame(value_frame)'''
+    #config.pop('core_radius')
+    
+    '''import cProfile
+    import pstats
 
+    with cProfile.Profile() as pr:
+        runner.run()
+
+    stats = pstats.Stats(pr)
+    stats.sort_stats(pstats.SortKey.TIME)
+    stats.print_stats()
+    '''
+    
+
+# %%

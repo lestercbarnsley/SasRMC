@@ -1,152 +1,79 @@
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import List
+#%%
+import random
 
-from ..vector import Vector
-from .. import commands
-from ..box_simulation import Box
-from ..scattering_simulation import SimulationParams
-from .. import constants
+from sas_rmc import commands, Vector, constants
+from sas_rmc.shapes.cube import Cube
+
 
 rng = constants.RNG
+PI = constants.PI
 
 
-def different_random_int(n: int, number_to_avoid: int) -> int:
+def different_random_int(n: int, number_to_avoid: int) -> int: # raises ValueError
     for _ in range(200000):
-        x = rng.choice(range(n))
+        x = random.choice(range(n))
         if x != number_to_avoid:
             return x
-    return -1
+    raise ValueError(f"It is impossible to avoid {number_to_avoid} from a range of {n}")
 
-
-@dataclass
-class CommandFactory(ABC):
-    
-    @abstractmethod
-    def create_command(self, box: Box, particle_index: int, simulation_params: SimulationParams = None) -> commands.Command:
-        pass
-
-
-@dataclass  
-class CommandFactoryList(CommandFactory):
-    
-    @abstractmethod # This should be abstract because not every factory list is also a factory list
-    def create_command_list(self) -> List[CommandFactory]:
-        pass
-
-    def create_command(self, box: Box, particle_index: int, simulation_params: SimulationParams = None) -> commands.Command:
-        chosen_command = rng.choice(self.create_command_list())
-        return chosen_command.create_command(box, particle_index, simulation_params)
-
-
-@dataclass
-class MoveParticleByFactory(CommandFactory):
-    position_delta: Vector
-
-    def create_command(self, box: Box, particle_index: int, simulation_params: SimulationParams = None) -> commands.MoveParticleBy:
-        return commands.MoveParticleBy(
-            box = box,
+def create_command(
+        box_index: int,
+        particle_index: int,
+        move_by_distance: float,
+        cube: Cube,
+        total_particle_number: int,
+        nominal_angle_change: float = PI/8,
+        nominal_rescale_change: float = 0.02,
+        nominal_magnetization: float = 0,
+        ) -> commands.Command:
+    possible_commands = [
+        commands.MoveParticleBy(
+            box_index=box_index,
             particle_index=particle_index,
-            position_delta=self.position_delta)
-        
-
-@dataclass
-class JumpToParticleFactory(CommandFactory):
-
-    def create_command(self, box: Box, particle_index: int, simulation_params: SimulationParams = None) -> commands.JumpParticleTo:
-        return commands.JumpParticleTo(
-            box = box,
+            position_delta=Vector.random_vector_xy(length=rng.normal(loc = 0, scale = move_by_distance))
+            ),
+        commands.MoveParticleTo(
+            box_index=box_index,
             particle_index=particle_index,
-            reference_particle_index=different_random_int(len(box), particle_index))
-
-
-@dataclass
-class OrbitParticleFactory(CommandFactory):
-    actual_angle_change: float
-
-    def create_command(self, box: Box, particle_index: int, simulation_params: SimulationParams = None) -> commands.OrbitParticle:
-        return commands.OrbitParticle(
-            box=box,
+            position_new=cube.random_position_inside().project_to_xy()
+            ),
+        commands.JumpParticleTo(
+            box_index=box_index,
             particle_index=particle_index,
-            relative_angle=self.actual_angle_change)
-
-
-@dataclass
-class MoveParticleToFactory(CommandFactory):
-    in_plane: bool
-
-    def create_command(self, box: Box, particle_index: int, simulation_params: SimulationParams = None) -> commands.MoveParticleTo:
-        position_new = box.cube.random_position_inside()
-        if self.in_plane:
-            position_new = Vector(position_new.x, position_new.y)
-        return commands.MoveParticleTo(
-            box = box,
+            reference_particle_index=different_random_int(total_particle_number, particle_index)
+            ),
+        commands.OrbitParticle(
+            box_index=box_index,
             particle_index=particle_index,
-            position_new=position_new)
-
-
-@dataclass
-class RotateParticleFactory(CommandFactory):
-    actual_angle_change: float
-
-    def create_command(self, box: Box, particle_index: int, simulation_params: SimulationParams = None) -> commands.RotateParticle:
-        return commands.RotateParticle(
-            box = box,
+            relative_angle=rng.normal(loc = 0, scale=nominal_angle_change),
+            ),
+        commands.MagnetizeParticle(
+            box_index=box_index,
             particle_index=particle_index,
-            relative_angle=self.actual_angle_change)
-
-
-@dataclass
-class RotateMagnetizationFactory(CommandFactory):
-    actual_angle_change: float
-
-    def create_command(self, box: Box, particle_index: int, simulation_params: SimulationParams = None) -> commands.RotateMagnetization:
-        return commands.RotateMagnetization(
-            box = box,
-            particle_index= particle_index,
-            relative_angle=self.actual_angle_change)
-
-
-@dataclass
-class FlipMagnetizationFactory(CommandFactory):
-
-    def create_command(self, box: Box, particle_index: int, simulation_params: SimulationParams = None) -> commands.FlipMagnetization:
-        return commands.FlipMagnetization(
-            box = box,
-            particle_index= particle_index)
-
-
-@dataclass
-class NuclearMagneticRescaleFactory(CommandFactory):
-    change_by_factor: float
-
-    def create_command(self, box: Box, particle_index: int, simulation_params: SimulationParams = None) -> commands.NuclearMagneticRescale:
-        return commands.NuclearMagneticRescale(
-            simulation_params=simulation_params,
-            change_by_factor=self.change_by_factor
-            )
-
-
-@dataclass
-class CompressShellFactory(CommandFactory):
-    change_by_factor: float
-
-    def create_all_command(self, box: Box, particle_index: int, simulation_params: SimulationParams = None) -> commands.CompressAllShells:
-        return commands.CompressAllShells(
-            box = box,
+            magnetization=Vector.random_vector_xy(length=rng.normal(loc = 0, scale = nominal_magnetization))
+            ),
+        commands.RescaleMagnetization(
+            box_index=box_index,
             particle_index=particle_index,
-            change_by_factor=self.change_by_factor
-        )
-
-    def create_single_command(self, box: Box, particle_index: int, simulation_params: SimulationParams = None) -> commands.CompressShell:
-        return commands.CompressShell(
-            box=box,
+            rescale_factor=rng.normal(loc = 1.0, scale=nominal_rescale_change)
+            ),
+        commands.RotateMagnetization(
+           box_index=box_index,
             particle_index=particle_index,
-            change_by_factor=self.change_by_factor,
-            reference_particle_index=different_random_int(len(box), particle_index),
-        )
+            relative_angle=rng.normal(loc = 0, scale=nominal_angle_change),
+            ), 
+        commands.FlipMagnetization(
+            box_index=box_index,
+            particle_index=particle_index
+            ),
+        commands.RelativeRescale(
+            change_by_factor=rng.normal(loc = 1.0, scale=nominal_rescale_change)
+            ),
+        ]
+    return random.choice(possible_commands)
 
-    def create_command(self, box: Box, particle_index: int, simulation_params: SimulationParams = None) -> commands.Command:
-        cmd = rng.choice([self.create_all_command, self.create_single_command])
-        return cmd(box, particle_index, simulation_params)
 
+
+if __name__ == "__main__":
+    print(different_random_int(100,0))
+# %%

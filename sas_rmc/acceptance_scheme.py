@@ -1,14 +1,13 @@
 
 from enum import Enum
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from abc import ABC, abstractmethod
 
 import numpy as np
 
-from .scattering_simulation import ScatteringSimulation
-from . import constants
+from sas_rmc.constants import RNG
 
-rng = constants.RNG
+rng = RNG
 
 
 class AcceptanceState(Enum):
@@ -19,73 +18,48 @@ class AcceptanceState(Enum):
 
 @dataclass
 class AcceptanceScheme(ABC):
-    _acceptance_state: AcceptanceState = field( default_factory = lambda : AcceptanceState.UNTESTED, init = False)
-
     @abstractmethod
-    def handle_simulation(self, simulation: ScatteringSimulation) -> None:
+    def is_acceptable(self, old_goodness_of_fit: float, new_goodness_of_fit: float) -> bool:
         pass
 
-    def set_physical_acceptance(self, physical_acceptance: bool) -> None:
-        if not physical_acceptance:
-            self._acceptance_state = AcceptanceState.UNACCEPTABLE
-
     @abstractmethod
-    def is_acceptable(self) -> bool:
-        return True
-
     def get_loggable_data(self) -> dict:
-        return {}
-
-
-@dataclass
-class UnconditionalAcceptance(AcceptanceScheme):
-    
-    def handle_simulation(self, simulation: ScatteringSimulation) -> None:
-        return super().handle_simulation(simulation)
-
-    def is_acceptable(self) -> bool:
-        return True
+        pass
 
 
 @dataclass
 class MetropolisAcceptance(AcceptanceScheme):
-    temperature: float = 0
+    temperature: float
     rng_val: float = field(default_factory= rng.uniform)
-    delta_chi: float = field(default_factory= lambda : 0, init = False)
-    _after_chi: float = field(default_factory= lambda : 0, init = False)
-    _accepted_chi_squared: float = field(default_factory= lambda : np.inf, init = False)
-
-    def set_delta_chi(self, delta_chi: float, after_chi: float) -> None:
-        self.delta_chi = delta_chi
-        self._after_chi = after_chi
+    loggable_data: dict | None = None
     
-    def is_acceptable(self) -> bool:
-        return self._acceptance_state in [AcceptanceState.UNTESTED, AcceptanceState.ACCEPTABLE]
-        
-    def _calculate_success(self) -> None:
-        not_unacceptable = self.is_acceptable()
-        metropolis_success = lambda : False if self.temperature == 0 else self.rng_val < np.exp(-self.delta_chi / self.temperature)
-        simulation_acceptable = self.delta_chi < 0 or metropolis_success() if not_unacceptable else False
-        self._acceptance_state = AcceptanceState.ACCEPTABLE if simulation_acceptable else AcceptanceState.UNACCEPTABLE
-
-    def handle_simulation(self, simulation: ScatteringSimulation) -> None:
-        currently_acceptable = self.is_acceptable()
-        old_chi_squared = simulation.current_goodness_of_fit
-        new_chi_squared = simulation.get_goodness_of_fit() if currently_acceptable else old_chi_squared
-        delta_chi = new_chi_squared - old_chi_squared
-        self.set_delta_chi(delta_chi=delta_chi, after_chi = new_chi_squared)
-        self._calculate_success()
-        
-        if self.is_acceptable():
-            simulation.update_goodness_of_fit(new_chi_squared)
-        self._accepted_chi_squared = simulation.current_goodness_of_fit
-        
+    def is_acceptable(self, old_goodness_of_fit: float, new_goodness_of_fit: float) -> bool:
+        if np.abs(new_goodness_of_fit - 1) < np.abs(old_goodness_of_fit - 1):
+            return True
+        if self.temperature == 0:
+            return False
+        delta_chi = np.abs(new_goodness_of_fit - 1) - np.abs(old_goodness_of_fit - 1)
+        return self.rng_val < np.exp(-delta_chi / self.temperature)
+    
     def get_loggable_data(self) -> dict:
-        return {
-            "Current Chi^2": self._accepted_chi_squared,
-            "Test Chi^2": self._after_chi,
-            "RNG": self.rng_val,
-            "Temperature": self.temperature,
-            "Acceptable Move": self.is_acceptable(),
-            "Acceptance Test": type(self).__name__,
-        }
+        loggable_data = self.loggable_data if self.loggable_data is not None else {}
+        return {"Acceptance Scheme": type(self).__name__} |\
+            loggable_data |\
+            {k : v for k, v in asdict(self).items() if k != 'loggable_data'}
+    
+    
+@dataclass
+class AcceptanceEarlyTemination(AcceptanceScheme):
+    acceptance_scheme: AcceptanceScheme
+
+    def is_acceptable(self, old_goodness_of_fit: float, new_goodness_of_fit: float) -> bool:
+        if old_goodness_of_fit < 1.0 and new_goodness_of_fit < 1.0:
+            raise StopIteration
+        return self.acceptance_scheme.is_acceptable(old_goodness_of_fit, new_goodness_of_fit)
+    
+    def get_loggable_data(self) -> dict:
+        return self.acceptance_scheme.get_loggable_data()
+    
+
+if __name__ == "__main__":
+    pass

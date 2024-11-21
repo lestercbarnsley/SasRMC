@@ -1,4 +1,5 @@
 #%%
+import inspect
 
 import pandas as pd
 
@@ -18,50 +19,34 @@ truth_dict = {
     'false' : False
 } # I'm sure I haven't come close to fully covering all the wild and creative ways users could say "True" or "False"
 
-def is_bool_in_truth_dict(s: str) -> bool:
-    return s in truth_dict     
-
-def _is_numeric_type(s, t = int):
-    try:
-        v = t(s)
-        return True
-    except ValueError:
-        return False
-
-def is_int(s: str) -> bool:
-    return _is_numeric_type(s, t = int)
-
-def is_float(s: str) -> bool:
-    return _is_numeric_type(s, t = float)
-
-def add_row_to_dict(d: dict, param_name: str, param_value: str) -> None:
-    if not param_name.strip():
-        return
-    if r'#' in param_name.strip():
-        return
-    v = param_value.strip()
-    if not v:
-        return
-    for is_f, t in [
-            (is_int, int),
-            (is_float, float),
-            (is_bool_in_truth_dict, lambda v_ : truth_dict[v_]),
-            (lambda _ : True, lambda v_ : v_)]:
-        if is_f(v):
-            d[param_name] = t(v)
-            return
-
-def dataframe_to_config_dict(dataframe: pd.DataFrame) -> dict:
-    config_dict = dict()
-    for _, row in dataframe.iterrows():
+def parse_value_frame(value_frame: pd.DataFrame) -> dict:
+    d = {}
+    for _, row in value_frame.iterrows():
         param_name = row.iloc[0]
         param_value = row.iloc[1]
-        add_row_to_dict(config_dict, param_name, param_value)
-    return config_dict
+        if any(not p.strip() for p in (param_name, param_value)):
+            continue
+        if any('#' in p.strip() for p in (param_name, param_value)):
+            continue
+        v = param_value.strip()
+        if v.lower() in truth_dict:
+            v = truth_dict[v.lower()]
+        d[param_name.strip()] = v
+    return d
 
-def dataseries_to_config_dict(dataseries: pd.Series) -> dict:
-    config_dict = dict()
-    for h, v in dataseries.items():
-        add_row_to_dict(config_dict, h, v)
-    return config_dict
+
+def coerce_types(func):
+
+        def wrapper(*args, **kwargs):
+
+            coerced_kwargs = {}
+            no_kwargs_only = all(v.kind != inspect._ParameterKind.KEYWORD_ONLY for v in inspect.signature(func).parameters.values())
+            for k, v in inspect.signature(func).parameters.items():
+                if k in kwargs:
+                    if v.kind == inspect._ParameterKind.KEYWORD_ONLY or no_kwargs_only:
+                        coerced_kwargs[k] = v.annotation(kwargs[k])
+                    else:
+                        coerced_kwargs[k] = kwargs[k]
+            return func(*args, **coerced_kwargs)
+        return wrapper
 
