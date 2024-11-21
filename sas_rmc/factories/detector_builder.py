@@ -102,19 +102,18 @@ class DetectorConfigNoSmear(DetectorConfig):
         return 0.0
     
 
-def create_detector_image(dataframes: dict[str, pd.DataFrame], value_dict: dict, detector_config: DetectorConfig) -> DetectorImage: # raises KeyError
-    detector_df = dataframes[value_dict["Data Source"]] # raises KeyError
+def detector_image_from_dataframe(detector_df: pd.DataFrame, detector_config: DetectorConfig, polarization: Polarization | None = None):
     pixels = [detector_config.create_pixel(DetectorPixelFactory.gen_from_row({k : v for k, v in row.items()})) for _, row in detector_df.iterrows()]
-    detector_image = DetectorImage(pixels, polarization=detector_config.polarization)
-    buffer_source = value_dict.get("Buffer Source")
+    return DetectorImage(pixels, polarization=polarization if polarization is not None else detector_config.polarization)
+
+def create_detector_image(dataframes: dict[str, pd.DataFrame], detector_config: DetectorConfig, buffer_source: str | None = None) -> DetectorImage: # raises KeyError
+    detector_image = detector_image_from_dataframe(dataframes["Data Source"], detector_config)
     if not buffer_source:
         return detector_image
     if isinstance(buffer_source, float):
         return subtract_detectors(detector_image, buffer_source)
     if buffer_source in dataframes:
-        buffer_df = dataframes[buffer_source]
-        buffer_pixels = [detector_config.create_pixel(DetectorPixelFactory.gen_from_row({k : v for k, v in row.items()})) for _, row in buffer_df.iterrows()]
-        buffer_image = DetectorImage(buffer_pixels, polarization=Polarization.UNPOLARIZED) # Buffer should never be polarized
+        buffer_image = detector_image_from_dataframe(dataframes[buffer_source], detector_config, Polarization.UNPOLARIZED)
         return subtract_detectors(detector_image, buffer_image)
     raise KeyError("Could not find buffer source")
     
@@ -122,12 +121,12 @@ def create_detector_images(dataframes: dict[str, pd.DataFrame], detector_config_
     value_frame = list(dataframes.values())[0]
     value_dict = parse_data.parse_value_frame(value_frame)
     if value_dict.get("Data Source"):
-        return [create_detector_image(dataframes, value_dict, detector_config_creator(value_dict))]
+        return [create_detector_image(dataframes, detector_config_creator(value_dict), buffer_source=value_dict.get('Buffer Source'))]
     df = dataframes['Data parameters']
     return [create_detector_image(
         dataframes=dataframes,
-        value_dict={k : v for k, v in row.items()},
-        detector_config=detector_config_creator({k : v for k, v in row.items()})
+        detector_config=detector_config_creator({k : v for k, v in row.items()}),
+        buffer_source=row.get('Buffer Source')
     ) for _, row in df.iterrows()]
 
 def create_detector_images_no_smearing(dataframes: dict[str, pd.DataFrame]) -> list[DetectorImage]:
@@ -165,7 +164,6 @@ if __name__ == "__main__":
     def test_with_polarization(polarization: Polarization) -> None:
         print(polarization)
 
-    test_with_polarization(**{'polarization' : 'spin_up'})
 
 
 # %%
