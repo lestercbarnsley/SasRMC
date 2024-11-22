@@ -97,9 +97,11 @@ class DetectorConfigSmearing(DetectorConfig):
         return self.polarization
     
     def create_pixel(self, pixel_factory: DetectorPixelFactory) -> DetectorPixel: # The pixel factory coerces types as it is a Pydantic dataclass
+        sigma_para = pixel_factory.sigma_para if pixel_factory.sigma_para is not None else self.get_sigma_parallel(pixel_factory.qX, pixel_factory.qY)
+        sigma_perp = pixel_factory.sigma_perp if pixel_factory.sigma_perp is not None else self.get_sigma_geometric()
         return pixel_factory.create_pixel(
-            sigma_para_derived=self.get_sigma_parallel(pixel_factory.qX, pixel_factory.qY),
-            sigma_perp_derived=self.get_sigma_geometric()
+            sigma_para_derived=sigma_para,
+            sigma_perp_derived=sigma_perp
         )
     
     @classmethod

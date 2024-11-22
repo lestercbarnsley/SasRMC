@@ -12,7 +12,6 @@ from sas_rmc.shapes import Cube
 PI = constants.PI
 rng = constants.RNG
 
-
 @dataclass
 class Box:
     '''The Box class is responsible for particle mechanics, determining how and when particles can move. It has no knowledge about anything related to scattering, which is the responsibility of the Simulator class. Special cases of the Box class can be made as their own class that inherit from the Box'''
