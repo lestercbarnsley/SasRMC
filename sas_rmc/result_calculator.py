@@ -61,7 +61,7 @@ class AnalyticalCalculator(ResultCalculator):
         )
 
     def intensity_result(self, scattering_simulation: ScatteringSimulation) -> np.ndarray:
-        return np.average(
+        return np.average(  
             [box_intensity(
                 form_results=[self.modulated_form_array(particle) for particle in particle_arrays_from(box)], 
                 box_volume= box.volume, 
@@ -73,6 +73,8 @@ class AnalyticalCalculator(ResultCalculator):
                 ) for box in scattering_simulation.box_list],
             axis = 0
             )
+        # There may be a speed boost associated with caching the box intensity to the box, but this only matters if the total number of boxes exceeds
+        # the base case number in the sum array list function
     
     
 @array_cache(max_size=40_000)

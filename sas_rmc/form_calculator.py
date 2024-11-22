@@ -23,7 +23,8 @@ class FieldDirection(Enum):
 
 @array_cache(max_size=5_000)
 def sum_array_list(array_list: list[np.ndarray]) -> np.ndarray:
-    if len(array_list) < 8:
+    ARRAY_LIST_BASE_CASE = 6 # This number can result in a recursion error if it's set too low. Beware.
+    if len(array_list) < ARRAY_LIST_BASE_CASE:
         return np.sum(array_list, axis = 0)
     divisions = min(2, int(np.sqrt(len(array_list))))
     return sum_array_list([sum_array_list(array_list[i::divisions]) for i in range(divisions)])
