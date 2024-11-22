@@ -166,7 +166,12 @@ def create_detector_images(dataframes: dict[str, pd.DataFrame], detector_config_
     value_dict = parse_data.parse_value_frame(value_frame)
     data_source = value_dict.get("Data Source")
     if data_source:
-        return [create_detector_image(dataframes, detector_config_creator(value_dict), data_source = data_source, buffer_source=value_dict.get('Buffer Source'))]
+        return [create_detector_image(
+            dataframes, 
+            detector_config_creator(value_dict), 
+            data_source = data_source, 
+            buffer_source=value_dict.get('Buffer Source')
+            )]
     df = dataframes['Data parameters']
     return [create_detector_image(
         dataframes=dataframes,
