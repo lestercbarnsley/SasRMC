@@ -32,15 +32,6 @@ class Evaluator(ABC):
         pass
 
 
-def get_evaluation_document(evaluator_name: str, current_goodness_of_fit: float, evaluation: bool, md: dict | None = None) -> dict:
-    md = md if md is not None else {}
-    return {
-        "Evaluator" : evaluator_name,
-        "Current goodness of fit" : current_goodness_of_fit,
-        "Acceptance" : evaluation
-    } | md
-
-
 @dataclass
 class Fitter(ABC):
 
@@ -135,6 +126,7 @@ class NoSmearing2DFitter(Fitter):
             "Smearing" : False
         }
 
+
 @dataclass
 class FitterMultiple(Fitter):
     fitter_list: list[Fitter]
@@ -157,6 +149,15 @@ class FitterMultiple(Fitter):
         return {f"Fitter {i}" : fitter.get_loggable_data(simulation_state) 
                 for i, fitter 
                 in enumerate(self.fitter_list)}
+    
+
+def get_evaluation_document(evaluator_name: str, current_goodness_of_fit: float, evaluation: bool, md: dict | None = None) -> dict:
+    md = md if md is not None else {}
+    return {
+        "Evaluator" : evaluator_name,
+        "Current goodness of fit" : current_goodness_of_fit,
+        "Acceptance" : evaluation
+    } | md
 
 
 @dataclass
@@ -164,33 +165,47 @@ class EvaluatorWithFitter(Evaluator):
     fitter: Fitter
     current_chi_squared: float = np.inf
 
-    def evaluate_and_get_document(self, simulation_state: ScatteringSimulation, acceptance_scheme: AcceptanceScheme) -> tuple[bool, dict]:
-        if not simulation_state.get_physical_acceptance():
-            document = get_evaluation_document(
-                evaluator_name=type(self).__name__,
-                current_goodness_of_fit=self.current_chi_squared,
-                evaluation=False,
-                md = acceptance_scheme.get_loggable_data() | {"Physical acceptance" : False}
-            )
-            return False, document
-        md = {"Physical acceptance" : True}
-        new_goodness_of_fit = self.fitter.calculate_goodness_of_fit(simulation_state)
-        if acceptance_scheme.is_acceptable(self.current_chi_squared, new_goodness_of_fit):
-            self.current_chi_squared = new_goodness_of_fit
-            document = get_evaluation_document(
-                evaluator_name=type(self).__name__,
-                current_goodness_of_fit=new_goodness_of_fit,
-                evaluation=True,
-                md = acceptance_scheme.get_loggable_data() | md
-            )
-            return True, document
+    def evaluation_without_physical_acceptance(self, acceptance_scheme: AcceptanceScheme) -> tuple[bool, dict]:
+        physical_md = {"Physical acceptance" : False}
+        document = get_evaluation_document(
+            evaluator_name=type(self).__name__,
+            current_goodness_of_fit=self.current_chi_squared,
+            evaluation=False,
+            md = acceptance_scheme.get_loggable_data() | physical_md
+        )
+        return False, document
+    
+    def evaluation_with_success(self, acceptance_scheme: AcceptanceScheme, new_goodness_of_fit: float) -> tuple[bool, dict]:
+        physical_md = {"Physical acceptance" : True}
+        document = get_evaluation_document(
+            evaluator_name=type(self).__name__,
+            current_goodness_of_fit=new_goodness_of_fit,
+            evaluation=True,
+            md = acceptance_scheme.get_loggable_data() | physical_md
+        )
+        return True, document
+    
+    def evaluation_without_success(self, acceptance_scheme: AcceptanceScheme, new_goodness_of_fit: float) -> tuple[bool, dict]:
+        physical_md = {"Physical acceptance" : True}
         document = get_evaluation_document(
             evaluator_name=type(self).__name__,
             current_goodness_of_fit=new_goodness_of_fit,
             evaluation=False,
-            md = acceptance_scheme.get_loggable_data() | md
+            md = acceptance_scheme.get_loggable_data() | physical_md
         )
         return False, document
+    
+    def update_chi_squared(self, new_chi_squared: float) -> None:
+        self.current_chi_squared = new_chi_squared
+
+    def evaluate_and_get_document(self, simulation_state: ScatteringSimulation, acceptance_scheme: AcceptanceScheme) -> tuple[bool, dict]:
+        if not simulation_state.get_physical_acceptance():
+            return self.evaluation_without_physical_acceptance(acceptance_scheme)
+        new_goodness_of_fit = self.fitter.calculate_goodness_of_fit(simulation_state)
+        if acceptance_scheme.is_acceptable(self.current_chi_squared, new_goodness_of_fit):
+            self.update_chi_squared(new_chi_squared=new_goodness_of_fit) # State has changed
+            return self.evaluation_with_success(acceptance_scheme, self.current_chi_squared)
+        return self.evaluation_without_success(acceptance_scheme, new_goodness_of_fit)   
     
     def default_box_dimensions(self) -> list[float]:
         return self.fitter.default_box_dimensions()

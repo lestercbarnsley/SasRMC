@@ -97,9 +97,11 @@ class DetectorConfigSmearing(DetectorConfig):
         return self.polarization
     
     def create_pixel(self, pixel_factory: DetectorPixelFactory) -> DetectorPixel: # The pixel factory coerces types as it is a Pydantic dataclass
+        sigma_para = pixel_factory.sigma_para if pixel_factory.sigma_para is not None else self.get_sigma_parallel(pixel_factory.qX, pixel_factory.qY)
+        sigma_perp = pixel_factory.sigma_perp if pixel_factory.sigma_perp is not None else self.get_sigma_geometric()
         return pixel_factory.create_pixel(
-            sigma_para_derived=self.get_sigma_parallel(pixel_factory.qX, pixel_factory.qY),
-            sigma_perp_derived=self.get_sigma_geometric()
+            sigma_para_derived=sigma_para,
+            sigma_perp_derived=sigma_perp
         )
     
     @classmethod
@@ -166,7 +168,12 @@ def create_detector_images(dataframes: dict[str, pd.DataFrame], detector_config_
     value_dict = parse_data.parse_value_frame(value_frame)
     data_source = value_dict.get("Data Source")
     if data_source:
-        return [create_detector_image(dataframes, detector_config_creator(value_dict), data_source = data_source, buffer_source=value_dict.get('Buffer Source'))]
+        return [create_detector_image(
+            dataframes, 
+            detector_config_creator(value_dict), 
+            data_source = data_source, 
+            buffer_source=value_dict.get('Buffer Source')
+            )]
     df = dataframes['Data parameters']
     return [create_detector_image(
         dataframes=dataframes,

@@ -18,12 +18,17 @@ class Simulator:
 
     def start(self) -> None:
         starting_state = self.state
+        if not starting_state.get_physical_acceptance_strong():
+            raise AssertionError("Cannot run simulation with this starting state.")
         if self.log_callback is not None:
             self.log_callback.start(starting_state.get_loggable_data() | self.evaluator.get_loggable_data(starting_state))
 
     def __enter__(self) -> Self:
         self.start()
         return self
+    
+    def set_state(self, new_state: ScatteringSimulation) -> None:
+        self.state = new_state
 
     def simulate(self) -> None:
         for step in self.controller.ledger:
@@ -31,12 +36,14 @@ class Simulator:
             new_state, command_document = command.execute_and_get_document(self.state)
             evaluation, evaluation_document = self.evaluator.evaluate_and_get_document(new_state, step.acceptance_scheme)
             if evaluation:
-                self.state = new_state
+                self.set_state(new_state)
             if self.log_callback is not None:
                 self.log_callback.event(command_document | evaluation_document)
 
     def stop(self) -> None:
         ending_state = self.state
+        if not ending_state.get_physical_acceptance_strong():
+            raise AssertionError("The ending state is not physically acceptable. Something has gone wrong.")
         if self.log_callback is not None:
             self.log_callback.stop(ending_state.get_loggable_data() | self.evaluator.get_loggable_data(ending_state))
     
