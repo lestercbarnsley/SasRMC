@@ -80,6 +80,9 @@ class Particle(ABC):
     @abstractmethod
     def change_magnetization(self, magnetization: Vector) -> Self:
         pass
+
+    def change_particle(self, particle: Self) -> Self: # Usually not needed # Provides an abstract method to get access to the change_bound_particle method in composed particles
+        return particle
     
     @abstractmethod
     def get_loggable_data(self) -> dict: # This is a template, but it must be overrided

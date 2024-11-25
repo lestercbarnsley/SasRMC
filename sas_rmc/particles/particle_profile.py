@@ -61,6 +61,9 @@ class ParticleProfile(Particle): # This is essentially an abstract wrapper class
     def change_magnetization(self, magnetization: Vector) -> Self:
         new_bound_particle = self.get_bound_particle().change_magnetization(magnetization)
         return self.change_bound_particle(new_bound_particle)
+    
+    def change_particle(self, particle: Self) -> Self:
+        return self.change_bound_particle(particle)
 
     @abstractmethod
     def form_profile(self, q_profile: np.ndarray) -> np.ndarray:
