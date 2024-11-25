@@ -29,13 +29,14 @@ where `3.x` is the Python version you wish to use. (Please use 3.10 or greater).
 
 ## Installation as a Python dependency  
 
-This is more for developers who want to integrate SasRMC into their own projects.
+You can also integrate SasRMC as a package into your own projects.
 
 1. Make an isolated Python project in your usual way.  
-2. If you're using **pip**, run:  
+2. If you're using **pip**, with your virtual environment activated, run:  
     `(venv)$ pip install git+https://github.com/lestercbarnsley/SasRMC.git`  
-3. If you're using **poetry**, run:  
-    `(venv)$ poetry add git+https://github.com/lestercbarnsley/SasRMC.git`  
+3. If you're using **poetry**, navigate to the same folder as your pyproject.toml and run:  
+    `(venv)$ poetry add git+https://github.com/lestercbarnsley/SasRMC.git`
+4. The SasRMC command line tool can also be used as long as your virtual environment or poetry shell is activated: `(venv)$ sasrmc --help`  
 
 ## Getting simulation input files  
 
