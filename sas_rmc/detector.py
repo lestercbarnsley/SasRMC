@@ -4,6 +4,7 @@ from enum import Enum
 from typing import Any, Callable, Iterable
 
 import numpy as np
+from numpy import typing as npt
 from typing_extensions import Self
 
 from sas_rmc import vector, Vector
@@ -27,8 +28,6 @@ SIMULATED_INTENSITY = 'simulated_intensity'
 SIMUATED_INTENSITY_ERR = 'simulated_intensity_err'
 POLARIZATION = "Polarization"
 
-    
-
 
 class Polarization(Enum):
     UNPOLARIZED = "unpolarized"
@@ -38,9 +37,6 @@ class Polarization(Enum):
     MINUS_PLUS = "minus_plus"
     PLUS_MINUS = "plus_minus"
     PLUS_PLUS = "plus_plus"
-
-
-    
 
 
 def orthogonal_xy(x: float, y: float) -> tuple[float, float]: # If I find I need this function a lot, I'll make it a method in the Vector class, but for now I'm happy for it to be a helper function
@@ -70,6 +66,7 @@ class DetectorPixel:
     def resolution_function(self, qx_array: np.ndarray, qy_array: np.ndarray) -> np.ndarray:
         qx_offset = qx_array - self.qX
         qy_offset = qy_array - self.qY
+        qx = qx_array[0]
         q_offset = (qx_offset, qy_offset, np.array([0.0]))
         q_vec = Vector(self.qX, self.qY)
         q_para = q_vec.unit_vector
@@ -84,12 +81,12 @@ class DetectorPixel:
     def get_smearing_func(self, qx_array: np.ndarray, qy_array: np.ndarray, gaussian_floor: float = DEFAULT_GAUSSIAN_FLOOR_FRACTION) -> Callable[[np.ndarray], float]:
         gaussian = self.resolution_function(qx_array, qy_array)
         idxs = np.where(gaussian > gaussian.max() * gaussian_floor)
-        def slicing_func(arr: np.ndarray) -> np.ndarray:
+        def slicing_func(arr: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
             return arr[idxs]
         sliced_gaussian = slicing_func(gaussian)
-        sliced_gaussian_sum = sliced_gaussian.sum()
+        sliced_gaussian_sum = np.sum(sliced_gaussian).item()
         def smearing_func(arr: np.ndarray) -> float:
-            return (slicing_func(arr) * sliced_gaussian).sum() / sliced_gaussian_sum # This is way faster than np.average
+            return np.sum(slicing_func(arr) * sliced_gaussian).item() / sliced_gaussian_sum # This is way faster than np.average
             
         return smearing_func
 
@@ -255,5 +252,19 @@ def subtract_detectors(detector_image: DetectorImage, subtraction: DetectorImage
 
 if __name__ == "__main__":
     p = Polarization("spin_down")
+
+    from numpy import typing as npt
+    from typing import TypeVar
+
+    T = TypeVar('T', bound=npt.NBitBase)
+
+    def show_numpy(arr: npt.NDArray[np.floating]) -> float:
+        return np.sum(arr).item()
+    
+    a = show_numpy(np.array([3]))
+
+    print(a)
+    print(type(a))
+
 
 #%%

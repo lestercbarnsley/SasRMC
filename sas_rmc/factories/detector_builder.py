@@ -26,11 +26,12 @@ class DetectorPixelFactory:
     qZ: float = 0
     sigma_para: float | None = None
     sigma_perp: float | None = None
-    shadow_factor: bool = True
+    shadow_factor: bool | None = None
 
     def create_pixel(self, sigma_para_derived: float | None = None, sigma_perp_derived: float | None = None) -> DetectorPixel:
         sigma_para = self.sigma_para if self.sigma_para is not None else sigma_para_derived # Prefer to get the pixel data from self, injection is the second choice
         sigma_perp = self.sigma_perp if self.sigma_perp is not None else sigma_perp_derived
+        shadow_factor = self.shadow_factor if self.shadow_factor is not None else (self.intensity > 0)
         if sigma_perp is None:
             raise ValueError("Missing data for sigma perp")
         if sigma_para is None:
@@ -43,15 +44,16 @@ class DetectorPixelFactory:
             qZ=self.qZ,
             sigma_para=sigma_para,
             sigma_perp=sigma_perp,
-            shadow_factor = self.shadow_factor
+            shadow_factor = shadow_factor
         )
 
     @classmethod
     def gen_from_row(cls, row: dict):
-        d = row | {
+        d = row
+        ''' | {
             'shadow_factor' : row.get('intensity', 0) > 0
-        }
-        return cls(**d)
+        }'''
+        return cls(**row)
     
 
 @pydantic_dataclass
