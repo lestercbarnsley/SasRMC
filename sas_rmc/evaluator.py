@@ -4,6 +4,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
+from numpy import typing as npt
 
 from sas_rmc import constants
 from sas_rmc.detector import DetectorImage, make_smearing_function, DEFAULT_GAUSSIAN_FLOOR_FRACTION
@@ -53,10 +54,22 @@ def calculate_goodness_of_fit(simulated_intensity: np.ndarray, experimental_dete
     uncertainty = np.where(experimental_detector.intensity_err == 0, 1, experimental_detector.intensity_err)
     return ((experimental_intensity - simulated_intensity)**2 / uncertainty**2)[experimental_detector.shadow_factor].mean()
 
+def unique_arr_to_max_diff(grads: npt.NDArray[np.floating]) -> float:
+    #grads = np.array(np.gradient(unique_arr))
+    v =  np.max(grads)
+    return v.item()
+
+def mean(arr: np.ndarray) -> float:
+    return np.average(arr).item()
+
+def np_sum(arr: npt.NDArray[np.floating]) -> float:
+    val = np.sum(arr)
+    return val.item()
+
 def qXqY_delta(detector: DetectorImage) -> tuple[float, float]:
     qXs = np.unique(detector.qX)
     qYs = np.unique(detector.qY)
-    qX_diff = np.max(np.gradient(qXs))
+    qX_diff = np.max([g for g in np.gradient(qXs)])
     qY_diff = np.max(np.gradient(qYs))
     return float(qX_diff), float(qY_diff)
     

@@ -66,7 +66,6 @@ class DetectorPixel:
     def resolution_function(self, qx_array: np.ndarray, qy_array: np.ndarray) -> np.ndarray:
         qx_offset = qx_array - self.qX
         qy_offset = qy_array - self.qY
-        qx = qx_array[0]
         q_offset = (qx_offset, qy_offset, np.array([0.0]))
         q_vec = Vector(self.qX, self.qY)
         q_para = q_vec.unit_vector
@@ -81,7 +80,7 @@ class DetectorPixel:
     def get_smearing_func(self, qx_array: np.ndarray, qy_array: np.ndarray, gaussian_floor: float = DEFAULT_GAUSSIAN_FLOOR_FRACTION) -> Callable[[np.ndarray], float]:
         gaussian = self.resolution_function(qx_array, qy_array)
         idxs = np.where(gaussian > gaussian.max() * gaussian_floor)
-        def slicing_func(arr: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
+        def slicing_func(arr: np.ndarray) -> npt.NDArray[np.floating]:
             return arr[idxs]
         sliced_gaussian = slicing_func(gaussian)
         sliced_gaussian_sum = np.sum(sliced_gaussian).item()
