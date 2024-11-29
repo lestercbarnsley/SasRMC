@@ -49,7 +49,7 @@ class DetectorPixelFactory:
     @classmethod
     def gen_from_row(cls, row: dict):
         d = row | {
-            'shadow_factor' : float(row.get('intensity', 0)) > 0
+            'shadow_factor' : row.get('intensity', 0) > 0
         }
         return cls(**d)
     

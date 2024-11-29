@@ -133,16 +133,14 @@ class FitterMultiple(Fitter):
     weight: list[float] | None = None
 
     def calculate_goodness_of_fit(self, simulation_state: ScatteringSimulation) -> float:
-        return float(
-            np.average(
+        return np.average(
                 [fitter.calculate_goodness_of_fit(simulation_state) for fitter in self.fitter_list], 
-                weights=self.weight)
-            )
+                weights=self.weight).item()
 
     def default_box_dimensions(self) -> list[float]:
         return max(
             [fitter.default_box_dimensions() for fitter in self.fitter_list], 
-            key=lambda box_dimension : float(np.prod(box_dimension))
+            key=lambda box_dimension : np.prod(box_dimension).item()
             )
 
     def get_loggable_data(self, simulation_state: ScatteringSimulation) -> dict:

@@ -176,7 +176,7 @@ class Vector:
         return length * (cls.from_numpy(random_numbers).unit_vector)
 
     @classmethod
-    def xy_from_angle(cls, length: float = 1, angle: float = 0):
+    def xy_from_angle(cls, length: float = 1.0, angle: float = 0.0):
         return cls(x = length * float(np.cos(angle)), y = length * float(np.sin(angle)))
 
     @classmethod

@@ -61,8 +61,8 @@ def magnetic_data_to_patches(particle_data: dict) -> list[patches.Patch]:
 
 @dataclass
 class BoxData:
-    particle_list: list
-    dim_list: list
+    particle_list: list[dict]
+    dim_list: list[float]
 
     def to_dataframe(self) -> pd.DataFrame:
         dim_data = {f'box_dimension_{i}' : dim for i, dim in enumerate(self.dim_list)}
@@ -104,8 +104,8 @@ class BoxData:
 
     def calculate_concentration(self) -> float:
         total_particle_volume = np.sum(self.get_all_volume())
-        box_volume = np.prod(self.dim_list)
-        return float(total_particle_volume / box_volume)
+        box_volume = np.prod(self.dim_list).item()
+        return total_particle_volume / box_volume
 
     @classmethod
     def create_from_dict(cls, d):
@@ -134,11 +134,9 @@ class SimData:
         return self.scale_factor_data['Value']
 
     def calculate_corrected_concentration(self) -> float:
-        return float(
-            self.get_scale_factor_value() * np.average(
+        return self.get_scale_factor_value() * np.average(
                 [box_data.calculate_concentration() for box_data in self.box_data_list]
-                )
-            )
+                ).item()
     
     def get_average_magnetization(self) -> Vector:
         vectors = sum((box_data.get_all_magnetization() for box_data in self.box_data_list), start= [])

@@ -29,7 +29,7 @@ def sector_at_q(qx: np.ndarray, qy: np.ndarray, intensity: np.ndarray, shadow_fa
     intensities = [intensity for intensity in intensities if intensity]
     if not intensities:
         return None
-    return float(np.average(intensities))
+    return np.average(intensities).item()
 
 def sector_analysis(qx: np.ndarray, qy: np.ndarray, intensity: np.ndarray, shadow_factor: np.ndarray, nominal_angle: float, angle_range: float) -> tuple[np.ndarray, np.ndarray]:
     qx_diff = np.diff(np.unique(qx)).max()
