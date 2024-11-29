@@ -256,10 +256,15 @@ if __name__ == "__main__":
     from numpy import typing as npt
     from typing import TypeVar
 
-    T = TypeVar('T', bound=npt.NBitBase)
+    T = TypeVar('T', bound=np.number)
 
-    def show_numpy(arr: npt.NDArray[np.floating]) -> float:
-        return np.sum(arr).item()
+    def show_numpy(arr: npt.NDArray[T]) -> T:
+        a = arr.item(0)
+        return a
+        #return np.sum(arr)
+    
+    def get_item(l: list[T]) -> T:
+        return l[0]
     
     a = show_numpy(np.array([3]))
 
