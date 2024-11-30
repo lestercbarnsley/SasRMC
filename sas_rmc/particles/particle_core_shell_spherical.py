@@ -1,7 +1,7 @@
 #%%
 
 from dataclasses import dataclass
-from typing import TypeVar
+from typing import TypeVar, Sequence
 
 import numpy as np
 from typing_extensions import Self
@@ -15,7 +15,7 @@ from sas_rmc.shapes import Shape, Sphere, collision_detected
 
 S = TypeVar("S", bound=Shape)
 
-def change_shape_positions(shape_list: list[S], position: Vector) -> list[S]:
+def change_shape_positions(shape_list: Sequence[S], position: Vector) -> list[S]:
     return [shape.change_position(position) for shape in shape_list]
 
 @dataclass
