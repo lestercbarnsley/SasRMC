@@ -1,6 +1,7 @@
 #%%
 
 
+from typing import Iterator
 import numpy as np
 from numpy import typing as npt
 from scipy import constants as scipy_constants
@@ -31,6 +32,10 @@ def np_sum(array: npt.NDArray[np.floating]) -> float:
 def np_prod(array: npt.NDArray[np.floating]) -> float:
     return np.prod(array).item()
 
+def iter_np_array(array: npt.NDArray[np.floating]) -> Iterator[float]:
+    array_len = array.size
+    for i in range(array_len):
+        yield array.take(i).item()
 
 
 # string names

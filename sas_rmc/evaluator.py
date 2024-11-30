@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from sas_rmc import constants
-from sas_rmc.constants import np_max, np_average, np_prod
+from sas_rmc.constants import np_max, np_average, np_prod, iter_np_array
 from sas_rmc.detector import DetectorImage, make_smearing_function, DEFAULT_GAUSSIAN_FLOOR_FRACTION
 from sas_rmc.result_calculator import ResultCalculator
 from sas_rmc.array_cache import method_array_cache
@@ -97,7 +97,7 @@ class Smearing2DFitter(Fitter):
         return {
             "Result calculator" : type(self.result_calculator).__name__,
             "Detector data" : self.experimental_detector.get_loggable_data(),
-            "Simulated intensity" : [float(intensity) for intensity in self.simulate_intensity(simulation_state)],
+            "Simulated intensity" : [intensity for intensity in iter_np_array(self.simulate_intensity(simulation_state))],
             "Polarization" : self.experimental_detector.polarization.value,
             "Smearing" : True
         }
@@ -123,7 +123,7 @@ class NoSmearing2DFitter(Fitter):
         return {
             "Result calculator" : type(self.result_calculator).__name__,
             "Detector data" : self.experimental_detector.get_loggable_data(),
-            "Simulated intensity" : [float(intensity) for intensity in self.simulate_intensity(simulation_state)],
+            "Simulated intensity" : [intensity for intensity in iter_np_array(self.simulate_intensity(simulation_state))],
             "Polarization" : self.experimental_detector.polarization.value,
             "Smearing" : False
         }

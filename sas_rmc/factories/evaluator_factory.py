@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 
+from sas_rmc.constants import np_sum
 from sas_rmc.detector import DetectorImage
 from sas_rmc.evaluator import EvaluatorWithFitter, FitterMultiple, Smearing2DFitter, NoSmearing2DFitter, qXqY_delta
 from sas_rmc.form_calculator import FieldDirection
@@ -42,7 +43,7 @@ def create_evaluator_with_smearing(dataframes: dict[str, pd.DataFrame]) -> Evalu
                 create_smearing_fitter_from_experimental_detector(detector, density_factor, field_direction) 
                 for detector in detector_list
             ],
-            weight=[detector.shadow_factor.sum() for detector in detector_list]
+            weight=[np_sum(detector.shadow_factor) for detector in detector_list]
         ),
     )
 
@@ -60,6 +61,6 @@ def create_evaluator_no_smearing(dataframes: dict[str, pd.DataFrame]) -> Evaluat
                     ),
                 experimental_detector=detector
             ) for detector in detector_list],
-            weight=[detector.shadow_factor.sum() for detector in detector_list]
+            weight=[np_sum(detector.shadow_factor) for detector in detector_list]
         ),
     )
