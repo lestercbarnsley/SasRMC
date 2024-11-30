@@ -8,7 +8,7 @@ import pandas as pd
 
 from sas_rmc import Vector
 from sas_rmc.loggers import LogCallback
-from sas_rmc.constants import np_average
+from sas_rmc.constants import np_average, np_prod, np_sum
 
 
 def particle_data_to_magnetization_vector(particle_data: dict) -> Vector | None:
@@ -104,8 +104,8 @@ class BoxData:
         return fig
 
     def calculate_concentration(self) -> float:
-        total_particle_volume = np.sum(self.get_all_volume())
-        box_volume = np.prod(self.dim_list).item()
+        total_particle_volume = np_sum(np.array(self.get_all_volume()))
+        box_volume = np_prod(np.array(self.dim_list))
         return total_particle_volume / box_volume
 
     @classmethod

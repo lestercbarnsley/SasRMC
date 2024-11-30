@@ -16,9 +16,6 @@ B_H_IN_INVERSE_AMP_METRES = (GAMMA_N * R_0 / 2) / BOHR_MAG
 
 RNG = np.random.default_rng()
 
-def non_zero_list(ls: list) -> bool:
-    return bool(np.sum(np.array(ls)**2))
-
 def np_max(array: npt.NDArray[np.floating]) -> float:
     return np.max(array).item()
 
@@ -31,7 +28,7 @@ def np_average(array: list[float], weights: list[float] | None = None) -> float:
 def np_sum(array: npt.NDArray[np.floating]) -> float:
     return np.sum(array).item()
 
-def np_prod(array: np.ndarray) -> float:
+def np_prod(array: npt.NDArray[np.floating]) -> float:
     return np.prod(array).item()
 
 

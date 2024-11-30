@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from sas_rmc import constants
-from sas_rmc.constants import np_max, np_average
+from sas_rmc.constants import np_max, np_average, np_prod
 from sas_rmc.detector import DetectorImage, make_smearing_function, DEFAULT_GAUSSIAN_FLOOR_FRACTION
 from sas_rmc.result_calculator import ResultCalculator
 from sas_rmc.array_cache import method_array_cache
@@ -143,7 +143,7 @@ class FitterMultiple(Fitter):
     def default_box_dimensions(self) -> list[float]:
         return max(
             [fitter.default_box_dimensions() for fitter in self.fitter_list], 
-            key=lambda box_dimension : np.prod(box_dimension).item()
+            key=lambda box_dimension : np_prod(np.array(box_dimension))
             )
 
     def get_loggable_data(self, simulation_state: ScatteringSimulation) -> dict:

@@ -8,10 +8,12 @@ import numpy as np
 from sas_rmc import Vector
 from sas_rmc.particles import CoreShellParticle, Particle
 from sas_rmc.shapes import Shape
+from sas_rmc.constants import np_sum
 
 
 def numerical_form(x_array: np.ndarray, y_array: np.ndarray, sld_sum: np.ndarray, qx: float, qy: float) -> float:
-    return np.sum(sld_sum * np.exp(1j * (x_array * qx + y_array * qy)))
+    arr =sld_sum * np.exp(1j * (x_array * qx + y_array * qy))
+    return np_sum(arr)
 
 def numerical_form_array(x_array: np.ndarray, y_array: np.ndarray, sld_sum: np.ndarray, qx_array: np.ndarray, qy_array: np.ndarray) -> np.ndarray:
     form = np.zeros(qx_array.shape)
