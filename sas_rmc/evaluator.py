@@ -4,9 +4,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
-from numpy import typing as npt
 
 from sas_rmc import constants
+from sas_rmc.constants import np_max, np_average
 from sas_rmc.detector import DetectorImage, make_smearing_function, DEFAULT_GAUSSIAN_FLOOR_FRACTION
 from sas_rmc.result_calculator import ResultCalculator
 from sas_rmc.array_cache import method_array_cache
@@ -52,26 +52,15 @@ class Fitter(ABC):
 def calculate_goodness_of_fit(simulated_intensity: np.ndarray, experimental_detector: DetectorImage) -> float:
     experimental_intensity = experimental_detector.intensity
     uncertainty = np.where(experimental_detector.intensity_err == 0, 1, experimental_detector.intensity_err)
-    return ((experimental_intensity - simulated_intensity)**2 / uncertainty**2)[experimental_detector.shadow_factor].mean()
-
-def unique_arr_to_max_diff(grads: npt.NDArray[np.floating]) -> float:
-    #grads = np.array(np.gradient(unique_arr))
-    v =  np.max(grads)
-    return v.item()
-
-def mean(arr: np.ndarray) -> float:
-    return np.average(arr).item()
-
-def np_sum(arr: npt.NDArray[np.floating]) -> float:
-    val = np.sum(arr)
-    return val.item()
+    difference_of_squares =((experimental_intensity - simulated_intensity)**2 / uncertainty**2)[experimental_detector.shadow_factor]
+    return np.average(difference_of_squares).item() # Use np.average here because the constant function takes a list
 
 def qXqY_delta(detector: DetectorImage) -> tuple[float, float]:
     qXs = np.unique(detector.qX)
     qYs = np.unique(detector.qY)
-    qX_diff = np.max([g for g in np.gradient(qXs)])
-    qY_diff = np.max(np.gradient(qYs))
-    return float(qX_diff), float(qY_diff)
+    qX_diff = np_max(np.gradient(qXs))
+    qY_diff = np_max(np.gradient(qYs))
+    return qX_diff, qY_diff
     
 
 @dataclass
@@ -146,9 +135,10 @@ class FitterMultiple(Fitter):
     weight: list[float] | None = None
 
     def calculate_goodness_of_fit(self, simulation_state: ScatteringSimulation) -> float:
-        return np.average(
-                [fitter.calculate_goodness_of_fit(simulation_state) for fitter in self.fitter_list], 
-                weights=self.weight).item()
+        return np_average(
+            [fitter.calculate_goodness_of_fit(simulation_state) for fitter in self.fitter_list], 
+            weights=self.weight
+        )
 
     def default_box_dimensions(self) -> list[float]:
         return max(
@@ -230,7 +220,8 @@ class EvaluatorWithFitter(Evaluator):
 
 
 if __name__ == "__main__":
-    pass
+    #print(repr(constants.np_average(np.random.rand(30000))))
+    print(repr(np_max(np.random.rand(10000))))
 
 
 # %%

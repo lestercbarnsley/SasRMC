@@ -8,6 +8,7 @@ import pandas as pd
 
 from sas_rmc import Vector
 from sas_rmc.loggers import LogCallback
+from sas_rmc.constants import np_average
 
 
 def particle_data_to_magnetization_vector(particle_data: dict) -> Vector | None:
@@ -134,9 +135,9 @@ class SimData:
         return self.scale_factor_data['Value']
 
     def calculate_corrected_concentration(self) -> float:
-        return self.get_scale_factor_value() * np.average(
+        return self.get_scale_factor_value() * np_average(
                 [box_data.calculate_concentration() for box_data in self.box_data_list]
-                ).item()
+                )
     
     def get_average_magnetization(self) -> Vector:
         vectors = sum((box_data.get_all_magnetization() for box_data in self.box_data_list), start= [])

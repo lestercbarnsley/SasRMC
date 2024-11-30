@@ -2,6 +2,7 @@
 
 
 import numpy as np
+from numpy import typing as npt
 from scipy import constants as scipy_constants
 
 def get_physical_constant(constant_name: str) -> float:
@@ -17,6 +18,23 @@ RNG = np.random.default_rng()
 
 def non_zero_list(ls: list) -> bool:
     return bool(np.sum(np.array(ls)**2))
+
+def np_max(array: npt.NDArray[np.floating]) -> float:
+    return np.max(array).item()
+
+def np_min(array: npt.NDArray[np.floating]) -> float:
+    return np.min(array).item()
+
+def np_average(array: list[float], weights: list[float] | None = None) -> float:
+    return np.average(array, weights=weights).item()
+
+def np_sum(array: npt.NDArray[np.floating]) -> float:
+    return np.sum(array).item()
+
+def np_prod(array: np.ndarray) -> float:
+    return np.prod(array).item()
+
+
 
 # string names
 NUCLEAR_RESCALE = "Nuclear rescale"

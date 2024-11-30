@@ -7,6 +7,7 @@ import pandas as pd
 from matplotlib import pyplot as plt, colors as mcolors, figure
 
 from sas_rmc import constants
+from sas_rmc.constants import np_average
 from sas_rmc.loggers import LogCallback, excel_logger
 
 
@@ -29,7 +30,7 @@ def sector_at_q(qx: np.ndarray, qy: np.ndarray, intensity: np.ndarray, shadow_fa
     intensities = [intensity for intensity in intensities if intensity]
     if not intensities:
         return None
-    return np.average(intensities).item()
+    return np_average(intensities)
 
 def sector_analysis(qx: np.ndarray, qy: np.ndarray, intensity: np.ndarray, shadow_factor: np.ndarray, nominal_angle: float, angle_range: float) -> tuple[np.ndarray, np.ndarray]:
     qx_diff = np.diff(np.unique(qx)).max()

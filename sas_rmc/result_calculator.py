@@ -74,7 +74,7 @@ class AnalyticalCalculator(ResultCalculator):
                 field_direction=self.field_direction
                 ) for box in scattering_simulation.box_list],
             axis = 0
-            )
+            ) # Use np.average here because the return type is also an numpy array.
         # There may be a speed boost associated with caching the box intensity to the box, but this only matters if the total number of boxes exceeds
         # the base case number in the sum array list function
     
@@ -115,7 +115,7 @@ class ProfileCalculator(ResultCalculator):
                 scattering_simulation.scale_factor.value
                 ) for box in scattering_simulation.box_list],
             axis = 0
-        )
+        )  # Use np.average here because the return type is also an numpy array.
         
 
 

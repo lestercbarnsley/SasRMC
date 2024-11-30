@@ -4,12 +4,12 @@ from enum import Enum
 from typing import Any, Callable, Iterable
 
 import numpy as np
-from numpy import typing as npt
 from typing_extensions import Self
 
 from sas_rmc import vector, Vector
 from sas_rmc.array_cache import method_array_cache
 from sas_rmc import constants
+from sas_rmc.constants import np_sum
 
 
 PI = constants.PI
@@ -80,12 +80,12 @@ class DetectorPixel:
     def get_smearing_func(self, qx_array: np.ndarray, qy_array: np.ndarray, gaussian_floor: float = DEFAULT_GAUSSIAN_FLOOR_FRACTION) -> Callable[[np.ndarray], float]:
         gaussian = self.resolution_function(qx_array, qy_array)
         idxs = np.where(gaussian > gaussian.max() * gaussian_floor)
-        def slicing_func(arr: np.ndarray) -> npt.NDArray[np.floating]:
+        def slicing_func(arr: np.ndarray) -> np.ndarray:
             return arr[idxs]
         sliced_gaussian = slicing_func(gaussian)
-        sliced_gaussian_sum = np.sum(sliced_gaussian).item()
+        sliced_gaussian_sum = np_sum(sliced_gaussian)
         def smearing_func(arr: np.ndarray) -> float:
-            return np.sum(slicing_func(arr) * sliced_gaussian).item() / sliced_gaussian_sum # This is way faster than np.average
+            return np_sum(slicing_func(arr) * sliced_gaussian) / sliced_gaussian_sum # This is way faster than np.average
             
         return smearing_func
 
