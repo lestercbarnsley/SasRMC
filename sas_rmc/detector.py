@@ -9,7 +9,7 @@ from typing_extensions import Self
 from sas_rmc import vector, Vector
 from sas_rmc.array_cache import method_array_cache
 from sas_rmc import constants
-from sas_rmc.constants import np_sum
+from sas_rmc.constants import np_max, np_sum
 
 
 PI = constants.PI
@@ -79,7 +79,7 @@ class DetectorPixel:
     @method_array_cache
     def get_smearing_func(self, qx_array: np.ndarray, qy_array: np.ndarray, gaussian_floor: float = DEFAULT_GAUSSIAN_FLOOR_FRACTION) -> Callable[[np.ndarray], float]:
         gaussian = self.resolution_function(qx_array, qy_array)
-        idxs = np.where(gaussian > gaussian.max() * gaussian_floor)
+        idxs = (gaussian > (np_max(gaussian) * gaussian_floor)).nonzero()
         def slicing_func(arr: np.ndarray) -> np.ndarray:
             return arr[idxs]
         sliced_gaussian = slicing_func(gaussian)

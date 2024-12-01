@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
@@ -50,9 +51,7 @@ class ParticleCommand(Command):
             "Particle index" : self.particle_index } \
             | particle.get_loggable_data()
     
-    def execute_and_get_document(self, scattering_simulation: ScatteringSimulation | None = None) -> tuple[ScatteringSimulation, dict]:
-        if scattering_simulation is None:
-            raise ValueError("scattering_simulation is not optional for this class")
+    def execute_and_get_document(self, scattering_simulation: ScatteringSimulation) -> tuple[ScatteringSimulation, dict]:
         new_simulation = self.execute(scattering_simulation)
         document = self.get_document_from_scattering_simulation(new_simulation)
         return new_simulation, document
@@ -66,8 +65,6 @@ class GroupCommand(Command):
         return super().execute(scattering_simulation)
 
     def execute_and_get_document(self, scattering_simulation: ScatteringSimulation) -> tuple[ScatteringSimulation, dict]:
-        if scattering_simulation is None:
-            raise ValueError("scattering_simulation is not optional for this class")
         document = {"Action" : type(self).__name__}
         new_simulation = scattering_simulation
         for i, command in enumerate(self.command_list):
@@ -203,6 +200,16 @@ class FlipMagnetization(ParticleCommand):
     
 
 @dataclass
+class MutateParticle(ParticleCommand):
+    particle_mutation_function: Callable[[Particle], Particle]
+
+    def execute(self, scattering_simulation: ScatteringSimulation) -> ScatteringSimulation:
+        particle = self.get_particle(scattering_simulation)
+        new_particle = self.particle_mutation_function(particle)
+        return SetParticleState(self.box_index, self.particle_index, new_particle).execute(scattering_simulation)
+
+
+@dataclass
 class ScaleCommand(Command):
 
     @abstractmethod
@@ -217,9 +224,7 @@ class ScaleCommand(Command):
             "Particle index" : -1} \
             | scale_factor.get_loggable_data()
     
-    def execute_and_get_document(self, scattering_simulation: ScatteringSimulation | None = None) -> tuple[ScatteringSimulation, dict]:
-        if scattering_simulation is None:
-            raise ValueError("scattering simulation is not optional for this class")
+    def execute_and_get_document(self, scattering_simulation: ScatteringSimulation) -> tuple[ScatteringSimulation, dict]:
         new_simulation = self.execute(scattering_simulation)
         document = self.get_document_from_scattering_simulation(new_simulation)
         return new_simulation, document
