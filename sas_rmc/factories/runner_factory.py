@@ -58,7 +58,7 @@ create_core_shell_command = create_command_if_acceptable_command(command_factory
 
 def particle_box_index_iterator(simulation_state: ScatteringSimulation) -> Iterator[tuple[int, int]]:
     for box_index, box in enumerate(simulation_state.box_list):
-        for particle_index, _ in enumerate(box.particles):
+        for particle_index, _ in enumerate(box.particle_results):
             yield box_index, particle_index
 
 
@@ -125,7 +125,7 @@ class CoreShellRunner:
                     particle_index=particle_index,
                     move_by_distance=self.core_radius,
                     cube = box.cube,
-                    total_particle_number=len(box.particles),
+                    total_particle_number=len(box.particle_results),
                     nominal_magnetization=self.core_magnetization
                 )
                 acceptance_scheme = acceptable_command_factory.create_metropolis_acceptance(temperature, cycle, step)

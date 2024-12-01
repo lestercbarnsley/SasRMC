@@ -42,9 +42,9 @@ def numerical_test(show_plot: bool = True):
         height=1000,
         cylinder_sld=6
     ) for _ in range(particle_number)]
-    box = Box(particles=particles, cube = Cube(dimension_0=100000, dimension_1=3000, dimension_2=10000))
-    for i, particle in enumerate(box.particles):
-        box.particles[i] = particle.set_position(Vector(4 *i* 103, 0, 0)).set_orientation(Vector(0,0,1))
+    box = Box(particle_results=particles, cube = Cube(dimension_0=100000, dimension_1=3000, dimension_2=10000))
+    for i, particle in enumerate(box.particle_results):
+        box.particle_results[i] = particle.set_position(Vector(4 *i* 103, 0, 0)).set_orientation(Vector(0,0,1))
 
     intensity = box_profile_calculator(box, profile_calculator)
     if show_plot:

@@ -148,7 +148,7 @@ class CoreShellParticle(Particle):
 
 @dataclass
 class CoreShellParticleForm(ParticleArray):
-    core_shell_particle: CoreShellParticle
+    bound_particle: CoreShellParticle
 
     @classmethod
     def gen_from_parameters(cls, position: Vector, magnetization: Vector | None = None, core_radius: float = 0, thickness: float = 0, core_sld: float = 0, shell_sld: float = 0, solvent_sld: float = 0):
@@ -161,18 +161,13 @@ class CoreShellParticleForm(ParticleArray):
             shell_sld=shell_sld,
             solvent_sld=solvent_sld
         )
-        return cls(core_shell_particle=core_shell_particle)
+        return cls(bound_particle=core_shell_particle)
 
     def get_bound_particle(self) -> Particle:
-        return self.core_shell_particle
-    
-    def change_bound_particle(self, bound_particle: Particle) -> Self:
-        if not isinstance(bound_particle, CoreShellParticle):
-            raise TypeError("Only bind core shell particle to this form calculator")
-        return type(self)(core_shell_particle=bound_particle)
+        return self.bound_particle
     
     def form_result(self, qx_array: np.ndarray, qy_array: np.ndarray) -> FormResult:
-        return self.core_shell_particle.form_result(qx_array, qy_array)
+        return self.bound_particle.form_result(qx_array, qy_array)
     
     def get_loggable_data(self) -> dict:
         return self.get_bound_particle().get_loggable_data()
@@ -202,7 +197,7 @@ if __name__ == "__main__":
     )
     print(p_1.collision_detected(p_2))
 
-    core_shell_form = CoreShellParticleForm(core_shell_particle=p_2)
+    core_shell_form = CoreShellParticleForm(bound_particle=p_2)
 
     print(core_shell_form.get_loggable_data())
 

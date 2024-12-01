@@ -29,7 +29,7 @@ class ResultCalculator(ABC):
 
 def modulated_form_array(particle: ParticleArray, qx_array: np.ndarray, qy_array: np.ndarray) -> FormResult:
     form_result = particle.form_result(qx_array, qy_array)
-    position = particle.get_position()
+    position = particle.get_bound_particle().get_position()
     modulation = np.exp(1j * vector.dot(position.to_tuple(), (qx_array, qy_array)))
     return FormResult(
         form_nuclear=form_result.form_nuclear * modulation,
@@ -40,11 +40,11 @@ def modulated_form_array(particle: ParticleArray, qx_array: np.ndarray, qy_array
 
 @array_cache
 def particle_arrays_from(box: Box) -> list[ParticleArray]:
-    return [particle for particle in box.particles if isinstance(particle, ParticleArray)]
+    return [particle for particle in box.particle_results if isinstance(particle, ParticleArray)]
 
 @array_cache
 def particle_profiles_from(box: Box) -> list[ParticleProfile]:
-    return [particle for particle in box.particles if isinstance(particle, ParticleProfile)]
+    return [particle for particle in box.particle_results if isinstance(particle, ParticleProfile)]
 
 
 @dataclass

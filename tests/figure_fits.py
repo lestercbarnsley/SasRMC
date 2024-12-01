@@ -49,7 +49,7 @@ def box_from_detector(detector_list: DetectorImage, particle_list: List[Particle
     dimension_1 = np.max([2 * PI / detector.qy_delta for detector in detector_list])
     dimension_2 = dimension_0
     return Box(
-        particles=particle_list,
+        particle_results=particle_list,
         cube = Cube(
             dimension_0=dimension_0,
             dimension_1=dimension_1,
@@ -434,7 +434,7 @@ def profiles(ax, experimental_average_fn, simulated_average_fn, sector_tuples, l
     ax.text(0.05, 0.95, letter, color = "black", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=ax.transAxes)
 
 def box_to_position_array(box: Box) -> np.ndarray:
-    return np.array([[particle.position.x, particle.position.y] for particle in box.particles])
+    return np.array([[particle.position.x, particle.position.y] for particle in box.particle_results])
 
 def figure_particle_maps():
     #from matplotlib.gridspec import GridSpec
@@ -1059,7 +1059,7 @@ def figure_polarization_v2():
     #ax2.text(0.05, 0.92, r'(b)', color = "red", fontsize = FONT_SIZE,horizontalalignment='left', verticalalignment='center', transform=ax2.transAxes)
     ax2.legend(loc = "lower left", fontsize = 'small')
 
-    get_from_box_list = lambda getter_fn: np.array([getter_fn(particle) for particle in box_list[0].particles])
+    get_from_box_list = lambda getter_fn: np.array([getter_fn(particle) for particle in box_list[0].particle_results])
     pos_x = get_from_box_list(lambda particle: particle.position.x)
     pos_y = get_from_box_list(lambda particle: particle.position.y)
     mag_x = get_from_box_list(lambda particle: particle.magnetization.x)
@@ -1124,7 +1124,7 @@ def figure_polarization_v2():
 def quick_test(): # Add to version control then delete
     box_writer = BoxWriter.standard_box_writer()
     box = Box(
-        particles=[CoreShellParticle.gen_from_parameters(position = Vector.null_vector(), core_radius=100) for _ in range(20)],
+        particle_results=[CoreShellParticle.gen_from_parameters(position = Vector.null_vector(), core_radius=100) for _ in range(20)],
         cube=Cube(dimension_0=10000, dimension_1=10000, dimension_2=10000)
     )
     box.force_inside_box(in_plane=True)

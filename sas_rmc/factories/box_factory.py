@@ -18,7 +18,7 @@ def create_cube(dimensions: Sequence[float]) -> Cube:
 
 def create_box_list_without_concentration(box_number: int, particle_number: int, particle_factory: Callable[[], Particle], dimensions: Sequence[float]):
     return [Box(
-        particles = [particle_factory() for _ in range(int(particle_number / box_number))], 
+        particle_results = [particle_factory() for _ in range(int(particle_number / box_number))], 
         cube=create_cube(dimensions),
         ).force_to_plane() for _ in range(box_number)]
 
@@ -31,7 +31,7 @@ def create_particle_iterator(particle_factory: Callable[[], Particle], nominal_c
 
 def create_box_list_without_particle_number(box_number: int, nominal_concentration: float, particle_factory: Callable[[], Particle], dimensions: Sequence[float]) -> list[Box]:
     return [Box(
-        particles = [particle for particle in create_particle_iterator(particle_factory=particle_factory, nominal_concentration=nominal_concentration, dimensions=dimensions)], 
+        particle_results = [particle for particle in create_particle_iterator(particle_factory=particle_factory, nominal_concentration=nominal_concentration, dimensions=dimensions)], 
         cube = create_cube(dimensions)).force_to_plane() for _ in range(box_number)]
 
 def create_box_iterator(particle_factory: Callable[[], Particle], particle_number: int, nominal_concentration: float, dimensions: Sequence[float]) -> Iterator[Box]:

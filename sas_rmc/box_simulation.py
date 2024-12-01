@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing_extensions import Self
 
 from sas_rmc import Vector, constants
-from sas_rmc.particles import Particle
+from sas_rmc.particles import ParticleResult, Particle
 from sas_rmc.shapes import Cube
 
 
@@ -15,36 +15,43 @@ rng = constants.RNG
 @dataclass
 class Box:
     '''The Box class is responsible for particle mechanics, determining how and when particles can move. It has no knowledge about anything related to scattering, which is the responsibility of the Simulator class. Special cases of the Box class can be made as their own class that inherit from the Box'''
-    particles: list[Particle]
+    particle_results: list[ParticleResult]
     cube: Cube
 
     #IF the box has no responsibility for the scattering, it should have no knowledge of the nuclear and magnetic rescale factors
     #Now that we're using the controller pattern, we can start getting rid of the "actions" in this class, because all actions are now the responsibility of Command subclasses
 
     def __len__(self) -> int:
-        return len(self.particles)
+        return len(self.particle_results)
 
     @property
     def volume(self) -> float:
         return self.cube.get_volume()
+    
+    def get_particles(self) -> list[Particle]:
+        return [particle_res.get_particle() for particle_res in self.particle_results]
 
     def is_inside(self, position) -> bool:
         return self.cube.is_inside(position)
     
+    def get_particle(self, particle_index: int) -> Particle:
+        return self.particle_results[particle_index].get_particle()
+    
     def wall_or_particle_collision(self, particle_index: int) -> bool:
-        particle = self.particles[particle_index]
+        particle = self.get_particle(particle_index)
         if not self.is_inside(particle.get_position()):
             return True
-        return any(particle.collision_detected(particle_j) for j, particle_j in enumerate(self.particles) if j!=particle_index)
+        return any(particle.collision_detected(particle_j) for j, particle_j in enumerate(self.get_particles()) if j!=particle_index)
     
     def change_particle(self, particle_index: int, new_particle: Particle) -> Self:
+        new_particle_res = self.particle_results[particle_index].change_particle(new_particle)
         return type(self)(
-            particles=[particle if j!=particle_index else new_particle for j, particle in enumerate(self.particles)],
+            particle_results=[particle_res if j!=particle_index else new_particle_res for j, particle_res in enumerate(self.particle_results)],
             cube = self.cube
         )
     
     def move_to_new_position(self, particle_index: int, new_position: Vector) -> Self:
-        new_particle = self.particles[particle_index].change_position(new_position)
+        new_particle = self.get_particle(particle_index).change_position(new_position)
         return self.change_particle(particle_index, new_particle)
     
     def move_inside_box(self, particle_index: int) -> Self:
@@ -56,9 +63,9 @@ class Box:
         return self.move_to_new_position(particle_index, new_position)
     
     def collision_test(self) -> bool:
-        if not all(self.is_inside(particle.get_position()) for particle in self.particles):
+        if not all(self.is_inside(particle.get_position()) for particle in self.get_particles()):
             return True
-        return any(particle_i.collision_detected(particle_j) for i, particle_i in enumerate(self.particles) for j, particle_j in enumerate(self.particles) if i > j)
+        return any(particle_i.collision_detected(particle_j) for i, particle_i in enumerate(self.get_particles()) for j, particle_j in enumerate(self.get_particles()) if i > j)
     
     def force_new_box(self, box_creation_function: Callable[[Self, int], Self]) -> Self:
         box = self
@@ -79,13 +86,13 @@ class Box:
         return self.force_new_box(lambda box, p : box.move_to_plane(p))
 
     def get_nearest_particle(self, position: Vector) -> Particle:
-        return min(self.particles, key = lambda particle : position.distance_from_vector(particle.get_position()))
+        return min(self.get_particles(), key = lambda particle : position.distance_from_vector(particle.get_position()))
         
     def get_loggable_data(self) -> dict:
         return {
-            f'Particle {i}' : particle.get_loggable_data() 
-            for i, particle 
-            in enumerate(self.particles)
+            f'Particle {i}' : particle_res.get_loggable_data() 
+            for i, particle_res 
+            in enumerate(self.particle_results)
         } | {
             'Dimension 0' : self.cube.dimension_0,
             'Dimension 1' : self.cube.dimension_1,

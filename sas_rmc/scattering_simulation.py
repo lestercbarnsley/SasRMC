@@ -95,7 +95,7 @@ class ScatteringSimulation:
         )
     
     def get_particle(self, box_index: int, particle_index: int) -> Particle:
-        return self.box_list[box_index].particles[particle_index]
+        return self.box_list[box_index].get_particle(particle_index)
     
     def change_particle(self, box_index: int, particle_index: int, new_particle: Particle) -> Self:
         new_box = self.box_list[box_index].change_particle(particle_index, new_particle)

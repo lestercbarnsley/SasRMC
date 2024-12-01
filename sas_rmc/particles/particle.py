@@ -100,7 +100,21 @@ class Particle(ABC):
             'Volume' : self.get_volume(),
             'Total scattering length' : self.get_scattering_length(),
         }
+
+
+@dataclass
+class ParticleResult(ABC):
+
+    @abstractmethod
+    def get_particle(self) -> Particle:
+        pass
+
+    @abstractmethod
+    def change_particle(self, particle: Particle) -> Self:
+        pass
     
+    def get_loggable_data(self) -> dict:
+        return self.get_particle().get_loggable_data()
 
 
 

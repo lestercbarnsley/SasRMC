@@ -84,7 +84,7 @@ class ProfileCallback(LogCallback):
         fig.savefig(self.save_path_maker("scattering intensity", "pdf"))
         for box_number, box in enumerate(self.box_list):
             fig, ax = plt.subplots()
-            ax.scatter(x = [particle.position.x for particle in box.particles], y = [particle.position.y for particle in box.particles])
+            ax.scatter(x = [particle.position.x for particle in box.particle_results], y = [particle.position.y for particle in box.particle_results])
             fig.set_size_inches(5,5)
             ax.set_xlabel(r'X ($\AA$)',fontsize =  16)#'x-large')
             ax.set_ylabel(r'Y ($\AA$)',fontsize =  16)#'x-large')
@@ -122,25 +122,25 @@ def create_box(particle_number: int, particle_factory: ParticleFactory ) -> Box:
                 particle = particles[ij]
                 particles[ij] = particle.set_position(Vector(1 * i * LATTICE_PARAM, 1 * j * LATTICE_PARAM))
     
-    box= Box(particles=particles, cube = cube)
+    box= Box(particle_results=particles, cube = cube)
     #box.force_inside_box(in_plane= True)
     return box
 
 def create_random_box(particle_number: int, particle_factory: ParticleFactory) -> Box:
     particles = [particle_factory.create_particle() for _ in range(particle_number)]
     cube = Cube(dimension_0=TWOPIDIVQMIN, dimension_1=TWOPIDIVQMIN, dimension_2=HEIGHT)
-    box = Box(particles=particles, cube = cube)
-    for i, _ in enumerate(box.particles):
+    box = Box(particle_results=particles, cube = cube)
+    for i, _ in enumerate(box.particle_results):
         while box.wall_or_particle_collision(i):
-            particle = box.particles[i]
+            particle = box.particle_results[i]
             random_position = box.cube.random_position_inside()
             new_position = Vector(random_position.x, random_position.y)
-            box.particles[i] = particle.set_position(new_position)
+            box.particle_results[i] = particle.set_position(new_position)
     return box
 
 def create_line(particle_number: int, particle_factory: ParticleFactory ) -> Box:
     particles = [particle_factory.create_particle().set_position(Vector(i * LATTICE_PARAM, 0)) for i in range(particle_number)]
-    return Box(particles=particles, cube=Cube(dimension_0=HEIGHT, dimension_1=HEIGHT))
+    return Box(particle_results=particles, cube=Cube(dimension_0=HEIGHT, dimension_1=HEIGHT))
 
 def create_hexagonal_box(particle_number: int, particle_factory: ParticleFactory) -> Box:
     ROOT_THREE_ON_TWO = np.sqrt(3) / 2
@@ -158,7 +158,7 @@ def create_hexagonal_box(particle_number: int, particle_factory: ParticleFactory
                 )
     size_x = 6* max(particle.shapes[0].radius for particle in particles) + max(particle.position.x for particle in particles) - min(particle.position.x for particle in particles)
     size_y= 6* max(particle.shapes[0].radius for particle in particles) + max(particle.position.y for particle in particles) - min(particle.position.y for particle in particles)
-    return Box(particles = particles, cube = Cube(dimension_0=size_x, dimension_1=size_y, dimension_2=HEIGHT + 0.1))
+    return Box(particle_results = particles, cube = Cube(dimension_0=size_x, dimension_1=size_y, dimension_2=HEIGHT + 0.1))
             
     
     

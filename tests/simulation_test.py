@@ -34,16 +34,16 @@ def default_box(particles: List[Particle] = None) -> Box:
     if particles is None:
         particles = default_particles()
     box = Box(
-        particles = particles,
+        particle_results = particles,
         cube = default_cube()
     )
     box.force_inside_box()
     return box
 
 def structure_box(box: Box) -> None:
-    radius =  np.average([p.shapes[1].radius for p in box.particles])
-    for i, particle in enumerate(box.particles):
-        box.particles[i] = particle.set_position(Vector(0, 2.2 * i * radius))
+    radius =  np.average([p.shapes[1].radius for p in box.particle_results])
+    for i, particle in enumerate(box.particle_results):
+        box.particle_results[i] = particle.set_position(Vector(0, 2.2 * i * radius))
 
 
 
@@ -108,7 +108,7 @@ def test_box_disperse():
     for radius in radii:
         particle_number = 50
         particles = [CoreShellParticle.gen_from_parameters(position = Vector.null_vector(), core_radius=radius, thickness = 10, core_sld=6) for _ in range(particle_number)]
-        box = Box(particles = particles, cube = cube)
+        box = Box(particle_results = particles, cube = cube)
         for in_plane in [True, False]:
             box.force_inside_box(in_plane=in_plane)
             assert box.collision_test() == False
@@ -299,8 +299,8 @@ def test_box_intensity():
     detector_image = DEFAULT_DETECTOR_IMAGE
     qx_array, qy_array = detector_image.qX, detector_image.qY
     form_calculator = sas_rmc.result_calculator.AnalyticalCalculator(qx_array, qy_array)
-    b_tensity = box_intensity([form_calculator.form_result(p) for p in box.particles], box.volume, qx_array, qy_array)
-    get_mfas = lambda : [form_calculator.form_result(p).form_nuclear for p in box.particles]
+    b_tensity = box_intensity([form_calculator.form_result(p) for p in box.particle_results], box.volume, qx_array, qy_array)
+    get_mfas = lambda : [form_calculator.form_result(p).form_nuclear for p in box.particle_results]
     mfas_prior = get_mfas()
     command = commands.MoveParticleBy(box, 15, Vector(20,20,20))
     command.execute()
@@ -313,7 +313,7 @@ def test_box_intensity():
             assert np.average(mfa_after - mfa_prior) == 0
             assert id(mfa_after) == id(mfa_prior)
 
-    b_tensity_after = box_intensity([form_calculator.form_result(p) for p in box.particles], box.volume, qx_array, qy_array)
+    b_tensity_after = box_intensity([form_calculator.form_result(p) for p in box.particle_results], box.volume, qx_array, qy_array)
     assert b_tensity.shape == b_tensity_after.shape
     assert np.average(b_tensity_after - b_tensity) != 0
 
@@ -508,7 +508,7 @@ def test_set_particle_magnetization():
     for _ in range(50):
         box = default_box()
         box.force_inside_box()
-        get_particle = lambda i : box.particles[i]
+        get_particle = lambda i : box.particle_results[i]
         particle_4_old = get_particle(4)
         magnetization = particle_4_old.magnetization
         new_magnetization = Vector.random_vector(470e3)
