@@ -2,6 +2,8 @@
 import random
 
 from sas_rmc import commands, Vector, constants
+from sas_rmc.particles import Particle, ParticleArray
+from sas_rmc.particles.particle_core_shell_spherical import CoreShellParticle
 from sas_rmc.shapes.cube import Cube
 
 
@@ -15,6 +17,22 @@ def different_random_int(n: int, number_to_avoid: int) -> int: # raises ValueErr
         if x != number_to_avoid:
             return x
     raise ValueError(f"It is impossible to avoid {number_to_avoid} from a range of {n}")
+
+def embiggen_core_shell_particle(particle: Particle, embiggen_factor: float) -> Particle:
+    if isinstance(particle, CoreShellParticle):
+        return CoreShellParticle.gen_from_parameters(
+            position=particle.get_position(),
+            magnetization=particle.get_magnetization(),
+            core_radius=particle.core_radius * embiggen_factor,
+            thickness=particle.thickness,
+            core_sld=particle.core_sld,
+            shell_sld=particle.shell_sld,
+            solvent_sld=particle.solvent_sld
+        )
+    if isinstance(particle, ParticleArray):
+        bound_particle = particle.get_bound_particle()
+        return particle.change_bound_particle(embiggen_core_shell_particle(bound_particle, embiggen_factor))
+    raise TypeError()
 
 def create_command(
         box_index: int,
@@ -68,6 +86,11 @@ def create_command(
             ),
         commands.RelativeRescale(
             change_by_factor=rng.normal(loc = 1.0, scale=nominal_rescale_change)
+            ),
+        commands.MutateParticle(
+            box_index=box_index,
+            particle_index=particle_index,
+            particle_mutation_function=lambda p : embiggen_core_shell_particle(p, rng.normal(loc = 1.0, scale=nominal_rescale_change))
             ),
         ]
     return random.choice(possible_commands)

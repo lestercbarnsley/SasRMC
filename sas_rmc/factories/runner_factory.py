@@ -50,6 +50,7 @@ core_shell_commands = {
     commands.RotateMagnetization,
     commands.RescaleCommand,
     commands.RelativeRescale,
+    commands.MutateParticle
     
 }
 

@@ -36,6 +36,12 @@ class Particle(ABC):
     
     """
 
+    def get_bound_particle(self) -> Self:
+        return self
+    
+    def change_bound_particle(self, bound_particle: Self) -> Self:
+        return bound_particle
+
     @abstractmethod
     def get_position(self) -> Vector:
         pass
