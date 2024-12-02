@@ -62,7 +62,10 @@ class GroupCommand(Command):
     command_list: list[Command]
 
     def execute(self, scattering_simulation: ScatteringSimulation) -> ScatteringSimulation:
-        return super().execute(scattering_simulation)
+        scattering_simulation_new = scattering_simulation
+        for command in self.command_list:
+            scattering_simulation_new = command.execute(scattering_simulation_new)
+        return scattering_simulation_new
 
     def execute_and_get_document(self, scattering_simulation: ScatteringSimulation) -> tuple[ScatteringSimulation, dict]:
         document = {"Action" : type(self).__name__}

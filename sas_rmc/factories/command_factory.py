@@ -31,6 +31,25 @@ def embiggen_core_shell_particle(particle: Particle, embiggen_factor: float) -> 
         )
     raise TypeError()
 
+def embiggen_core_shell_shell(particle: Particle, embiggen_factor: float) -> Particle:
+    if isinstance(particle, CoreShellParticle):
+        return CoreShellParticle.gen_from_parameters(
+            position=particle.get_position(),
+            magnetization=particle.get_magnetization(),
+            core_radius=particle.core_radius,
+            thickness=particle.thickness * embiggen_factor,
+            core_sld=particle.core_sld,
+            shell_sld=particle.shell_sld,
+            solvent_sld=particle.solvent_sld
+        )
+    raise TypeError()
+
+def embiggen_option(particle: Particle, embiggen_factor: float) -> Particle:
+    return random.choice([
+        embiggen_core_shell_particle(particle, embiggen_factor),
+        embiggen_core_shell_shell(particle, embiggen_factor)
+    ])
+
 def create_command(
         box_index: int,
         particle_index: int,
@@ -87,7 +106,7 @@ def create_command(
         commands.MutateParticle(
             box_index=box_index,
             particle_index=particle_index,
-            particle_mutation_function=lambda p : embiggen_core_shell_particle(p, rng.normal(loc = 1.0, scale=nominal_rescale_change))
+            particle_mutation_function=lambda p : embiggen_option(p, rng.normal(loc = 1.0, scale=nominal_rescale_change))
             ),
         ]
     return random.choice(possible_commands)
