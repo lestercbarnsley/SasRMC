@@ -6,11 +6,10 @@ from typing_extensions import Self
 
 from sas_rmc import Vector
 from sas_rmc.array_cache import array_cache
-from sas_rmc.particles.particle import FormResult
+from sas_rmc.particles.particle import FormResult, Particle, magnetic_sld_in_angstrom_minus_2
 from sas_rmc.particles.particle_form import ParticleArray
 from sas_rmc.particles.particle_profile import ParticleProfile
 from sas_rmc.shapes.sphere import sphere_volume, Sphere
-from sas_rmc.particles import Particle, magnetic_sld_in_angstrom_minus_2
 
 
 def theta_fn(qR: np.ndarray) -> np.ndarray:
@@ -29,7 +28,8 @@ def form_array_sphere(radius: float, sld: float, q_array: np.ndarray) -> np.ndar
 
 @array_cache(max_size=50)
 def array_magnitude(*q_component_arrays: np.ndarray) -> np.ndarray: # I'm considering moving this to vector module
-    return np.sqrt((np.array(q_component_arrays)**2).sum(axis = 0))
+    return np.sqrt((np.array(q_component_arrays)**2).sum(axis = 0)) 
+    # I'm fighting numpy's type hinting limitations here, but it's a short function with properly types inputs and outputs
 
 
 @dataclass
@@ -123,16 +123,11 @@ class SphericalParticle(Particle):
 class SphericalParticleForm(ParticleArray):
     spherical_particle: SphericalParticle
 
-    def get_bound_particle(self) -> Particle:
+    def get_bound_particle(self) -> SphericalParticle:
         return self.spherical_particle
     
-    def change_bound_particle(self, bound_particle: Particle) -> Self:
-        if not isinstance(bound_particle, SphericalParticle):
-            raise TypeError("Only bind spherical particle to this form calculator")
-        return type(self)(spherical_particle=bound_particle)
-    
     def form_result(self, qx_array: np.ndarray, qy_array: np.ndarray) -> FormResult:
-        return self.spherical_particle.form_result(qx_array, qy_array)
+        return self.get_bound_particle().form_result(qx_array, qy_array)
     
     def get_loggable_data(self) -> dict:
         return self.get_bound_particle().get_loggable_data()
@@ -145,17 +140,11 @@ class SphericalParticleProfile(ParticleProfile):
     def get_bound_particle(self) -> SphericalParticle:
         return self.spherical_particle
     
-    def change_bound_particle(self, bound_particle: Particle) -> Self:
-        if not isinstance(bound_particle, SphericalParticle):
-            raise TypeError("Only bind spherical particle to this form calculator")
-        return type(self)(spherical_particle=bound_particle)
-    
     def form_profile(self, q_profile: np.ndarray) -> np.ndarray:
-        return self.spherical_particle.form_array(q_profile, q_profile * 0)
+        return self.get_bound_particle().form_array(q_profile, q_profile * 0)
     
     def get_loggable_data(self) -> dict:
         return self.get_bound_particle().get_loggable_data()
-    
     
 
 

@@ -8,6 +8,7 @@ from typing_extensions import Self
 
 from sas_rmc.particles import FormResult, Particle
 from sas_rmc.particles.particle_form import ParticleArray
+from sas_rmc.particles.particle_profile import ParticleProfile
 from sas_rmc.particles.particle_spherical import SphericalParticle
 from sas_rmc import Vector
 from sas_rmc.shapes import Shape, Sphere, collision_detected
@@ -163,15 +164,42 @@ class CoreShellParticleForm(ParticleArray):
         )
         return cls(bound_particle=core_shell_particle)
 
-    def get_bound_particle(self) -> Particle:
+    def get_bound_particle(self) -> CoreShellParticle:
         return self.bound_particle
     
     def form_result(self, qx_array: np.ndarray, qy_array: np.ndarray) -> FormResult:
-        return self.bound_particle.form_result(qx_array, qy_array)
+        return self.get_bound_particle().form_result(qx_array, qy_array)
     
     def get_loggable_data(self) -> dict:
         return self.get_bound_particle().get_loggable_data()
     
+
+@dataclass
+class CoreShellParticleProfile(ParticleProfile):
+    bound_particle: CoreShellParticle
+
+    @classmethod
+    def gen_from_parameters(cls, position: Vector, magnetization: Vector | None = None, core_radius: float = 0, thickness: float = 0, core_sld: float = 0, shell_sld: float = 0, solvent_sld: float = 0):
+        core_shell_particle = CoreShellParticle.gen_from_parameters(
+            position=position,
+            magnetization=magnetization,
+            core_radius=core_radius,
+            thickness=thickness,
+            core_sld=core_sld,
+            shell_sld=shell_sld,
+            solvent_sld=solvent_sld
+        )
+        return cls(bound_particle=core_shell_particle) # I don't think I actually need this, so I might mark it for deletion
+    
+    def get_bound_particle(self) -> CoreShellParticle:
+        return self.bound_particle
+    
+    def form_profile(self, q_profile: np.ndarray) -> np.ndarray:
+        return self.get_bound_particle().form_array(q_profile, q_profile * 0)
+    
+    def get_loggable_data(self) -> dict:
+        return self.get_bound_particle().get_loggable_data()
+
 
 if __name__ == "__main__":
     t = CoreShellParticle.gen_from_parameters(

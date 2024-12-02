@@ -1,5 +1,4 @@
-
-
+#%%
 
 from abc import abstractmethod
 from dataclasses import dataclass
@@ -7,9 +6,7 @@ from dataclasses import dataclass
 import numpy as np
 from typing_extensions import Self
 
-from sas_rmc import Vector
 from sas_rmc.particles import Particle, FormResult, ParticleResult
-from sas_rmc.shapes import Shape
 
 
 @dataclass
@@ -33,3 +30,4 @@ class ParticleArray(ParticleResult): # This is essentially an abstract wrapper c
         loggable_data = super().get_loggable_data()
         return loggable_data | self.get_bound_particle().get_loggable_data()
         # I think the form particle wrapper should typically be transparent to the logger
+        

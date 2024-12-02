@@ -40,7 +40,7 @@ def iter_np_array(array: npt.NDArray[np.floating]) -> Iterator[float]:
     array_len = array.size
     for i in range(array_len):
         yield array.take(i).item()
-
+        
 
 # string names
 NUCLEAR_RESCALE = "Nuclear rescale"
