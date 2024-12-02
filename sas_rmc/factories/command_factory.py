@@ -29,9 +29,6 @@ def embiggen_core_shell_particle(particle: Particle, embiggen_factor: float) -> 
             shell_sld=particle.shell_sld,
             solvent_sld=particle.solvent_sld
         )
-    if isinstance(particle, ParticleArray):
-        bound_particle = particle.get_bound_particle()
-        return particle.change_bound_particle(embiggen_core_shell_particle(bound_particle, embiggen_factor))
     raise TypeError()
 
 def create_command(

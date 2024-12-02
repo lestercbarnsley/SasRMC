@@ -11,7 +11,8 @@ import pandas as pd
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 import numpy as np
 
-from sas_rmc import constants, Evaluator, commands, Controller, ControlStep, loggers, Particle
+from sas_rmc import constants, Evaluator, commands, Controller, ControlStep, loggers
+from sas_rmc.particles import ParticleResult
 from sas_rmc.scattering_simulation import ScatteringSimulation, SimulationParam
 from sas_rmc.rmc_runner import RmcRunner
 from sas_rmc.factories import parse_data, box_factory, particle_factory, command_factory, acceptable_command_factory, evaluator_factory
@@ -65,6 +66,7 @@ def particle_box_index_iterator(simulation_state: ScatteringSimulation) -> Itera
 class ParticleType(Enum):
     CoreShellParticle = "CoreShellParticle"
 
+
 @pydantic_dataclass
 class CoreShellRunner:
     simulation_title: str
@@ -92,7 +94,7 @@ class CoreShellRunner:
     box_dimension_2: float = 0.0
     box_dimension_3: float = 0.0
 
-    def create_particle(self) -> Particle:
+    def create_particle(self) -> ParticleResult:
         if self.particle_type == ParticleType.CoreShellParticle:
             return particle_factory.create_core_shell_particle(**self.__dict__)
         else:

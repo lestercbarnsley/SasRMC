@@ -74,8 +74,8 @@ class Vector:
     def to_numpy(self) -> np.ndarray:
         return np.array(self.to_list())
 
-    def to_tuple(self) -> tuple[float, ...]:
-        return tuple(self.itercomps())
+    def to_tuple(self) -> tuple[float, float, float]:
+        return self.x, self.y, self.z
     
     def __iter__(self) -> Iterator[float]:
         return self.itercomps()
@@ -188,10 +188,6 @@ class Vector:
     def random_normal_vector(cls, step_size:float = 1.0):
         random_numbers = rng.normal(loc = 0, scale = step_size, size = 3)
         return cls.from_numpy(random_numbers)
-
-
-        
-
 
 
 

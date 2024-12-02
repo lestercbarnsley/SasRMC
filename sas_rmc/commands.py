@@ -100,6 +100,7 @@ class MoveParticleBy(ParticleCommand):
         position_new = particle.get_position() + self.position_delta
         return MoveParticleTo(self.box_index, self.particle_index, position_new).execute(scattering_simulation)
 
+
 @dataclass
 class JumpParticleTo(ParticleCommand):
     reference_particle_index: int

@@ -8,8 +8,8 @@ from scipy import special
 from sas_rmc import constants, vector
 from sas_rmc.box_simulation import Box
 from sas_rmc.array_cache import method_array_cache, array_cache
-from sas_rmc.detector import Polarization
-from sas_rmc.form_calculator import box_intensity, FieldDirection, sum_array_list
+from sas_rmc.polarizer import Polarizer
+from sas_rmc.form_calculator import box_intensity, sum_array_list
 from sas_rmc.particles import ParticleArray, FormResult
 from sas_rmc.particles.particle_profile import ParticleProfile
 from sas_rmc.scattering_simulation import ScatteringSimulation
@@ -51,8 +51,7 @@ def particle_profiles_from(box: Box) -> list[ParticleProfile]:
 class AnalyticalCalculator(ResultCalculator):
     qx_array: np.ndarray
     qy_array: np.ndarray
-    polarization: Polarization
-    field_direction: FieldDirection = FieldDirection.Y
+    polarizer: Polarizer
 
     @method_array_cache(cache_holder_index=1)
     def modulated_form_array(self, particle: ParticleArray) -> FormResult:
@@ -68,10 +67,9 @@ class AnalyticalCalculator(ResultCalculator):
                 form_results=[self.modulated_form_array(particle) for particle in particle_arrays_from(box)], 
                 box_volume= box.volume, 
                 qx=self.qx_array, 
-                qy=self.qy_array, 
+                qy=self.qy_array,
+                polarizer = self.polarizer,
                 rescale_factor=scattering_simulation.scale_factor.value, 
-                polarization=self.polarization, 
-                field_direction=self.field_direction
                 ) for box in scattering_simulation.box_list],
             axis = 0
             ) # Use np.average here because the return type is also an numpy array.
@@ -94,7 +92,7 @@ class ProfileCalculator(ResultCalculator):
         return particle.form_profile(self.q_profile)
     
     def structure_factor(self, particle_i: ParticleProfile, particle_j: ParticleProfile) -> np.ndarray:
-        distance = particle_i.get_position().distance_from_vector(particle_j.get_position())
+        distance = particle_i.get_bound_particle().get_position().distance_from_vector(particle_j.get_bound_particle().get_position())
         return structure_factor(self.q_profile, distance)
     
     @method_array_cache(cache_holder_index=1, max_size=1000)
