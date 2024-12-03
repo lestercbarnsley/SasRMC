@@ -8,7 +8,7 @@ import numpy as np
 from sas_rmc import constants
 from sas_rmc.constants import np_max, np_average, np_prod, iter_np_array
 from sas_rmc.detector import DetectorImage, make_smearing_function, DEFAULT_GAUSSIAN_FLOOR_FRACTION
-from sas_rmc.result_calculator import ResultCalculator
+from sas_rmc.result_calculator import ProfileCalculator, ResultCalculator
 from sas_rmc.array_cache import method_array_cache
 from sas_rmc.acceptance_scheme import AcceptanceScheme
 from sas_rmc.scattering_simulation import ScatteringSimulation
@@ -155,6 +155,23 @@ class FitterMultiple(Fitter):
         return {f"Fitter {i}" : fitter.get_loggable_data(simulation_state) 
                 for i, fitter 
                 in enumerate(self.fitter_list)}
+    
+
+
+
+
+@dataclass
+class ProfileFitter(Fitter):
+    profile_calculator: ProfileCalculator
+    experimental_intensity: np.ndarray
+    experimental_uncertainty: np.ndarray | None = None
+
+    def calculate_goodness_of_fit(self, simulation_state: ScatteringSimulation) -> float:
+        simulated_intensity = self.profile_calculator.intensity_result(simulation_state)
+        uncertainty = self.experimental_uncertainty if self.experimental_uncertainty is not None else np.ones(self.experimental_intensity.shape)
+        difference_of_squares = ((self.experimental_intensity - simulated_intensity)**2 / uncertainty**2)
+        return np.average(difference_of_squares).item() 
+
     
 
 def get_evaluation_document(evaluator_name: str, current_goodness_of_fit: float, evaluation: bool, md: dict | None = None) -> dict:
