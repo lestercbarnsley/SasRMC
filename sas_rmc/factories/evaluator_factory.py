@@ -1,12 +1,15 @@
+#%%
+from abc import ABC, abstractmethod
 import pandas as pd
 import numpy as np
+from pydantic.dataclasses import dataclass as pydantic_dataclass
 
 from sas_rmc import polarizer
 from sas_rmc.constants import np_sum
 from sas_rmc.detector import DetectorImage, Polarization
-from sas_rmc.evaluator import EvaluatorWithFitter, FitterMultiple, Smearing2DFitter, NoSmearing2DFitter, qXqY_delta
+from sas_rmc.evaluator import Evaluator, EvaluatorWithFitter, FitterMultiple, Smearing2DFitter, NoSmearing2DFitter, qXqY_delta
 from sas_rmc.result_calculator import AnalyticalCalculator
-from sas_rmc.factories import detector_builder
+from sas_rmc.factories import detector_builder, parse_data
 
 
 def analytical_calculator_from_experimental_detector(detector: DetectorImage, density_factor: float, polarizer: polarizer.Polarizer) -> AnalyticalCalculator:
@@ -80,3 +83,76 @@ def create_evaluator_no_smearing(dataframes: dict[str, pd.DataFrame]) -> Evaluat
             weight=[np_sum(detector.shadow_factor) for detector in detector_list]
         ),
     )
+
+
+@pydantic_dataclass
+class EvaluatorFactory(ABC):
+    @abstractmethod
+    def create_evaluator(self) -> Evaluator:
+        pass
+
+    @classmethod
+    @abstractmethod
+    def create_from_dataframes(cls, dataframes: dict[str, pd.DataFrame]):
+        pass
+
+
+@pydantic_dataclass
+class EvaluatorWithSmearingFactory(EvaluatorFactory):
+    detector_list: list[DetectorImage]
+    detector_smearing: bool
+    field_direction: str = "Y"
+    density_factor: float = 1.4
+
+    def create_smearing_evaluator(self) -> EvaluatorWithFitter:
+        return EvaluatorWithFitter(
+        fitter=FitterMultiple(
+            fitter_list=[
+                create_smearing_fitter_from_experimental_detector(detector, self.density_factor, self.field_direction) 
+                for detector in self.detector_list
+            ],
+            weight=[np_sum(detector.shadow_factor) for detector in self.detector_list]
+            ),
+        )
+    
+    def create_nonsmearing_evaluator(self) -> EvaluatorWithFitter:
+        return EvaluatorWithFitter(
+            fitter=FitterMultiple(
+                fitter_list=[NoSmearing2DFitter(
+                    result_calculator=AnalyticalCalculator(
+                        qx_array=detector.qX, 
+                        qy_array=detector.qY, 
+                        polarizer=polarizer_from(detector.polarization, self.field_direction)
+                        ),
+                    experimental_detector=detector
+                ) for detector in self.detector_list],
+                weight=[np_sum(detector.shadow_factor) for detector in self.detector_list]
+            ),
+        )
+
+    def create_evaluator(self) -> EvaluatorWithFitter:
+        if self.detector_smearing:
+            return self.create_smearing_evaluator()
+        else:
+            return self.create_nonsmearing_evaluator() #It's ok to have conditionals in a factory
+        
+    @classmethod
+    def create_from_dataframes(cls, dataframes: dict[str, pd.DataFrame]):
+        detector_list = detector_builder.create_detector_images_with_smearing(dataframes)
+        value_frame = parse_data.parse_value_frame(dataframes['Simulation parameters'])
+        return cls(detector_list=detector_list, **value_frame)
+    
+    
+#%%
+if __name__ == "__main__":
+    from pathlib import Path
+    input_config_path = Path(r"E:\Programming\SasRMC\data\CoreShell Simulation Input - Copy - Copy.xlsx")
+    dataframes = pd.read_excel(
+        input_config_path,
+        dtype = str,
+        sheet_name = None,
+        keep_default_na=False,
+        )
+    
+    t = EvaluatorWithSmearingFactory.create_from_dataframes(dataframes)
+
