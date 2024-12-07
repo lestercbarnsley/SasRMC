@@ -91,11 +91,6 @@ class EvaluatorFactory(ABC):
     def create_evaluator(self) -> Evaluator:
         pass
 
-    '''@classmethod
-    @abstractmethod
-    def create_from_dataframes(cls, dataframes: dict[str, pd.DataFrame]):
-        pass'''
-
 
 @pydantic_dataclass
 class EvaluatorWithSmearingFactory(EvaluatorFactory):
@@ -133,14 +128,17 @@ class EvaluatorWithSmearingFactory(EvaluatorFactory):
     def create_evaluator(self) -> EvaluatorWithFitter:
         if self.detector_smearing:
             return self.create_smearing_evaluator()
-        else:
-            return self.create_nonsmearing_evaluator() #It's ok to have conditionals in a factory
+        return self.create_nonsmearing_evaluator() #It's ok to have conditionals in a factory
         
     @classmethod
     def create_from_dataframes(cls, dataframes: dict[str, pd.DataFrame]):
         detector_list = detector_builder.create_detector_images_with_smearing(dataframes)
         value_frame = parse_data.parse_value_frame(dataframes['Simulation parameters'])
         return cls(detector_list=detector_list, **value_frame)
+    
+
+def create_evaluator_factory_from(dataframes: dict[str, pd.DataFrame]) -> EvaluatorFactory:
+    return EvaluatorWithSmearingFactory.create_from_dataframes(dataframes)
     
     
 #%%

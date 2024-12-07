@@ -28,10 +28,7 @@ def parse_value_frame(value_frame: pd.DataFrame) -> dict:
             continue
         if any('#' in p.strip() for p in (param_name, param_value)):
             continue
-        v = param_value.strip()
-        if v.lower() in truth_dict:
-            v = truth_dict[v.lower()]
-        d[param_name.strip()] = v
+        d[param_name.strip()] = param_value.strip()
     return d
 
 

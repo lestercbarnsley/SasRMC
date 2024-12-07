@@ -10,12 +10,6 @@ from sas_rmc.constants import RNG
 rng = RNG
 
 
-class AcceptanceState(Enum):
-    UNTESTED = "untested"
-    ACCEPTABLE = "acceptable"
-    UNACCEPTABLE = "unacceptable"
-
-
 @dataclass
 class AcceptanceScheme(ABC):
     @abstractmethod

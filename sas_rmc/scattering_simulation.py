@@ -52,7 +52,7 @@ class SimulationParam:
 
 @dataclass
 class SimulationConstant(SimulationParam):
-    def set_value(self, new_value: float) -> SimulationParam:
+    def set_value(self, new_value: float) -> Self:
         return self
 
     def get_physical_acceptance(self) -> bool:

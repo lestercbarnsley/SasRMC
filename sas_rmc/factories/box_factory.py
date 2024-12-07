@@ -2,7 +2,11 @@
 from collections.abc import Callable
 from typing import Iterator, Sequence
 
+import pandas as pd
+from pydantic.dataclasses import dataclass as pydantic_dataclass
+
 from sas_rmc import Vector
+from sas_rmc.factories import parse_data
 from sas_rmc.particles import ParticleResult
 from sas_rmc.box_simulation import Box
 from sas_rmc.shapes import Cube
@@ -61,6 +65,33 @@ def create_box_list(particle_factory: Callable[[], ParticleResult], dimensions: 
         return create_box_list_without_box_number(particle_number, nominal_concentration, particle_factory, dimensions)
     return create_box_list_without_concentration(box_number, particle_number, particle_factory, dimensions)
 
+
+@pydantic_dataclass
+class BoxFactory:
+    particle_number: int | None = None
+    nominal_concentration: float | None = None
+    box_number: int | None = None
+
+    def create_box_list(self, particle_factory, dimensions: Sequence[float]) -> list[Box]:
+        if not self.particle_number:
+            if not self.nominal_concentration:
+                raise TypeError("Nominal concentration is missing")
+            if not self.box_number:
+                raise TypeError("Box number is missing")
+            return create_box_list_without_particle_number(self.box_number, self.nominal_concentration, particle_factory, dimensions)
+        if not self.box_number:
+            if not self.nominal_concentration:
+                raise TypeError("Nominal concentration is missing")
+            if not self.particle_number:
+                raise TypeError("Particle number is missing")
+            return create_box_list_without_box_number(self.particle_number, self.nominal_concentration, particle_factory, dimensions)
+        return create_box_list_without_concentration(self.box_number, self.particle_number, particle_factory, dimensions)
+
+    @classmethod
+    def create_from_dataframes(cls, dataframes: dict[str, pd.DataFrame]):
+        value_frame = parse_data.parse_value_frame(dataframes['Simulation parameters'])
+        return cls(**value_frame)
+
 if __name__ == "__main__":
-    print(Vector(0,1))
+    pass
 

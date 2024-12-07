@@ -205,7 +205,7 @@ class CommandFactory:
                 self.create_jump_particle_to,
                 self.create_orbit_particle
             ])
-        if self.allow_magnetization_changes:
+        if self.allow_magnetization_changes and self.nominal_magnetization:
             create_allowed_commands.extend([
                 self.create_magnetize_particle,
                 self.create_rescale_magnetization,
@@ -232,4 +232,6 @@ class CommandFactory:
 
 if __name__ == "__main__":
     print(different_random_int(100,0))
+
+    
 # %%
