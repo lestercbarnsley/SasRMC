@@ -3,21 +3,6 @@ import inspect
 
 import pandas as pd
 
-  
-truth_dict = {
-    'ON' : True,
-    'OFF' : False,
-    'on' : True,
-    'off' : False,
-    'On': True,
-    'Off': False,
-    'True' :  True,
-    'TRUE' : True,
-    'true' : True,
-    'False' :  False,
-    'FALSE' : False,
-    'false' : False
-} # I'm sure I haven't come close to fully covering all the wild and creative ways users could say "True" or "False"
 
 def parse_value_frame(value_frame: pd.DataFrame) -> dict:
     d = {}
