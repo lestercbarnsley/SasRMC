@@ -7,6 +7,7 @@ from pydantic.dataclasses import dataclass as pydantic_dataclass
 
 from sas_rmc.factories import parse_data
 from sas_rmc.factories.box_factory import BoxFactory
+from sas_rmc.factories.particle_factory import ParticleFactory
 from sas_rmc.scattering_simulation import ScatteringSimulation, SimulationParam
 
 
@@ -26,7 +27,7 @@ class SimulationStateFactory:
             raise ValueError("Box dimensions are missing.")
         return ScatteringSimulation(
             scale_factor=SimulationParam( 1.0, name = "scale_factor", bounds = (0, np.inf)),
-            box_list=self.box_factory.create_box_list(self.create_particle, box_dimensions)
+            box_list=self.box_factory.create_box_list(self.particle_factory, box_dimensions)
         )
 
     @classmethod
