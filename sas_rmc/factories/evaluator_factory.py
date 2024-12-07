@@ -91,10 +91,10 @@ class EvaluatorFactory(ABC):
     def create_evaluator(self) -> Evaluator:
         pass
 
-    @classmethod
+    '''@classmethod
     @abstractmethod
     def create_from_dataframes(cls, dataframes: dict[str, pd.DataFrame]):
-        pass
+        pass'''
 
 
 @pydantic_dataclass
