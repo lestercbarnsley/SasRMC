@@ -1,5 +1,4 @@
 #%%
-from collections.abc import Callable
 from typing import Iterator, Sequence
 
 import pandas as pd

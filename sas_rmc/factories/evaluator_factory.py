@@ -1,5 +1,8 @@
 #%%
 from abc import ABC, abstractmethod
+from enum import Enum
+
+from typing_extensions import assert_never
 import pandas as pd
 import numpy as np
 from pydantic.dataclasses import dataclass as pydantic_dataclass
@@ -147,8 +150,34 @@ class EvaluatorWithSmearingFactory(EvaluatorFactory):
         return cls(detector_list=detector_list, **value_frame)
     
 
+class ProfileType(Enum):
+    DETECTOR_IMAGE = "detector_image"
+    PROFILE = "profile"
+
+
+def infer_profile_type_from_dataframe(dataframe: pd.DataFrame) -> ProfileType:
+    if all(col_name in [col.lower() for col in dataframe.columns] for col_name in ['qx', 'qy']):
+        return ProfileType.DETECTOR_IMAGE
+    elif 'q' in [col.lower() for col in dataframe.columns]:
+        return ProfileType.PROFILE
+    raise ValueError("Cannot infer profile type from headers in detector data sheets")
+
+def infer_profile_type(dataframes: dict[str, pd.DataFrame]) -> ProfileType:
+    value_frame = parse_data.parse_value_frame(dataframes['Simulation parameters'])
+    data_source = value_frame.get("Data Source")
+    if data_source:
+        return infer_profile_type_from_dataframe(dataframes[data_source])
+    data_params = dataframes['Data parameters']
+    data_source = data_params['Data Source'].iloc[0]
+    return infer_profile_type_from_dataframe(dataframes[data_source])
+
 def create_evaluator_factory_from(dataframes: dict[str, pd.DataFrame]) -> EvaluatorFactory:
-    return EvaluatorWithSmearingFactory.create_from_dataframes(dataframes)
+    profile_type = infer_profile_type(dataframes)
+    if profile_type == ProfileType.DETECTOR_IMAGE:
+        return EvaluatorWithSmearingFactory.create_from_dataframes(dataframes)
+    if profile_type == ProfileType.PROFILE:
+        raise NotImplementedError("To be done")
+    assert_never(profile_type)
     
     
 #%%
