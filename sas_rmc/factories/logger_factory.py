@@ -1,6 +1,7 @@
 
 
 from abc import ABC, abstractmethod
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -12,8 +13,12 @@ from sas_rmc.factories.evaluator_factory import ProfileType, infer_profile_type
 from sas_rmc.loggers.logger import LogCallback
 
 
+DATETIME_FORMAT = '%Y%m%d%H%M%S'
+
+
 @pydantic_dataclass
 class LoggerFactory(ABC):
+    
     @abstractmethod
     def create_callbacks(self) -> LogCallback:
         pass
@@ -44,7 +49,8 @@ class CallbackFactory(LoggerFactory):
     @classmethod
     def create_from_dataframes(cls, dataframes: dict[str, pd.DataFrame], result_folder: Path):
         value_frame = parse_data.parse_value_frame(dataframes['Simulation parameters'])
-        return CallbackFactory(result_folder = result_folder, **value_frame)
+        datetime_string = datetime.now().strftime(DATETIME_FORMAT)
+        return CallbackFactory(result_folder = result_folder, datetime_string=datetime_string, **value_frame)
     
 
 def create_logger_from_dataframes(dataframes: dict[str, pd.DataFrame], result_folder: Path) -> LoggerFactory:

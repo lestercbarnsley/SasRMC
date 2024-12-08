@@ -21,11 +21,11 @@ def create_metropolis_acceptance(temperature: float, cycle: int, step: int) -> M
 
 @pydantic_dataclass
 class AcceptanceFactory:
-    annealing_stop_cycle_number: int
-    anneal_start_temp: float
     annealing_type: str
     total_cycles: int
-    anneal_fall_rate: float
+    anneal_start_temp: float = 10
+    anneal_fall_rate: float = 0.1
+    annealing_stop_cycle_number: int = -1
 
     def create_very_fast_temperature(self, cycle: int) -> float:
         annealing_stop_cycle = self.annealing_stop_cycle_number if self.annealing_stop_cycle_number > 0 else int(self.total_cycles / 2)

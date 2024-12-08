@@ -19,7 +19,7 @@ class RunnerFactory:
     state_factory: SimulationStateFactory
     evaluator_factory: EvaluatorFactory
     callback_factory: LoggerFactory
-    force_log: bool
+    force_log_file: bool
 
     def create_runner(self) -> RmcRunner:
         evaluator=self.evaluator_factory.create_evaluator()
@@ -31,7 +31,7 @@ class RunnerFactory:
                 evaluator=evaluator,
                 log_callback=self.callback_factory.create_callbacks()
             ),
-            force_log=self.force_log
+            force_log=self.force_log_file
         )
 
     @classmethod
@@ -66,7 +66,9 @@ def create_runner(input_config_path: Path, result_folder: Path) -> RmcRunner:
 
 
 if __name__ == "__main__":
-    pass
+    input_path = Path(r"E:\Programming\SasRMC\data\CoreShell Simulation Input - Copy.xlsx")
+    output = Path(r"E:\Programming\SasRMC\data\results")
+    runner = create_runner(input_path, output)
     
     
 

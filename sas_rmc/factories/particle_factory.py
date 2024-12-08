@@ -92,7 +92,7 @@ class CoreShellParticleFactory(ParticleFactory):
         value_frame = parse_data.parse_value_frame(dataframes['Simulation parameters'])
         return cls(profile_type = profile_type, **value_frame)
 
-def create_from_dataframes(dataframes: dict[str, pd.DataFrame]) -> ParticleFactory:
+def create_particle_factory_from_dataframes(dataframes: dict[str, pd.DataFrame]) -> ParticleFactory:
     value_frame = parse_data.parse_value_frame(dataframes['Simulation parameters'])
     particle_type = value_frame['particle_type']
     profile_type = infer_profile_type(dataframes)
