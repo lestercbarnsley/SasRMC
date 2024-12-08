@@ -39,7 +39,7 @@ class RunnerFactory:
 
     def create_runner(self) -> RmcRunner:
         evaluator=self.evaluator_factory.create_evaluator()
-        state = self.state_factory.create_simulation_state(evaluator.default_box_dimensions())
+        state = self.state_factory.create_simulation_state(self.evaluator_factory.default_box_dimensions())
         return RmcRunner(
             simulator=Simulator(
                 controller = self.controller_factory.create_controller(state),

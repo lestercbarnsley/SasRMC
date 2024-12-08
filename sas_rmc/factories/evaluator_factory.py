@@ -5,7 +5,7 @@ import numpy as np
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 
 from sas_rmc import polarizer
-from sas_rmc.constants import np_sum
+from sas_rmc.constants import np_sum, PI
 from sas_rmc.detector import DetectorImage, Polarization
 from sas_rmc.evaluator import Evaluator, EvaluatorWithFitter, FitterMultiple, Smearing2DFitter, NoSmearing2DFitter, qXqY_delta
 from sas_rmc.result_calculator import AnalyticalCalculator
@@ -91,6 +91,10 @@ class EvaluatorFactory(ABC):
     def create_evaluator(self) -> Evaluator:
         pass
 
+    @abstractmethod
+    def default_box_dimensions(self) -> list[float]:
+        pass
+
 
 @pydantic_dataclass
 class EvaluatorWithSmearingFactory(EvaluatorFactory):
@@ -129,6 +133,12 @@ class EvaluatorWithSmearingFactory(EvaluatorFactory):
         if self.detector_smearing:
             return self.create_smearing_evaluator()
         return self.create_nonsmearing_evaluator() #It's ok to have conditionals in a factory
+    
+    def default_box_dimensions(self) -> list[float]:
+        qXqY_delta_list = [qXqY_delta(experimental_detector) for experimental_detector in self.detector_list]
+        smallest_qxqy = min(qXqY_delta_list, key = lambda delta : delta[0] + delta[1])
+        qX_diff, qY_diff = smallest_qxqy
+        return [2 * PI / qX_diff, 2 * PI / qY_diff, 2 * PI / qX_diff]
         
     @classmethod
     def create_from_dataframes(cls, dataframes: dict[str, pd.DataFrame]):

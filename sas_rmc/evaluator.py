@@ -25,10 +25,6 @@ class Evaluator(ABC):
         pass
 
     @abstractmethod
-    def default_box_dimensions(self) -> list[float]:
-        pass
-
-    @abstractmethod
     def get_loggable_data(self, simulation_state: ScatteringSimulation) -> dict:
         pass
 
@@ -38,10 +34,6 @@ class Fitter(ABC):
 
     @abstractmethod
     def calculate_goodness_of_fit(self, simulation_state: ScatteringSimulation) -> float:
-        pass
-
-    @abstractmethod
-    def default_box_dimensions(self) -> list[float]:
         pass
 
     @abstractmethod
@@ -85,7 +77,7 @@ class Smearing2DFitter(Fitter):
             gaussian_floor=self.gaussian_floor
         )
     
-    def default_box_dimensions(self) -> list[float]:
+    def default_box_dimensions(self) -> list[float]: # Mark for deletion
         qX_diff, qY_diff = qXqY_delta(self.experimental_detector)
         return [2 * PI / qX_diff, 2 * PI / qY_diff, 2 * PI / qX_diff]
         
@@ -116,7 +108,7 @@ class NoSmearing2DFitter(Fitter):
         intensity_result = self.result_calculator.intensity_result(simulation_state)
         return intensity_result
 
-    def default_box_dimensions(self) -> list[float]:
+    def default_box_dimensions(self) -> list[float]: # Mark for deletion
         qX_diff, qY_diff = qXqY_delta(self.experimental_detector)
         return [2 * PI / qX_diff, 2 * PI / qY_diff, 2 * PI / qX_diff]
 
@@ -145,12 +137,6 @@ class FitterMultiple(Fitter):
             weights=self.weight
         )
 
-    def default_box_dimensions(self) -> list[float]:
-        return max(
-            [fitter.default_box_dimensions() for fitter in self.fitter_list], 
-            key=lambda box_dimension : np_prod(np.array(box_dimension))
-            )
-
     def get_loggable_data(self, simulation_state: ScatteringSimulation) -> dict:
         return {f"Fitter {i}" : fitter.get_loggable_data(simulation_state) 
                 for i, fitter 
@@ -170,7 +156,10 @@ class ProfileFitter(Fitter):
         simulated_intensity = self.profile_calculator.intensity_result(simulation_state)
         uncertainty = self.experimental_uncertainty if self.experimental_uncertainty is not None else np.ones(self.experimental_intensity.shape)
         difference_of_squares = ((self.experimental_intensity - simulated_intensity)**2 / uncertainty**2)
-        return np.average(difference_of_squares).item() 
+        return np.average(difference_of_squares).item()
+    
+    def get_loggable_data(self, simulation_state: ScatteringSimulation) -> dict:
+        raise NotImplementedError("To be implemented")
 
     
 
@@ -229,9 +218,6 @@ class EvaluatorWithFitter(Evaluator):
             self.update_chi_squared(new_chi_squared=new_goodness_of_fit) # State has changed
             return self.evaluation_with_success(acceptance_scheme, self.current_chi_squared)
         return self.evaluation_without_success(acceptance_scheme, new_goodness_of_fit)   
-    
-    def default_box_dimensions(self) -> list[float]:
-        return self.fitter.default_box_dimensions()
     
     def get_loggable_data(self, simulation_state: ScatteringSimulation) -> dict:
         return {
