@@ -55,12 +55,17 @@ class CommandFactory:
     particle_type: str
     allow_particle_physics: bool = True
     allow_magnetization_changes: bool = True
-    allow_morphology_changes: bool = True
+    allow_morphology_changes: bool = False
     allow_simulation_changes: bool = True
     nominal_angle_change: float = PI/8
     nominal_rescale_change: float = 0.02
     nominal_magnetization: float = 0
+    core_magnetization: float = 0
     move_by_distance: float | None = None
+
+    def get_magnetization(self) -> float:
+        # This exists to account for multiple names for nominal magnetization
+        return max(self.nominal_magnetization, self.core_magnetization, key = abs)
 
     def create_move_by(self, simulation_state: ScatteringSimulation, box_index: int, particle_index: int) -> commands.MoveParticleBy:
         move_by_distance = self.move_by_distance if self.move_by_distance is not None else (simulation_state.get_particle(box_index, particle_index).get_volume()**(1/3)) / 2
@@ -90,12 +95,19 @@ class CommandFactory:
             particle_index=particle_index,
             relative_angle=rng.normal(loc = 0, scale=self.nominal_angle_change),
         )
+
+    def create_rotate_particle(self, _: ScatteringSimulation, box_index: int, particle_index: int) -> commands.RotateParticle:
+        return commands.RotateParticle(
+            box_index=box_index,
+            particle_index=particle_index,
+            relative_angle=rng.normal(loc = 0, scale=self.nominal_angle_change),
+        )
     
     def create_magnetize_particle(self, _: ScatteringSimulation, box_index: int, particle_index: int) -> commands.MagnetizeParticle:
         return commands.MagnetizeParticle(
             box_index=box_index,
             particle_index=particle_index,
-            magnetization=Vector.random_vector_xy(length=rng.normal(loc = 0, scale = self.nominal_magnetization))
+            magnetization=Vector.random_vector_xy(length=rng.normal(loc = 0, scale = self.get_magnetization()))
         )
         
     def create_rescale_magnetization(self, _: ScatteringSimulation, box_index: int, particle_index: int) -> commands.RescaleMagnetization:
@@ -145,7 +157,11 @@ class CommandFactory:
                 self.create_jump_particle_to,
                 self.create_orbit_particle
             ])
-        if self.allow_magnetization_changes and self.nominal_magnetization:
+            if self.particle_type not in ["CoreShellParticle"]:
+                create_allowed_commands.extend([
+                    self.create_rotate_particle
+                ])
+        if self.allow_magnetization_changes and self.get_magnetization():
             create_allowed_commands.extend([
                 self.create_magnetize_particle,
                 self.create_rescale_magnetization,
