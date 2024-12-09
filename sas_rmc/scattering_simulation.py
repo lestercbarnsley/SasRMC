@@ -60,6 +60,10 @@ class SimulationConstant(SimulationParam):
     
     def get_loggable_data(self) -> dict:
         return super().get_loggable_data()
+    
+
+def box_physical_acceptance(box: Box, particle_index: int) -> bool:
+    return not box.wall_or_particle_collision(particle_index)
 
 
 @dataclass
@@ -77,38 +81,41 @@ class ScatteringSimulation:
         if any(box.collision_test() for box in self.box_list):
             return False
         return True
-
-    def validate_new_state(self, new_state: Self) -> Self:
-        if self.get_physical_acceptance():
-            return new_state
-        new_state.physical_acceptance = new_state.get_physical_acceptance_strong()
-        return new_state
+    
+    def validate_state(self) -> Self:
+        return type(self)(
+            scale_factor = self.scale_factor,
+            box_list = self.box_list,
+            physical_acceptance = self.get_physical_acceptance_strong()
+        )
     
     def set_scale_factor(self, new_scale_factor: float) -> Self:
         scale_factor = self.scale_factor.set_value(new_scale_factor)
-        return self.validate_new_state(
-            type(self)(
-                scale_factor=scale_factor,
-                box_list = self.box_list,
-                physical_acceptance = scale_factor.get_physical_acceptance()
-            )
+        new_state = type(self)(
+            scale_factor=scale_factor,
+            box_list = self.box_list,
+            physical_acceptance = scale_factor.get_physical_acceptance()
         )
+        if self.get_physical_acceptance():
+            return new_state
+        return new_state.validate_state()
     
     def get_particle(self, box_index: int, particle_index: int) -> Particle:
         return self.box_list[box_index].get_particle(particle_index)
     
     def change_particle(self, box_index: int, particle_index: int, new_particle: Particle) -> Self:
         new_box = self.box_list[box_index].change_particle(particle_index, new_particle)
-        physical_acceptance = not new_box.wall_or_particle_collision(particle_index)
-        return self.validate_new_state(
-            type(self)(
-                scale_factor=self.scale_factor,
-                box_list=[
-                    box if box_index !=i else new_box
-                    for i, box in enumerate(self.box_list)],
-                physical_acceptance = physical_acceptance
-            )
+        physical_acceptance = box_physical_acceptance(new_box, particle_index)
+        new_state = type(self)(
+            scale_factor=self.scale_factor,
+            box_list=[
+                box if box_index !=i else new_box
+                for i, box in enumerate(self.box_list)],
+            physical_acceptance = physical_acceptance
         )
+        if self.get_physical_acceptance():
+            return new_state
+        return new_state.validate_state()
     
     def get_loggable_data(self) -> dict:
         return {

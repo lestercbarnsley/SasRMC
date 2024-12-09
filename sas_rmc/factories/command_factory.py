@@ -1,4 +1,5 @@
 #%%
+from collections.abc import Callable
 import random
 
 import pandas as pd
@@ -9,7 +10,6 @@ from sas_rmc.factories import parse_data
 from sas_rmc.particles import Particle
 from sas_rmc.particles.particle_core_shell_spherical import CoreShellParticle
 from sas_rmc.scattering_simulation import ScatteringSimulation
-from sas_rmc.shapes.cube import Cube
 
 
 rng = constants.RNG
@@ -49,76 +49,10 @@ def embiggen_core_shell_shell(particle: Particle, embiggen_factor: float) -> Par
         )
     raise TypeError()
 
-def embiggen_option(particle: Particle, embiggen_factor: float) -> Particle:
-    return random.choice([
-        embiggen_core_shell_particle(particle, embiggen_factor),
-        embiggen_core_shell_shell(particle, embiggen_factor)
-    ])
-
-def create_command(
-        box_index: int,
-        particle_index: int,
-        move_by_distance: float,
-        cube: Cube,
-        total_particle_number: int,
-        nominal_angle_change: float = PI/8,
-        nominal_rescale_change: float = 0.02,
-        nominal_magnetization: float = 0,
-        ) -> commands.Command:
-    possible_commands = [
-        commands.MoveParticleBy(
-            box_index=box_index,
-            particle_index=particle_index,
-            position_delta=Vector.random_vector_xy(length=rng.normal(loc = 0, scale = move_by_distance))
-            ),
-        commands.MoveParticleTo(
-            box_index=box_index,
-            particle_index=particle_index,
-            position_new=cube.random_position_inside().project_to_xy()
-            ),
-        commands.JumpParticleTo(
-            box_index=box_index,
-            particle_index=particle_index,
-            reference_particle_index=different_random_int(total_particle_number, particle_index)
-            ),
-        commands.OrbitParticle(
-            box_index=box_index,
-            particle_index=particle_index,
-            relative_angle=rng.normal(loc = 0, scale=nominal_angle_change),
-            ),
-        commands.MagnetizeParticle(
-            box_index=box_index,
-            particle_index=particle_index,
-            magnetization=Vector.random_vector_xy(length=rng.normal(loc = 0, scale = nominal_magnetization))
-            ),
-        commands.RescaleMagnetization(
-            box_index=box_index,
-            particle_index=particle_index,
-            rescale_factor=rng.normal(loc = 1.0, scale=nominal_rescale_change)
-            ),
-        commands.RotateMagnetization(
-           box_index=box_index,
-            particle_index=particle_index,
-            relative_angle=rng.normal(loc = 0, scale=nominal_angle_change),
-            ), 
-        commands.FlipMagnetization(
-            box_index=box_index,
-            particle_index=particle_index
-            ),
-        commands.RelativeRescale(
-            change_by_factor=rng.normal(loc = 1.0, scale=nominal_rescale_change)
-            ),
-        commands.MutateParticle(
-            box_index=box_index,
-            particle_index=particle_index,
-            particle_mutation_function=lambda p : embiggen_option(p, rng.normal(loc = 1.0, scale=nominal_rescale_change))
-            ),
-        ]
-    return random.choice(possible_commands)
-
 
 @pydantic_dataclass
 class CommandFactory:
+    particle_type: str
     allow_particle_physics: bool = True
     allow_magnetization_changes: bool = True
     allow_morphology_changes: bool = True
@@ -195,6 +129,12 @@ class CommandFactory:
             particle_index=particle_index,
             particle_mutation_function=lambda p : embiggen_core_shell_shell(p, embiggen_factor=rng.normal(loc = 1.0, scale=self.nominal_rescale_change))
         )
+    
+    def core_shell_particle_mutations(self) -> list[Callable[[ScatteringSimulation, int, int], commands.MutateParticle]]:
+        return [
+            self.create_embiggen_core_shell_particle,
+            self.create_embiggen_core_shell_shell
+            ]
         
     def create_command(self, simulation_state: ScatteringSimulation, box_index: int, particle_index: int) -> commands.Command:
         create_allowed_commands = []
@@ -216,11 +156,11 @@ class CommandFactory:
                 self.create_relative_rescale
             ])
         if self.allow_morphology_changes:
-            if isinstance(simulation_state.get_particle(box_index, particle_index), CoreShellParticle):
-                create_allowed_commands.extend([
-                    self.create_embiggen_core_shell_particle,
-                    self.create_embiggen_core_shell_shell
-                ])
+            match self.particle_type:
+                case "CoreShellParticle":
+                    create_allowed_commands.extend(self.core_shell_particle_mutations())
+                case _:
+                    pass
         create = random.choice(create_allowed_commands)
         return create(simulation_state, box_index, particle_index)
 

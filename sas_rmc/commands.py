@@ -135,7 +135,8 @@ class OrbitParticle(ParticleCommand):
 
     def execute(self, scattering_simulation: ScatteringSimulation) -> ScatteringSimulation:
         particle = self.get_particle(scattering_simulation)
-        reference_particle = scattering_simulation.box_list[self.box_index].get_nearest_particle(particle.get_position())
+        box = scattering_simulation.box_list[self.box_index]
+        reference_particle = box.get_nearest_particle(self.particle_index)
         position_new = small_angle_change(particle.get_position(), self.relative_angle, reference_particle.get_position())
         return MoveParticleTo(self.box_index, self.box_index, position_new).execute(scattering_simulation)
 

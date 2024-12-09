@@ -37,4 +37,5 @@ class SimulationStateFactory:
             particle_factory = particle_factory,
             box_factory = box_factory,
             **value_frame
-            )
+        )
+    

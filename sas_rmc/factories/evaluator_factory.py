@@ -2,7 +2,6 @@
 from abc import ABC, abstractmethod
 from enum import Enum
 
-from typing_extensions import assert_never
 import pandas as pd
 import numpy as np
 from pydantic.dataclasses import dataclass as pydantic_dataclass
@@ -28,21 +27,34 @@ def analytical_calculator_from_experimental_detector(detector: DetectorImage, de
         polarizer=polarizer
     )
 
+def field_direction_from(field_direction_str: str) -> polarizer.FieldDirection:
+    match field_direction_str:
+        case 'X':
+            return polarizer.FieldDirectionX()
+        case 'Y':
+            return polarizer.FieldDirectionY()
+        case 'Z':
+            return polarizer.FieldDirectionZ()
+        case _:
+            raise ValueError("This field direction string is not recognized")
+
 def polarizer_from(polarization: Polarization, field_direction_str: str) -> polarizer.Polarizer:
-    field_direction = {
-        'X' : polarizer.FieldDirectionX(),
-        'Y' : polarizer.FieldDirectionY(),
-        'Z' : polarizer.FieldDirectionZ()
-    }[field_direction_str]
-    return {
-        Polarization.MINUS_MINUS : polarizer.PolarizerMinusMinus(field_direction),
-        Polarization.MINUS_PLUS : polarizer.PolarizerMinusPlus(field_direction),
-        Polarization.PLUS_MINUS : polarizer.PolarizerPlusMinus(field_direction),
-        Polarization.PLUS_PLUS : polarizer.PolarizerPlusPlus(field_direction),
-        Polarization.SPIN_DOWN : polarizer.PolarizerSpinDown(field_direction),
-        Polarization.SPIN_UP : polarizer.PolarizerSpinUp(field_direction),
-        Polarization.UNPOLARIZED : polarizer.PolarizerUnpolarized(field_direction)
-    }[polarization]
+    field_direction = field_direction_from(field_direction_str)
+    match polarization:
+        case Polarization.MINUS_MINUS:
+            return polarizer.PolarizerMinusMinus(field_direction)
+        case Polarization.MINUS_PLUS:
+            return polarizer.PolarizerMinusPlus(field_direction)
+        case Polarization.PLUS_PLUS:
+            return polarizer.PolarizerPlusPlus(field_direction)
+        case Polarization.PLUS_MINUS:
+            return polarizer.PolarizerPlusMinus(field_direction)
+        case Polarization.SPIN_DOWN:
+            return polarizer.PolarizerSpinDown(field_direction)
+        case Polarization.SPIN_UP:
+            return polarizer.PolarizerSpinUp(field_direction)
+        case Polarization.UNPOLARIZED:
+            return polarizer.PolarizerUnpolarized(field_direction)
 
 def create_smearing_fitter_from_experimental_detector(detector: DetectorImage, density_factor: float = 1.4, field_direction_str: str = "Y") -> Smearing2DFitter:
     polarizer = polarizer_from(detector.polarization, field_direction_str)

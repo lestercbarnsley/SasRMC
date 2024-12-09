@@ -12,6 +12,14 @@ from sas_rmc.shapes import Cube
 PI = constants.PI
 rng = constants.RNG
 
+
+def random_position_inside_cube(cube: Cube) -> Vector:
+    return cube.random_position_inside()
+
+def random_position_on_cube_plane(cube: Cube) -> Vector:
+    return cube.random_position_inside().project_to_xy()
+
+
 @dataclass
 class Box:
     '''The Box class is responsible for particle mechanics, determining how and when particles can move. It has no knowledge about anything related to scattering, which is the responsibility of the Simulator class. Special cases of the Box class can be made as their own class that inherit from the Box'''
@@ -42,7 +50,7 @@ class Box:
         if not self.is_inside(particle.get_position()):
             return True
         return any(particle.collision_detected(particle_j) for j, particle_j in enumerate(self.get_particles()) if j!=particle_index)
-    
+
     def change_particle(self, particle_index: int, new_particle: Particle) -> Self:
         new_particle_res = self.particle_results[particle_index].change_particle(new_particle)
         return type(self)(
@@ -53,40 +61,30 @@ class Box:
     def move_to_new_position(self, particle_index: int, new_position: Vector) -> Self:
         new_particle = self.get_particle(particle_index).change_position(new_position)
         return self.change_particle(particle_index, new_particle)
+
+    def move_within_box(self, particle_index: int, cube_position_function: Callable[[Cube], Vector]) -> Self:
+        new_position = cube_position_function(self.cube)
+        return self.move_to_new_position(particle_index, new_position)
     
     def move_inside_box(self, particle_index: int) -> Self:
-        new_position = self.cube.random_position_inside()
-        return self.move_to_new_position(particle_index, new_position)
+        return self.move_within_box(particle_index, random_position_inside_cube)
         
     def move_to_plane(self, particle_index: int) -> Self:
-        new_position = self.cube.random_position_inside().project_to_xy()
-        return self.move_to_new_position(particle_index, new_position)
+        return self.move_within_box(particle_index, random_position_on_cube_plane)
     
     def collision_test(self) -> bool:
         if not all(self.is_inside(particle.get_position()) for particle in self.get_particles()):
             return True
         return any(particle_i.collision_detected(particle_j) for i, particle_i in enumerate(self.get_particles()) for j, particle_j in enumerate(self.get_particles()) if i > j)
     
-    def force_new_box(self, box_creation_function: Callable[[Self, int], Self]) -> Self:
-        box = self
-        l = len(box)
-        for particle_index in range(l):
-            for _ in range(100_000):
-                box = box_creation_function(box, particle_index)
-                if not box.wall_or_particle_collision(particle_index):
-                    break
-            else:
-                raise ValueError("Box is too dense to resolve")
-        return box
-        
-    def force_inside_box(self) -> Self:
-        return self.force_new_box(lambda box, p : box.move_inside_box(p))
-        
-    def force_to_plane(self) -> Self:
-        return self.force_new_box(lambda box, p : box.move_to_plane(p))
-
-    def get_nearest_particle(self, position: Vector) -> Particle:
-        return min(self.get_particles(), key = lambda particle : position.distance_from_vector(particle.get_position()))
+    def get_nearest_particle(self, particle_index: int) -> Particle:
+        current_particle_position = self.get_particle(particle_index).get_position()
+        def distance_from_particle(particle: Particle) -> float:
+            return current_particle_position.distance_from_vector(particle.get_position())
+        return min(
+            [particle for i, particle in enumerate(self.get_particles()) if i != particle_index],
+            key = distance_from_particle
+            )
         
     def get_loggable_data(self) -> dict:
         return {
