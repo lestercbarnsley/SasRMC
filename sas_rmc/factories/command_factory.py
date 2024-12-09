@@ -68,7 +68,7 @@ class CommandFactory:
         return max(self.nominal_magnetization, self.core_magnetization, key = abs)
 
     def create_move_by(self, simulation_state: ScatteringSimulation, box_index: int, particle_index: int) -> commands.MoveParticleBy:
-        move_by_distance = self.move_by_distance if self.move_by_distance is not None else (simulation_state.get_particle(box_index, particle_index).get_volume()**(1/3)) / 2
+        move_by_distance = self.move_by_distance if self.move_by_distance is not None else (simulation_state.get_particle(box_index, particle_index).get_volume()**(1/3))
         return commands.MoveParticleBy(
             box_index=box_index,
             particle_index=particle_index,
