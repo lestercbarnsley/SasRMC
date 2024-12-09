@@ -83,22 +83,26 @@ class CoreShellParticleFactory(ParticleFactory):
         )
     
     def create_particle_result(self) -> ParticleResult:
-        if self.profile_type == ProfileType.DETECTOR_IMAGE:
-            return self.create_particle_form()
-        return self.create_particle_profile()
+        match self.profile_type:
+            case ProfileType.DETECTOR_IMAGE:
+                return self.create_particle_form()
+            case ProfileType.PROFILE:
+                return self.create_particle_profile()
     
     @classmethod
     def create_from_dataframes(cls, dataframes: dict[str, pd.DataFrame], profile_type: ProfileType):
         value_frame = parse_data.parse_value_frame(dataframes['Simulation parameters'])
         return cls(profile_type = profile_type, **value_frame)
 
-def create_particle_factory_from_dataframes(dataframes: dict[str, pd.DataFrame]) -> ParticleFactory:
+def create_particle_factory_from(dataframes: dict[str, pd.DataFrame]) -> ParticleFactory:
     value_frame = parse_data.parse_value_frame(dataframes['Simulation parameters'])
     particle_type = value_frame['particle_type']
     profile_type = infer_profile_type(dataframes)
-    if particle_type == "CoreShellParticle":
-        return CoreShellParticleFactory.create_from_dataframes(dataframes, profile_type)
-    raise NotImplementedError("Other particle types currently aren't implemented")
+    match particle_type:
+        case "CoreShellParticle":
+            return CoreShellParticleFactory.create_from_dataframes(dataframes, profile_type)
+        case _:
+            raise NotImplementedError("Other particle types currently aren't implemented")
     
 
 

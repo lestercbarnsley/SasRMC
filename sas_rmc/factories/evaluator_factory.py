@@ -173,11 +173,11 @@ def infer_profile_type(dataframes: dict[str, pd.DataFrame]) -> ProfileType:
 
 def create_evaluator_factory_from(dataframes: dict[str, pd.DataFrame]) -> EvaluatorFactory:
     profile_type = infer_profile_type(dataframes)
-    if profile_type == ProfileType.DETECTOR_IMAGE:
-        return EvaluatorWithSmearingFactory.create_from_dataframes(dataframes)
-    if profile_type == ProfileType.PROFILE:
-        raise NotImplementedError("To be done")
-    assert_never(profile_type)
+    match profile_type:
+        case ProfileType.DETECTOR_IMAGE:
+            return EvaluatorWithSmearingFactory.create_from_dataframes(dataframes)
+        case ProfileType.PROFILE:
+            raise NotImplementedError("To be done")
     
     
 #%%

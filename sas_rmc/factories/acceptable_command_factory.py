@@ -40,12 +40,17 @@ class AcceptanceFactory:
         return self.anneal_start_temp / (1 + cycle)
     
     def get_temperature(self, cycle: int) -> float:
-        if self.annealing_type.lower() == "greedy".lower():
-            return 0
-        if "very".lower() not in self.annealing_type.lower():
-            return self.create_very_fast_temperature(cycle)
-        return self.create_fast_temperature(cycle)
-    
+        annealing_type = self.annealing_type.lower()
+        match annealing_type:
+            case annealing_type if "greedy" in annealing_type:
+                return 0
+            case annealing_type if "very" in annealing_type:
+                return self.create_very_fast_temperature(cycle)
+            case annealing_type if "fast" in annealing_type:
+                return self.create_fast_temperature(cycle)
+            case _:
+                return 0
+
     def create_metropolis_acceptance(self, cycle: int, step: int) -> MetropolisAcceptance:
         temperature = self.get_temperature(cycle)
         return MetropolisAcceptance(

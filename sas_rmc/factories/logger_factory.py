@@ -53,9 +53,11 @@ class CallbackFactory(LoggerFactory):
         return CallbackFactory(result_folder = result_folder, datetime_string=datetime_string, **value_frame)
     
 
-def create_logger_from_dataframes(dataframes: dict[str, pd.DataFrame], result_folder: Path) -> LoggerFactory:
+def create_logger_from(dataframes: dict[str, pd.DataFrame], result_folder: Path) -> LoggerFactory:
     profile_type = infer_profile_type(dataframes)
-    if profile_type == ProfileType.DETECTOR_IMAGE:
-        return CallbackFactory.create_from_dataframes(dataframes, result_folder)
-    raise NotImplementedError("to do")
+    match profile_type:
+        case ProfileType.DETECTOR_IMAGE:
+            return CallbackFactory.create_from_dataframes(dataframes, result_folder)
+        case ProfileType.PROFILE:
+            raise NotImplementedError("to do")
 

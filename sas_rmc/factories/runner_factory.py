@@ -5,7 +5,7 @@ from pydantic.dataclasses import dataclass as pydantic_dataclass
 import pandas as pd
 
 from sas_rmc.factories import parse_data
-from sas_rmc.factories.logger_factory import LoggerFactory, create_logger_from_dataframes
+from sas_rmc.factories.logger_factory import LoggerFactory, create_logger_from
 from sas_rmc.rmc_runner import RmcRunner
 from sas_rmc.simulator import Simulator
 from sas_rmc.factories.controller_factory import ControllerFactory
@@ -39,7 +39,7 @@ class RunnerFactory:
         state_factory = SimulationStateFactory.create_from_dataframes(dataframes)
         evaluator_factory = create_evaluator_factory_from(dataframes)
         controller_factory = ControllerFactory.create_from_dataframes(dataframes)
-        logger_factory = create_logger_from_dataframes(dataframes, result_folder)
+        logger_factory = create_logger_from(dataframes, result_folder)
         value_frame = parse_data.parse_value_frame(dataframes['Simulation parameters'])
         return RunnerFactory(
             controller_factory=controller_factory,
