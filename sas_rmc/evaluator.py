@@ -135,23 +135,29 @@ class FitterMultiple(Fitter):
                 in enumerate(self.fitter_list)}
     
 
-
-
-
 @dataclass
 class ProfileFitter(Fitter):
     profile_calculator: ProfileCalculator
     experimental_intensity: np.ndarray
     experimental_uncertainty: np.ndarray | None = None
 
+    def simulate_intensity(self, simulation_state: ScatteringSimulation) -> np.ndarray:
+        return self.profile_calculator.intensity_result(simulation_state)
+
     def calculate_goodness_of_fit(self, simulation_state: ScatteringSimulation) -> float:
-        simulated_intensity = self.profile_calculator.intensity_result(simulation_state)
+        simulated_intensity = self.simulate_intensity(simulation_state)
         uncertainty = self.experimental_uncertainty if self.experimental_uncertainty is not None else np.ones(self.experimental_intensity.shape)
         difference_of_squares = ((self.experimental_intensity - simulated_intensity)**2 / uncertainty**2)
         return np.average(difference_of_squares).item()
     
     def get_loggable_data(self, simulation_state: ScatteringSimulation) -> dict:
-        raise NotImplementedError("To be implemented")
+        experimental_uncertainty = self.experimental_uncertainty if self.experimental_uncertainty is not None else np.zeros(self.experimental_intensity.shape)
+        return {
+            "Result calculator" : type(self.profile_calculator).__name__,
+            "Experimental intensity" : [exp_intensity for exp_intensity in iter_np_array(self.experimental_intensity)],
+            "Experimental uncertainty" : [exp_intensity for exp_intensity in iter_np_array(experimental_uncertainty)],
+            "Simulated intensity" : [intensity for intensity in iter_np_array(self.simulate_intensity(simulation_state))],
+        }
 
     
 
