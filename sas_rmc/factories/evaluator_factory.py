@@ -9,9 +9,14 @@ from pydantic.dataclasses import dataclass as pydantic_dataclass
 from sas_rmc import polarizer
 from sas_rmc.constants import np_sum, PI
 from sas_rmc.detector import DetectorImage, Polarization
-from sas_rmc.evaluator import Evaluator, EvaluatorWithFitter, FitterMultiple, Smearing2DFitter, NoSmearing2DFitter, qXqY_delta
+from sas_rmc.evaluator import Evaluator, EvaluatorWithFitter, FitterMultiple, Smearing2DFitter, NoSmearing2DFitter, qXqY_delta, DEFAULT_GAUSSIAN_FLOOR_FRACTION
 from sas_rmc.result_calculator import AnalyticalCalculator
 from sas_rmc.factories import detector_builder, parse_data
+
+
+class ProfileType(Enum):
+    DETECTOR_IMAGE = "detector_image"
+    PROFILE = "profile"
 
 
 def analytical_calculator_from_experimental_detector(detector: DetectorImage, density_factor: float, polarizer: polarizer.Polarizer) -> AnalyticalCalculator:
@@ -56,7 +61,7 @@ def polarizer_from(polarization: Polarization, field_direction_str: str) -> pola
         case Polarization.UNPOLARIZED:
             return polarizer.PolarizerUnpolarized(field_direction)
 
-def create_smearing_fitter_from_experimental_detector(detector: DetectorImage, density_factor: float = 1.4, field_direction_str: str = "Y") -> Smearing2DFitter:
+def create_smearing_fitter_from_experimental_detector(detector: DetectorImage, density_factor: float = 1.4, field_direction_str: str = "Y", gaussian_floor: float = DEFAULT_GAUSSIAN_FLOOR_FRACTION) -> Smearing2DFitter:
     polarizer = polarizer_from(detector.polarization, field_direction_str)
     analytical_calculator = analytical_calculator_from_experimental_detector(detector, density_factor, polarizer)
     qx_matrix = analytical_calculator.qx_array
@@ -65,38 +70,8 @@ def create_smearing_fitter_from_experimental_detector(detector: DetectorImage, d
         result_calculator=analytical_calculator,
         experimental_detector=detector,
         qx_matrix=qx_matrix,
-        qy_matrix=qy_matrix
-    )
-
-def create_evaluator_with_smearing(dataframes: dict[str, pd.DataFrame]) -> EvaluatorWithFitter:
-    detector_list = detector_builder.create_detector_images_with_smearing(dataframes)
-    density_factor = 1.4
-    field_direction_str ="Y"
-    return EvaluatorWithFitter(
-        fitter=FitterMultiple(
-            fitter_list=[
-                create_smearing_fitter_from_experimental_detector(detector, density_factor, field_direction_str) 
-                for detector in detector_list
-            ],
-            weight=[np_sum(detector.shadow_factor) for detector in detector_list]
-        ),
-    )
-
-def create_evaluator_no_smearing(dataframes: dict[str, pd.DataFrame]) -> EvaluatorWithFitter:
-    detector_list = detector_builder.create_detector_images_no_smearing(dataframes)
-    field_direction_str ="Y"
-    return EvaluatorWithFitter(
-        fitter=FitterMultiple(
-            fitter_list=[NoSmearing2DFitter(
-                result_calculator=AnalyticalCalculator(
-                    qx_array=detector.qX, 
-                    qy_array=detector.qY, 
-                    polarizer=polarizer_from(detector.polarization, field_direction_str)
-                    ),
-                experimental_detector=detector
-            ) for detector in detector_list],
-            weight=[np_sum(detector.shadow_factor) for detector in detector_list]
-        ),
+        qy_matrix=qy_matrix,
+        gaussian_floor=gaussian_floor
     )
 
 
@@ -117,12 +92,13 @@ class EvaluatorWithSmearingFactory(EvaluatorFactory):
     detector_smearing: bool
     field_direction: str = "Y"
     density_factor: float = 1.4
+    gaussian_floor: float = DEFAULT_GAUSSIAN_FLOOR_FRACTION
 
     def create_smearing_evaluator(self) -> EvaluatorWithFitter:
         return EvaluatorWithFitter(
         fitter=FitterMultiple(
             fitter_list=[
-                create_smearing_fitter_from_experimental_detector(detector, self.density_factor, self.field_direction) 
+                create_smearing_fitter_from_experimental_detector(detector, self.density_factor, self.field_direction, self.gaussian_floor) 
                 for detector in self.detector_list
             ],
             weight=[np_sum(detector.shadow_factor) for detector in self.detector_list]
@@ -161,11 +137,6 @@ class EvaluatorWithSmearingFactory(EvaluatorFactory):
         value_frame = parse_data.parse_value_frame(dataframes['Simulation parameters'])
         return cls(detector_list=detector_list, **value_frame)
     
-
-class ProfileType(Enum):
-    DETECTOR_IMAGE = "detector_image"
-    PROFILE = "profile"
-
 
 def infer_profile_type_from_dataframe(dataframe: pd.DataFrame) -> ProfileType:
     if all(col_name in [col.lower() for col in dataframe.columns] for col_name in ['qx', 'qy']):

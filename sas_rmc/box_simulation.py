@@ -26,9 +26,6 @@ class Box:
     particle_results: list[ParticleResult]
     cube: Cube
 
-    #IF the box has no responsibility for the scattering, it should have no knowledge of the nuclear and magnetic rescale factors
-    #Now that we're using the controller pattern, we can start getting rid of the "actions" in this class, because all actions are now the responsibility of Command subclasses
-
     def __len__(self) -> int:
         return len(self.particle_results)
 

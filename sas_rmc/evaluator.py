@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from sas_rmc import constants
-from sas_rmc.constants import np_max, np_average, np_prod, iter_np_array
+from sas_rmc.constants import np_max, np_average, iter_np_array
 from sas_rmc.detector import DetectorImage, make_smearing_function, DEFAULT_GAUSSIAN_FLOOR_FRACTION
 from sas_rmc.result_calculator import ProfileCalculator, ResultCalculator
 from sas_rmc.array_cache import method_array_cache
@@ -76,10 +76,6 @@ class Smearing2DFitter(Fitter):
             qy_matrix=self.qy_matrix,
             gaussian_floor=self.gaussian_floor
         )
-    
-    def default_box_dimensions(self) -> list[float]: # Mark for deletion
-        qX_diff, qY_diff = qXqY_delta(self.experimental_detector)
-        return [2 * PI / qX_diff, 2 * PI / qY_diff, 2 * PI / qX_diff]
         
     def simulate_intensity(self, simulation_state: ScatteringSimulation) -> np.ndarray:
         intensity_result = self.result_calculator.intensity_result(simulation_state)
@@ -107,10 +103,6 @@ class NoSmearing2DFitter(Fitter):
     def simulate_intensity(self, simulation_state: ScatteringSimulation) -> np.ndarray:
         intensity_result = self.result_calculator.intensity_result(simulation_state)
         return intensity_result
-
-    def default_box_dimensions(self) -> list[float]: # Mark for deletion
-        qX_diff, qY_diff = qXqY_delta(self.experimental_detector)
-        return [2 * PI / qX_diff, 2 * PI / qY_diff, 2 * PI / qX_diff]
 
     def calculate_goodness_of_fit(self, simulation_state: ScatteringSimulation) -> float:
         simulated_intensity = self.simulate_intensity(simulation_state)
@@ -228,8 +220,8 @@ class EvaluatorWithFitter(Evaluator):
 
 
 if __name__ == "__main__":
-    #print(repr(constants.np_average(np.random.rand(30000))))
-    print(repr(np_max(np.random.rand(10000))))
+    pass
+
 
 
 # %%
