@@ -5,16 +5,12 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from sas_rmc import constants
 from sas_rmc.constants import np_max, np_average, iter_np_array
 from sas_rmc.detector import DetectorImage, make_smearing_function, DEFAULT_GAUSSIAN_FLOOR_FRACTION
 from sas_rmc.result_calculator import ProfileCalculator, ResultCalculator
 from sas_rmc.array_cache import method_array_cache
 from sas_rmc.acceptance_scheme import AcceptanceScheme
 from sas_rmc.scattering_simulation import ScatteringSimulation
-
-
-PI = constants.PI
 
 
 @dataclass

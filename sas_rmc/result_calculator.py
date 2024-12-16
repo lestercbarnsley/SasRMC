@@ -119,6 +119,16 @@ class ProfileCalculator(ResultCalculator):
             
 
 if __name__ == "__main__":
-    pass
+    from sas_rmc.scattering_simulation import SimulationParam
+    from sas_rmc.particles.particle_core_shell_spherical import CoreShellParticleProfile, CoreShellParticle
+    from sas_rmc import Vector
+    p = ProfileCalculator(q_profile=np.linspace(3e-3, 0.3, num = 100))
+    scattering_simulation = ScatteringSimulation(
+        scale_factor=SimulationParam(1.0, name = "scale", bounds=(0, np.inf)),
+        box_list=[Box(particle_results=[CoreShellParticleProfile(CoreShellParticle.gen_from_parameters(
+            position=Vector()
+        ))])]
+        
+    )
 
 #%%
