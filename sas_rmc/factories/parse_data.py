@@ -18,7 +18,12 @@ def parse_value_frame(value_frame: pd.DataFrame) -> dict:
 
 
 if __name__ == "__main__":
-    pass
+    from pathlib import Path
+    from datetime import datetime
+
+    for f in Path(__file__).parent.iterdir():
+        now = datetime.now().timestamp()
+        print(f.name, now - f.stat().st_mtime)
     
     
 
