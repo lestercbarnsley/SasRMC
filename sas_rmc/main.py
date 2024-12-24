@@ -134,7 +134,7 @@ def create(template_type: str, output: Path) -> None:
 
 cli.add_command(run)
 cli.add_command(config)
-#cli.add_command(create)
+cli.add_command(create)
     
 
 if __name__ == "__main__":
