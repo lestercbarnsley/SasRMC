@@ -7,7 +7,9 @@ from sas_rmc import constants
 from sas_rmc.acceptance_scheme import MetropolisAcceptance, AcceptanceScheme
 from sas_rmc.factories import parse_data
 
+
 rng = constants.RNG
+
 
 def create_metropolis_acceptance(temperature: float, cycle: int, step: int) -> MetropolisAcceptance:
     return MetropolisAcceptance(
@@ -18,6 +20,7 @@ def create_metropolis_acceptance(temperature: float, cycle: int, step: int) -> M
             "Step" : step
         }
     )
+
 
 @pydantic_dataclass
 class AcceptanceFactory:
