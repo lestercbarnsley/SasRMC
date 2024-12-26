@@ -7,7 +7,7 @@ from sas_rmc.vector import Vector
 from sas_rmc.factories import simulation_factory, particle_factory
 
 @fixture
-def simulation_state():
+def simulation_state() -> ScatteringSimulation:
     return simulation_factory.SimulationStateFactory(
         particle_factory=particle_factory.CoreShellParticleFactory(
             profile_type=particle_factory.ProfileType.DETECTOR_IMAGE,
