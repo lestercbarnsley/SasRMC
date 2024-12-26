@@ -35,7 +35,7 @@ class MockCommand(Command):
     
 
 @fixture
-def simulator(simulation_state) -> Simulator:
+def simulator(simulation_state: ScatteringSimulation) -> Simulator:
     step = ControlStep(command = MockCommand(), acceptance_scheme=MetropolisAcceptance(0))
     return Simulator(
         controller=Controller([step]),
