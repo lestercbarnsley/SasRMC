@@ -52,14 +52,6 @@ def dot(a: Sequence[np.ndarray | float], b: Sequence[np.ndarray | float]) -> np.
     bz = b[2] if len(b) > 2 else 0
     return (ax * bx) + (ay * by) + (az * bz)
 
-def broadcast_array_function(getter_function: Callable[[object], object], output_dtype: Type = np.float64) -> Callable[[np.ndarray],np.ndarray]:
-    numpy_ufunc = np.frompyfunc(getter_function, 1, 1)
-    return lambda arr : numpy_ufunc(arr).astype(output_dtype)
-
-def broadcast_to_numpy_array(object_array: np.ndarray, getter_function: Callable[[object], object], output_dtype: Type = np.float64) -> np.ndarray:
-    array_function = broadcast_array_function(getter_function=getter_function, output_dtype=output_dtype)
-    return array_function(object_array)
-
 @array_cache(max_size=100_000)
 def magnitude(*comps: float) -> float:
     return float(np.sqrt((np.array(comps)**2).sum()))
@@ -154,12 +146,12 @@ class Vector:
         return {key: component for (key, component) in zip(keys, self.itercomps())}
 
     @classmethod
-    def from_list(cls, l: list[float]):
+    def from_list(cls, l: Sequence[float]):
         return cls(x = l[0], y = l[1], z = l[2])
 
     @classmethod
-    def from_numpy(cls, arr):
-        return cls(x = arr[0], y = arr[1], z = arr[2])
+    def from_numpy(cls, arr: np.ndarray):
+        return cls.from_list(arr.tolist())
 
     @classmethod
     def from_dict(cls, d: dict, vector_str: str | None = None):
@@ -208,6 +200,7 @@ if __name__ == "__main__":
     print(type(random_angle))
     print(type(np.cos(random_angle)))
     print(Vector.xy_from_angle(length=1.0, angle=random_angle))
+    
 
 
 

@@ -63,3 +63,58 @@ def test_unit_vector(vec: Vector):
 def test_unit_vector_null():
     assert Vector.null_vector().unit_vector.mag == 0
 
+def test_cross():
+    assert isinstance(Vector(1,2,3).cross(Vector(3,4, 5)), Vector)
+
+@mark.parametrize(
+        ['vec_1', 'vec_2', 'distance'],
+        [
+            (Vector(0,0,0), Vector(0,0,0), 0),
+            (Vector(1,1,1), Vector(1,1,1), 0),
+            (Vector(3,2,1), Vector(2,2,1), 1)
+        ]
+)
+def test_distance(vec_1: Vector, vec_2: Vector, distance: float):
+    assert approx(distance) == vec_1.distance_from_vector(vec_2)
+
+@mark.parametrize(
+    'vec',
+    [
+        Vector(0,0,0),
+        Vector(1,1,1)
+    ]
+)
+def test_copy(vec: Vector):
+    vec_copy = vec.copy()
+    assert vec_copy == vec
+    assert id(vec_copy) != id(vec)
+
+@mark.parametrize(
+    'vec',
+    [
+        Vector(0,0,0),
+        Vector(1,1,1),
+        Vector(5,2,1)
+    ]
+)
+def test_project(vec: Vector):
+    vec_project = vec.project_to_xy()
+    assert approx(vec_project.z) == 0
+    assert vec_project.x == vec.x
+    assert vec_project.y == vec.y
+
+@mark.parametrize(
+    'vec',
+    [
+        Vector(0,0,0),
+        Vector(1,1,1),
+        Vector(5,2,1)
+    ]
+)
+def test_rotated_basis(vec: Vector):
+    basis_set = vec.rotated_basis()
+    assert basis_set[0] == vec.unit_vector
+    assert basis_set[0] * basis_set[1] == approx(0)
+    assert basis_set[0] * basis_set[2] == approx(0)
+    assert basis_set[1] * basis_set[2] == approx(0)
+
