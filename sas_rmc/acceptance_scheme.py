@@ -1,5 +1,5 @@
 
-from enum import Enum
+
 from dataclasses import asdict, dataclass, field
 from abc import ABC, abstractmethod
 

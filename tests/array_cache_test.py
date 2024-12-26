@@ -5,6 +5,8 @@ from pytest import mark
 import numpy as np
 
 from sas_rmc.array_cache import array_cache, method_array_cache
+from sas_rmc.shapes import Sphere
+from sas_rmc.vector import Vector
 
 
 @array_cache
@@ -16,7 +18,8 @@ def mock_func(input_arg) -> tuple:
     np.array([1]),
     "test",
     [3,1,2],
-    3
+    3,
+    Sphere(1, Vector.null_vector())
 ])
 def test_array_cache_gives_same_result(input_):
 
