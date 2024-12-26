@@ -94,7 +94,6 @@ def method_array_cache(func: Callable[P, R] | None = None, max_size: int = CLASS
             res_collection = object_cache.pop(argument_tuple)
             object_cache[argument_tuple] = res_collection
             return res_collection['result']
-            #return object_cache[argument_tuple]['result']
         
         return wrapper
     if func is not None:
