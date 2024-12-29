@@ -144,6 +144,7 @@ class CoreShellParticle(Particle):
             "Core SLD" : self.core_sld,
             "Shell SLD" : self.shell_sld,
             "Solvent SLD" : self.solvent_sld,
+            "Total scattering length" : self.get_scattering_length()
         }
     
 
@@ -199,6 +200,11 @@ class CoreShellParticleProfile(ParticleProfile):
     def get_bound_particle(self) -> CoreShellParticle:
         return self.bound_particle
     
+    def change_particle(self, particle: Particle) -> Self:
+        if not isinstance(particle, CoreShellParticle):
+            raise TypeError("particle is not compatible with this particle result type")
+        return type(self)(bound_particle=particle)
+
     def form_profile(self, q_profile: np.ndarray) -> np.ndarray:
         return self.get_bound_particle().form_array(q_profile, q_profile * 0)
     

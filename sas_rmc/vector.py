@@ -1,5 +1,5 @@
 #%%
-from typing import Callable, Iterator, Type, overload, Sequence
+from typing import Iterator, overload, Sequence
 from dataclasses import dataclass
 
 import numpy as np

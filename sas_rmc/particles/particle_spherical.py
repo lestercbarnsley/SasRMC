@@ -116,21 +116,38 @@ class SphericalParticle(Particle):
             "Core radius" : self.core_sphere.radius,
             "Sphere SLD" : self.sphere_sld,
             "Solvent SLD" : self.solvent_sld,
+            "Total scattering length" : self.get_scattering_length()
         }
     
 
 @dataclass
 class SphericalParticleForm(ParticleArray):
-    spherical_particle: SphericalParticle
+    bound_particle: SphericalParticle
 
     def get_bound_particle(self) -> SphericalParticle:
-        return self.spherical_particle
+        return self.bound_particle
+    
+    def change_particle(self, particle: Particle) -> Self:
+        if not isinstance(particle, SphericalParticle):
+            raise TypeError("particle is not compatible with this particle result type")
+        return type(self)(bound_particle = particle)
     
     def form_result(self, qx_array: np.ndarray, qy_array: np.ndarray) -> FormResult:
         return self.get_bound_particle().form_result(qx_array, qy_array)
     
     def get_loggable_data(self) -> dict:
         return self.get_bound_particle().get_loggable_data()
+    
+    @classmethod
+    def gen_from_parameters(cls, position: Vector, magnetization: Vector | None = None, sphere_radius: float = 0, sphere_sld: float = 0, solvent_sld: float = 0):
+        bound_particle = SphericalParticle.gen_from_parameters(
+            position=position,
+            magnetization=magnetization,
+            sphere_radius=sphere_radius,
+            sphere_sld=sphere_radius,
+            solvent_sld=solvent_sld
+        )
+        return cls(bound_particle = bound_particle)
     
 
 @dataclass
@@ -140,13 +157,28 @@ class SphericalParticleProfile(ParticleProfile):
     def get_bound_particle(self) -> SphericalParticle:
         return self.bound_particle
     
+    def change_particle(self, particle: Particle) -> Self:
+        if not isinstance(particle, SphericalParticle):
+            raise TypeError("particle is not compatible with this particle result type")
+        return type(self)(bound_particle = particle)
+    
     def form_profile(self, q_profile: np.ndarray) -> np.ndarray:
         return self.get_bound_particle().form_array(q_profile, q_profile * 0)
     
     def get_loggable_data(self) -> dict:
         return self.get_bound_particle().get_loggable_data()
     
-
+    @classmethod
+    def gen_from_parameters(cls, position: Vector, magnetization: Vector | None = None, sphere_radius: float = 0, sphere_sld: float = 0, solvent_sld: float = 0):
+        bound_particle = SphericalParticle.gen_from_parameters(
+            position=position,
+            magnetization=magnetization,
+            sphere_radius=sphere_radius,
+            sphere_sld=sphere_radius,
+            solvent_sld=solvent_sld
+        )
+        return cls(bound_particle = bound_particle)
+    
 
 if __name__ == "__main__":
     arrs = [np.random.rand(100, 200) for i in range(3)]

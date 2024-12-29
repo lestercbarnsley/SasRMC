@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import numpy as np
 from typing_extensions import Self
 
+from sas_rmc.vector import Vector
 from sas_rmc.particles import ParticleResult
 from sas_rmc.particles.particle import Particle
 
@@ -17,6 +18,9 @@ class ParticleProfile(ParticleResult): # This is essentially an abstract wrapper
     @abstractmethod
     def get_bound_particle(self) -> Particle:
         pass
+
+    def get_position(self) -> Vector:
+        return self.get_bound_particle().get_position()
 
     def get_particle(self) -> Particle:
         return self.get_bound_particle()

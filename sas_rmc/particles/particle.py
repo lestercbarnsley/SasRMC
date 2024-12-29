@@ -62,10 +62,6 @@ class Particle(ABC):
     def collision_detected(self, other_particle: Self) -> bool:
         return collision_detected(self.get_shapes(), other_particle.get_shapes())
 
-    @abstractmethod
-    def get_scattering_length(self) -> float:
-        pass
-
     def is_magnetic(self) -> bool:
         return self.get_magnetization().mag != 0
 
@@ -88,8 +84,7 @@ class Particle(ABC):
             **self.get_position().to_dict("Position"),
             **self.get_orientation().to_dict("Orientation"),
             **self.get_magnetization().to_dict("Magnetization"),
-            'Volume' : self.get_volume(),
-            'Total scattering length' : self.get_scattering_length(),
+            'Volume' : self.get_volume()
         }
 
 

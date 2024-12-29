@@ -90,7 +90,7 @@ class ProfileCalculator(ResultCalculator):
         return particle.form_profile(self.q_profile)
     
     def structure_factor(self, particle_i: ParticleProfile, particle_j: ParticleProfile) -> np.ndarray:
-        distance = particle_i.get_bound_particle().get_position().distance_from_vector(particle_j.get_bound_particle().get_position())
+        distance = particle_i.get_position().distance_from_vector(particle_j.get_position())
         return structure_factor(self.q_profile, distance)
     
     @method_array_cache(cache_holder_index=1, max_size=1000)
