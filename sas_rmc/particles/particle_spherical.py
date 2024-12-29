@@ -181,10 +181,6 @@ class SphericalParticleProfile(ParticleProfile):
     
 
 if __name__ == "__main__":
-    arrs = [np.random.rand(100, 200) for i in range(3)]
-    q_arr = array_magnitude(arrs[0], arrs[1], arrs[2])
-    print(q_arr.shape)
+    pass
 
-    assert np.all(array_magnitude(arrs[0], arrs[1]) - np.sqrt(arrs[0]**2 + arrs[1]**2) == 0) #I'll use this for  a unit test later
-    
   #%%
