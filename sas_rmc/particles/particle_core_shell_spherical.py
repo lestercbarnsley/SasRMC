@@ -167,6 +167,11 @@ class CoreShellParticleForm(ParticleArray):
     def get_bound_particle(self) -> CoreShellParticle:
         return self.bound_particle
     
+    def change_particle(self, particle: Particle) -> Self:
+        if not isinstance(particle, CoreShellParticle):
+            raise TypeError("particle is not compatible with this particle result type")
+        return type(self)(bound_particle=particle)
+    
     def form_result(self, qx_array: np.ndarray, qy_array: np.ndarray) -> FormResult:
         return self.get_bound_particle().form_result(qx_array, qy_array)
     

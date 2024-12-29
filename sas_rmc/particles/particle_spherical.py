@@ -135,10 +135,10 @@ class SphericalParticleForm(ParticleArray):
 
 @dataclass
 class SphericalParticleProfile(ParticleProfile):
-    spherical_particle: SphericalParticle
+    bound_particle: SphericalParticle
 
     def get_bound_particle(self) -> SphericalParticle:
-        return self.spherical_particle
+        return self.bound_particle
     
     def form_profile(self, q_profile: np.ndarray) -> np.ndarray:
         return self.get_bound_particle().form_array(q_profile, q_profile * 0)

@@ -11,16 +11,17 @@ from sas_rmc.particles import Particle, FormResult, ParticleResult
 
 @dataclass
 class ParticleArray(ParticleResult): # This is essentially an abstract wrapper class that is compatible with certain concrete result calculator implementations while still being compatible with the usual scattering simulation
-    bound_particle: Particle
 
+    @abstractmethod
     def get_bound_particle(self) -> Particle:
-        return self.bound_particle
+        pass
 
     def get_particle(self) -> Particle:
         return self.get_bound_particle()
     
+    @abstractmethod
     def change_particle(self, particle: Particle) -> Self:
-        return type(self)(bound_particle=particle)
+        pass
 
     @abstractmethod
     def form_result(self, qx_array: np.ndarray, qy_array: np.ndarray) -> FormResult:
