@@ -80,4 +80,4 @@ class CylindricalParticle(Particle):
         }
     
     def form_profile(self, q_profile: np.ndarray) -> np.ndarray:
-        
+        raise NotImplementedError()
