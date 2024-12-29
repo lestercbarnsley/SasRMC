@@ -25,6 +25,12 @@ def q_squared(qx: np.ndarray, qy: np.ndarray, offset: float = 1e-16) -> np.ndarr
     qq = qx**2 + qy**2
     return np.where(qq !=0 , qq, offset)
 
+@array_cache(max_size=5_000)
+def q_tuple(qx: np.ndarray, qy: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    if qx.shape != qy.shape:
+        raise AssertionError("qx and qy arrays need to be the same shape.")
+    return qx, qy, np.zeros(qx.shape)
+
 def get_form_magnetic_x(form_result: FormResult) -> np.ndarray:
     return form_result.form_magnetic_x
 
@@ -36,7 +42,7 @@ def get_form_magnetic_z(form_result: FormResult) -> np.ndarray:
 
 def magnetic_amplitude(form_results: list[FormResult], qx: np.ndarray, qy: np.ndarray) -> list[np.ndarray]:
     fm_x, fm_y, fm_z = [sum_array_list([getter_func(form_result) for form_result in form_results]) for getter_func in (get_form_magnetic_x, get_form_magnetic_y, get_form_magnetic_z)]
-    q = (qx, qy, 0)
+    q = q_tuple(qx, qy)
     q_square = q_squared(qx, qy)
     mqm = cross(q, cross((fm_x, fm_y, fm_z), q))
     return [mq_comp / q_square for mq_comp in mqm]

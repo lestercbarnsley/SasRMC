@@ -3,7 +3,7 @@
 import numpy as np
 from pytest import approx, mark
 
-from sas_rmc.constants import np_average, np_max, np_min, np_prod, np_sum, iter_np_array
+from sas_rmc.constants import np_average, np_max, np_min, np_prod, np_sum, iter_np_array, floating_list_from
 
 @mark.parametrize(
         ['vals', 'expected_average'],
@@ -81,6 +81,24 @@ def test_np_sum(vals: list[float], expected_sum: float):
 def test_iter_np_array(vals: list[float]):
     for val in iter_np_array(np.array(vals)):
         assert isinstance(val, float | int)
+
+@mark.parametrize(
+        'vals',
+        [
+            [1,1,1],
+            [0,0,0],
+            [1,2,3,4,5],
+            [32.4, 654.61, 353.123, 541.64],
+            [-32.4, -654.61, -353.123, 541.64]
+        ]
+)
+def test_floating_list(vals: list[float]):
+    floating_list = floating_list_from(np.array(vals))
+    assert isinstance(floating_list, list)
+    for val in floating_list:
+        assert isinstance(val, float | int)
+
+
 
 
 

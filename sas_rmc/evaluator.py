@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from sas_rmc.constants import np_max, np_average, iter_np_array
+from sas_rmc.constants import np_max, np_average, floating_list_from
 from sas_rmc.detector import DetectorImage, make_smearing_function, DEFAULT_GAUSSIAN_FLOOR_FRACTION
 from sas_rmc.result_calculator import ProfileCalculator, ResultCalculator
 from sas_rmc.array_cache import method_array_cache
@@ -86,7 +86,7 @@ class Smearing2DFitter(Fitter):
         return {
             "Result calculator" : type(self.result_calculator).__name__,
             "Detector data" : self.experimental_detector.get_loggable_data(),
-            "Simulated intensity" : [intensity for intensity in iter_np_array(self.simulate_intensity(simulation_state))],
+            "Simulated intensity" : floating_list_from(self.simulate_intensity(simulation_state)),
             "Polarization" : self.experimental_detector.polarization.value,
             "Smearing" : True
         }
@@ -108,7 +108,7 @@ class NoSmearing2DFitter(Fitter):
         return {
             "Result calculator" : type(self.result_calculator).__name__,
             "Detector data" : self.experimental_detector.get_loggable_data(),
-            "Simulated intensity" : [intensity for intensity in iter_np_array(self.simulate_intensity(simulation_state))],
+            "Simulated intensity" : floating_list_from(self.simulate_intensity(simulation_state)),
             "Polarization" : self.experimental_detector.polarization.value,
             "Smearing" : False
         }
@@ -150,9 +150,9 @@ class ProfileFitter(Fitter):
         experimental_uncertainty = self.experimental_uncertainty if self.experimental_uncertainty is not None else np.zeros(self.experimental_intensity.shape)
         return {
             "Result calculator" : type(self.profile_calculator).__name__,
-            "Experimental intensity" : [exp_intensity for exp_intensity in iter_np_array(self.experimental_intensity)],
-            "Experimental uncertainty" : [exp_intensity for exp_intensity in iter_np_array(experimental_uncertainty)],
-            "Simulated intensity" : [intensity for intensity in iter_np_array(self.simulate_intensity(simulation_state))],
+            "Experimental intensity" : floating_list_from(self.experimental_intensity),
+            "Experimental uncertainty" : floating_list_from(experimental_uncertainty),
+            "Simulated intensity" : floating_list_from(self.simulate_intensity(simulation_state)),
         }
 
     

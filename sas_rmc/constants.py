@@ -40,6 +40,9 @@ def iter_np_array(array: npt.NDArray[np.floating]) -> Iterator[float]:
     array_len = array.size
     for i in range(array_len):
         yield array.take(i).item()
+
+def floating_list_from(array: npt.NDArray[np.floating]) -> list[float]:
+    return [v for v in iter_np_array(array)]
         
 
 # string names

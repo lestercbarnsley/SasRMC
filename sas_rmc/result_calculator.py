@@ -38,7 +38,6 @@ def modulated_form_array(particle: ParticleArray, qx_array: np.ndarray, qy_array
         form_magnetic_z=form_result.form_magnetic_z * modulation
     )
 
-
 def particle_arrays_from(box: Box) -> list[ParticleArray]:
     return [particle for particle in box.particle_results if isinstance(particle, ParticleArray)]
 

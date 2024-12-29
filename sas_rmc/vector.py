@@ -151,7 +151,7 @@ class Vector:
 
     @classmethod
     def from_numpy(cls, arr: np.ndarray):
-        return cls.from_list(arr.tolist())
+        return cls.from_list(constants.floating_list_from(arr))
 
     @classmethod
     def from_dict(cls, d: dict, vector_str: str | None = None):
