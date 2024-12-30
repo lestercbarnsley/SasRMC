@@ -8,7 +8,7 @@ from sas_rmc.particles.particle_spherical import SphericalParticleProfile
 from sas_rmc.result_calculator import ProfileCalculator
 from sas_rmc.scattering_simulation import ScatteringSimulation, SimulationParam
 from sas_rmc.vector import Vector
-
+from sas_rmc.shapes import Cylinder
 
 
 def create_spherical_particle_profile(position: Vector, sphere_radius: float) -> SphericalParticleProfile:
@@ -19,12 +19,39 @@ def create_spherical_particle_profile(position: Vector, sphere_radius: float) ->
         solvent_sld=0
     )
 
+def create_cylinder(central_position: Vector, radius: float, height: float) -> list[SphericalParticleProfile]:
+    SPHERE_RADIUS = 20
+
+    cylinder = Cylinder(radius=radius, height=height, central_position=central_position, orientation=Vector(0,1))
+
+    particles = []
+    for x in np.arange(start=-radius, stop=+radius, step = SPHERE_RADIUS * 2):
+        for z in np.arange(start= -radius, stop= + radius, step=SPHERE_RADIUS):
+            for y in np.arange(start = -height/2, stop=+height/2 , step = SPHERE_RADIUS):
+                position = central_position + Vector(x, y, z)
+                if cylinder.is_inside(position):
+                    particles.append(
+                        SphericalParticleProfile.gen_from_parameters(
+                            position=position,
+                            sphere_radius=SPHERE_RADIUS,
+                            sphere_sld=6.9
+                        )
+                    )
+    return particles
+
 def create_box_list() -> list[Box]:
-    radius = 100
+    radius = 40
+    height = 1000
+    '''return [
+        Box(
+            particle_results=[create_spherical_particle_profile(Vector(0, 2 * i * radius, 0), 100) for i in range(int(height / radius))],
+            cube = Cube(Vector.null_vector(), orientation=Vector(0,1, 0), dimension_0=100_000, dimension_1=100_000, dimension_2=100_000))      
+    ]'''
     return [
         Box(
-            particle_results=[create_spherical_particle_profile(Vector(0, 2 * i * radius, 0), 100) for i in range(10)],
-            cube = Cube(Vector.null_vector(), orientation=Vector(0,1, 0), dimension_0=100_000, dimension_1=100_000, dimension_2=100_000))      
+            particle_results=create_cylinder(Vector.null_vector(), radius=radius, height=height),
+            cube=Cube(Vector.null_vector(), Vector(0,1), 100_000, 100_000, 100_000)
+        )
     ]
     
 
@@ -36,7 +63,7 @@ def create_simulation() -> ScatteringSimulation:
 
 def create_result_calculator() -> ProfileCalculator:
     return ProfileCalculator(
-        q_profile=np.linspace(2e-3, 0.2, num = 1000)
+        q_profile=np.linspace(2e-3, 0.2, num = 100)
     )
 
 def main() -> None:

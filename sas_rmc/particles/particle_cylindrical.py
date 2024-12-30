@@ -81,3 +81,18 @@ class CylindricalParticle(Particle):
     
     def form_profile(self, q_profile: np.ndarray) -> np.ndarray:
         raise NotImplementedError()
+    
+    def get_delta_sld(self, relative_position: Vector) -> float:
+        position = relative_position + self.get_position()
+        if self.core_cylinder.is_inside(position):
+            return (self.cylinder_sld - self.solvent_sld) * 1e-6
+        return self.solvent_sld * 1e-6
+    
+    def get_sld_arr(self, x_arr: np.ndarray, y_arr: np.ndarray, z_arr: np.ndarray) -> np.ndarray:
+        
+    
+    def form_array(self, qx_array: np.ndarray, qy_array: np.ndarray) -> np.ndarray:
+        
+        q_array = array_magnitude(qx_array, qy_array)
+        delta_sld = self.get_delta_sld()
+        return form_array_sphere(self.core_sphere.radius, delta_sld, q_array)
