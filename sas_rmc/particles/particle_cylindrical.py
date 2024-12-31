@@ -4,15 +4,11 @@ from dataclasses import dataclass, field
 
 from typing_extensions import Self
 import numpy as np
-from scipy import special, integrate
-#from scipy.special import jv as j_bessel
+from scipy import special
 
-from sas_rmc import constants, Vector, vector
+from sas_rmc import Vector, vector
 from sas_rmc.shapes import Cylinder, Shape
 from sas_rmc.particles.particle import Particle
-
-j_bessel = special.jv
-PI = constants.PI
 
 
 @dataclass
@@ -99,74 +95,34 @@ class CylindricalParticle(Particle):
     def form_arr(self, q: np.ndarray, alpha: np.ndarray) -> np.ndarray:
         h_arg = q * self.core_cylinder.height * np.cos(alpha)
         r_arg = q * self.core_cylinder.radius * np.sin(alpha)
-        return 2 * (self.cylinder_sld - self.solvent_sld) * self.get_volume() * special.spherical_jn(0, h_arg) * special.j0(r_arg) / r_arg
+        return 2 * (self.cylinder_sld - self.solvent_sld) * self.get_volume() * special.spherical_jn(0, h_arg) * special.j0(r_arg)#np.where(r_arg != 0, special.j0(r_arg) / r_arg, 1)
     
     def form_array(self, qx_array: np.ndarray, qy_array: np.ndarray) -> np.ndarray:
         
-        def alpha_angle(qx, qy: float) -> float:
-            return np.cos(Vector(qx, qy).unit_vector * self.get_orientation().unit_vector)
-        alpha = np.frompyfunc(alpha_angle, nin = 2, nout = 1)(qx_array, qy_array)
         q = np.sqrt(qx_array**2 + qy_array**2)
+        alpha = np.acos(vector.dot((qx_array / q, qy_array / q), self.get_orientation().unit_vector.to_tuple()))
         return self.form_arr(q, alpha)
     
 
 
 if __name__ == "__main__":
     from matplotlib import pyplot as plt
-    from sas_rmc.polarizer import mod
     cylinder = CylindricalParticle(
-        core_cylinder=Cylinder(100, 100, Vector.null_vector(), Vector(0, 1)),
+        core_cylinder=Cylinder(10, 300, Vector.null_vector(), Vector(0, 1, 0)),
         cylinder_sld=6.9,
         solvent_sld=0
     )
     qx, qy = np.meshgrid(
-        np.linspace(-0.05, 0.05, num = 101),
-        np.linspace(-0.05, 0.05, num = 101)
+        np.linspace(-0.4, 0.4, num = 101),
+        np.linspace(-0.4, 0.4, num = 101)
     )
-    #f = cylinder.form_array(qx, qy)
+    f = cylinder.form_array(qx, qy)
 
-    def sld(x: float, y: float, z: float) -> float:
-        return cylinder.get_sld_at_position(Vector(x, y, z))
-    
-    from scipy.integrate import quad
-
-    def sld_(x: float, y: float) -> float:
-        extent = cylinder.core_cylinder.height
-        return quad(lambda z: sld(x, y, z), -extent, +extent)[0]
-
-    def element(qx: float, qy: float, delta_x: np.ndarray, delta_y: np.ndarray, sld_array: np.ndarray, xarr: np.ndarray, yarr: np.ndarray) -> float:
-        return np.sum(delta_x * delta_y * sld_array * np.exp(1j * (qx * xarr + qy * yarr)))
-
-    def sld_arr(x, y) -> np.ndarray:
-        return np.frompyfunc(sld_, nin=2, nout=1)(x, y)
-
-    def form_(qx: np.ndarray, qy: np.ndarray):
-        x, y = np.meshgrid(
-            np.linspace(-100, +100, num = 31),
-            np.linspace(-100, +100, num=31)
-        )
-        sld_arr = np.frompyfunc(sld_, nin=2, nout=1)(x, y)
-        delta_x = np.gradient(x, axis=1)
-        delta_y = np.gradient(y, axis=0)
-        return np.frompyfunc(lambda qxi, qyi : element(qxi, qyi, delta_x, delta_y, sld_arr, x, y), nin=2, nout=1)(qx, qy)
-
-    
-    #def form(qx: float, qy: float) -> float:
-    #    return dblquad(lambda x, y : sld_(x, y) * np.exp(1j * (x * qx + y * qy)), -100, +100, -100, +100)[0]
-    
-    f = form_(qx, qy)
-    '''x, y = np.meshgrid(
-            np.linspace(-100, +100, num = 31),
-            np.linspace(-100, +100, num=31)
-        )
-    sld_arr_ = np.frompyfunc(sld_, nin=2, nout=1)(x, y)
-    delta_x = np.gradient(x, axis=1)
-    delta_y = np.gradient(y, axis=0)'''
 
     plt.imshow(np.log(np.real((f * f.conj()).astype(np.complex64))))
     plt.show()
 
-    
+    print(np.acos(1))
         
 
 
