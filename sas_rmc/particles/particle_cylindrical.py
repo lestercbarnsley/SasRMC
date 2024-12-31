@@ -7,8 +7,20 @@ import numpy as np
 from scipy import special
 
 from sas_rmc import Vector, vector
+from sas_rmc.array_cache import array_cache
 from sas_rmc.shapes import Cylinder, Shape
 from sas_rmc.particles.particle import Particle
+from sas_rmc.form_calculator import q_squared
+
+
+@array_cache
+def q_magnitude(qx_array: np.ndarray, qy_array: np.ndarray, offset: float = 1e-16) -> np.ndarray:
+    return np.sqrt(q_squared(qx_array, qy_array, offset=offset))
+
+@array_cache
+def calculate_alpha_angle(qx_array: np.ndarray, qy_array: np.ndarray, orientation: Vector) -> np.ndarray:
+    q = q_magnitude(qx_array, qy_array)
+    return np.acos(vector.dot((qx_array / q, qy_array / q), orientation.unit_vector.to_tuple()))
 
 
 @dataclass
@@ -79,36 +91,24 @@ class CylindricalParticle(Particle):
     def form_profile(self, q_profile: np.ndarray) -> np.ndarray:
         raise NotImplementedError()
     
-    def get_sld_at_position(self, relative_position: Vector) -> float:
-        position = relative_position + self.get_position()
-        if self.core_cylinder.is_inside(position):
-            return (self.cylinder_sld - self.solvent_sld) * 1e-6
-        return self.solvent_sld * 1e-6
-    
-    def sld_sum_along_line(self, x: float, y: float, num: int = 101) -> float:
-        extent = self.core_cylinder.height
-        z_line = np.linspace(-extent, +extent, num = num)
-        line = [Vector(x, y, z) for z in z_line]
-        sld = np.array([self.get_sld_at_position(relative_position) for relative_position in line])
-        return np.sum(sld * np.gradient(z_line))
-    
-    def form_arr(self, q: np.ndarray, alpha: np.ndarray) -> np.ndarray:
+    def form_array_with_orientation(self, q: np.ndarray, alpha: np.ndarray) -> np.ndarray:
         h_arg = q * self.core_cylinder.height * np.cos(alpha)
         r_arg = q * self.core_cylinder.radius * np.sin(alpha)
         return 2 * (self.cylinder_sld - self.solvent_sld) * self.get_volume() * special.spherical_jn(0, h_arg) * special.j0(r_arg)#np.where(r_arg != 0, special.j0(r_arg) / r_arg, 1)
     
     def form_array(self, qx_array: np.ndarray, qy_array: np.ndarray) -> np.ndarray:
-        
-        q = np.sqrt(qx_array**2 + qy_array**2)
-        alpha = np.acos(vector.dot((qx_array / q, qy_array / q), self.get_orientation().unit_vector.to_tuple()))
-        return self.form_arr(q, alpha)
+        q = q_magnitude(qx_array, qy_array)
+        alpha = calculate_alpha_angle(qx_array, qy_array, self.get_orientation())
+        return self.form_array_with_orientation(q, alpha)
     
 
 
 if __name__ == "__main__":
     from matplotlib import pyplot as plt
     cylinder = CylindricalParticle(
-        core_cylinder=Cylinder(10, 300, Vector.null_vector(), Vector(0, 1, 0)),
+        core_cylinder=Cylinder(10, 300, 
+            Vector.null_vector(),
+            Vector(1, 2,1)),
         cylinder_sld=6.9,
         solvent_sld=0
     )
@@ -122,8 +122,6 @@ if __name__ == "__main__":
     plt.imshow(np.log(np.real((f * f.conj()).astype(np.complex64))))
     plt.show()
 
-    print(np.acos(1))
-        
 
 
 #%%
