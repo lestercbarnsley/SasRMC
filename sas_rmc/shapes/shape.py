@@ -126,6 +126,15 @@ class Interface:
         position_ref = position - self.position_marker
         return position_ref - (self.normal.unit_vector * position_ref) * self.normal.unit_vector + self.position_marker
     
+    def intersection(self, line_start: Vector, line_direction: Vector) -> Vector | None: # This is only here on the off chance it is useful later
+        ln =  (self.normal.unit_vector) * (line_direction.unit_vector)
+        if ln != 0:
+            distance = ((self.position_marker - line_start) * (self.normal.unit_vector)) / ln
+            return distance * (line_direction.unit_vector) + line_start
+        if (line_start - self.position_marker) * (self.normal.unit_vector) == 0:
+            return line_start
+        return None # this needs to be unit tested
+
 
 @array_cache(max_size = 100_000)
 def collision_detected_between_two_shapes(shape_1: Shape, shape_2: Shape) -> bool:

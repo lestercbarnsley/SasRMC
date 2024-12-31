@@ -1,3 +1,4 @@
+#%%
 
 from dataclasses import dataclass, field
 
@@ -6,7 +7,7 @@ import numpy as np
 from scipy import special, integrate
 #from scipy.special import jv as j_bessel
 
-from sas_rmc import constants, Vector
+from sas_rmc import constants, Vector, vector
 from sas_rmc.shapes import Cylinder, Shape
 from sas_rmc.particles.particle import Particle
 
@@ -82,17 +83,91 @@ class CylindricalParticle(Particle):
     def form_profile(self, q_profile: np.ndarray) -> np.ndarray:
         raise NotImplementedError()
     
-    def get_delta_sld(self, relative_position: Vector) -> float:
+    def get_sld_at_position(self, relative_position: Vector) -> float:
         position = relative_position + self.get_position()
         if self.core_cylinder.is_inside(position):
             return (self.cylinder_sld - self.solvent_sld) * 1e-6
         return self.solvent_sld * 1e-6
     
-    def get_sld_arr(self, x_arr: np.ndarray, y_arr: np.ndarray, z_arr: np.ndarray) -> np.ndarray:
-        
+    def sld_sum_along_line(self, x: float, y: float, num: int = 101) -> float:
+        extent = self.core_cylinder.height
+        z_line = np.linspace(-extent, +extent, num = num)
+        line = [Vector(x, y, z) for z in z_line]
+        sld = np.array([self.get_sld_at_position(relative_position) for relative_position in line])
+        return np.sum(sld * np.gradient(z_line))
+    
+    def form_arr(self, q: np.ndarray, alpha: np.ndarray) -> np.ndarray:
+        h_arg = q * self.core_cylinder.height * np.cos(alpha)
+        r_arg = q * self.core_cylinder.radius * np.sin(alpha)
+        return 2 * (self.cylinder_sld - self.solvent_sld) * self.get_volume() * special.spherical_jn(0, h_arg) * special.j0(r_arg) / r_arg
     
     def form_array(self, qx_array: np.ndarray, qy_array: np.ndarray) -> np.ndarray:
         
-        q_array = array_magnitude(qx_array, qy_array)
-        delta_sld = self.get_delta_sld()
-        return form_array_sphere(self.core_sphere.radius, delta_sld, q_array)
+        def alpha_angle(qx, qy: float) -> float:
+            return np.cos(Vector(qx, qy).unit_vector * self.get_orientation().unit_vector)
+        alpha = np.frompyfunc(alpha_angle, nin = 2, nout = 1)(qx_array, qy_array)
+        q = np.sqrt(qx_array**2 + qy_array**2)
+        return self.form_arr(q, alpha)
+    
+
+
+if __name__ == "__main__":
+    from matplotlib import pyplot as plt
+    from sas_rmc.polarizer import mod
+    cylinder = CylindricalParticle(
+        core_cylinder=Cylinder(100, 100, Vector.null_vector(), Vector(0, 1)),
+        cylinder_sld=6.9,
+        solvent_sld=0
+    )
+    qx, qy = np.meshgrid(
+        np.linspace(-0.05, 0.05, num = 101),
+        np.linspace(-0.05, 0.05, num = 101)
+    )
+    #f = cylinder.form_array(qx, qy)
+
+    def sld(x: float, y: float, z: float) -> float:
+        return cylinder.get_sld_at_position(Vector(x, y, z))
+    
+    from scipy.integrate import quad
+
+    def sld_(x: float, y: float) -> float:
+        extent = cylinder.core_cylinder.height
+        return quad(lambda z: sld(x, y, z), -extent, +extent)[0]
+
+    def element(qx: float, qy: float, delta_x: np.ndarray, delta_y: np.ndarray, sld_array: np.ndarray, xarr: np.ndarray, yarr: np.ndarray) -> float:
+        return np.sum(delta_x * delta_y * sld_array * np.exp(1j * (qx * xarr + qy * yarr)))
+
+    def sld_arr(x, y) -> np.ndarray:
+        return np.frompyfunc(sld_, nin=2, nout=1)(x, y)
+
+    def form_(qx: np.ndarray, qy: np.ndarray):
+        x, y = np.meshgrid(
+            np.linspace(-100, +100, num = 31),
+            np.linspace(-100, +100, num=31)
+        )
+        sld_arr = np.frompyfunc(sld_, nin=2, nout=1)(x, y)
+        delta_x = np.gradient(x, axis=1)
+        delta_y = np.gradient(y, axis=0)
+        return np.frompyfunc(lambda qxi, qyi : element(qxi, qyi, delta_x, delta_y, sld_arr, x, y), nin=2, nout=1)(qx, qy)
+
+    
+    #def form(qx: float, qy: float) -> float:
+    #    return dblquad(lambda x, y : sld_(x, y) * np.exp(1j * (x * qx + y * qy)), -100, +100, -100, +100)[0]
+    
+    f = form_(qx, qy)
+    '''x, y = np.meshgrid(
+            np.linspace(-100, +100, num = 31),
+            np.linspace(-100, +100, num=31)
+        )
+    sld_arr_ = np.frompyfunc(sld_, nin=2, nout=1)(x, y)
+    delta_x = np.gradient(x, axis=1)
+    delta_y = np.gradient(y, axis=0)'''
+
+    plt.imshow(np.log(np.real((f * f.conj()).astype(np.complex64))))
+    plt.show()
+
+    
+        
+
+
+#%%
