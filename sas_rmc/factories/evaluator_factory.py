@@ -9,8 +9,8 @@ from pydantic.dataclasses import dataclass as pydantic_dataclass
 from sas_rmc import polarizer
 from sas_rmc.constants import np_sum, PI
 from sas_rmc.detector import DetectorImage, Polarization
-from sas_rmc.evaluator import Evaluator, EvaluatorWithFitter, FitterMultiple, Smearing2DFitter, NoSmearing2DFitter, qXqY_delta, DEFAULT_GAUSSIAN_FLOOR_FRACTION
-from sas_rmc.result_calculator import AnalyticalCalculator
+from sas_rmc.evaluator import Evaluator, EvaluatorWithFitter, FitterMultiple, ProfileFitter, Smearing2DFitter, NoSmearing2DFitter, qXqY_delta, DEFAULT_GAUSSIAN_FLOOR_FRACTION
+from sas_rmc.result_calculator import AnalyticalCalculator, LocalOrderCalculator
 from sas_rmc.factories import detector_builder, parse_data
 
 
@@ -136,6 +136,29 @@ class EvaluatorWithSmearingFactory(EvaluatorFactory):
         detector_list = detector_builder.create_detector_images_with_smearing(dataframes)
         value_frame = parse_data.parse_value_frame(dataframes['Simulation parameters'])
         return cls(detector_list=detector_list, **value_frame)
+    
+
+@pydantic_dataclass
+class EvaluatorProfileFactory(EvaluatorFactory):
+    angle_num: int = 91
+    field_direction: str = "Y"
+
+    def create_evaluator(self) -> Evaluator:
+        return EvaluatorWithFitter(
+            fitter = FitterMultiple(
+                fitter_list=[
+                    ProfileFitter(
+                        profile_calculator=LocalOrderCalculator(
+                            q = np.zeros(100),
+                            angle_num=self.angle_num,
+                            polarizer=polarizer_from(Polarization.UNPOLARIZED, self.field_direction),
+                        ),
+                        experimental_intensity=np.zeros(100),
+                        experimental_uncertainty=np.zeros(100)
+                    )
+                ]
+            )
+        )
     
 
 def infer_profile_type_from_dataframe(dataframe: pd.DataFrame) -> ProfileType:

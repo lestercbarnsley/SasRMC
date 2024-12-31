@@ -133,7 +133,7 @@ class FitterMultiple(Fitter):
 
 @dataclass
 class ProfileFitter(Fitter):
-    profile_calculator: ProfileCalculator
+    profile_calculator: ResultCalculator
     experimental_intensity: np.ndarray
     experimental_uncertainty: np.ndarray | None = None
 

@@ -114,6 +114,26 @@ class ProfileCalculator(ResultCalculator):
         )  # Use np.average here because the return type is also an numpy array.
         
 
+@dataclass
+class LocalOrderCalculator(ResultCalculator):
+    q: np.ndarray
+    angle_num: int
+    polarizer: Polarizer
+
+    @method_array_cache
+    def create_analytical_calculator(self) -> AnalyticalCalculator:
+        angles = np.linspace(-PI, +PI, num = self.angle_num)
+        q_arr, angle_arr = np.meshgrid(self.q, angles)
+        qx, qy = q_arr * np.cos(angle_arr), q_arr * np.sin(angle_arr)
+        return AnalyticalCalculator(
+            qx_array=qx,
+            qy_array=qy,
+            polarizer=self.polarizer
+        )
+
+    def intensity_result(self, scattering_simulation: ScatteringSimulation) -> np.ndarray:
+        analytical_calculator = self.create_analytical_calculator()
+        return np.sum(analytical_calculator.intensity_result(scattering_simulation), axis = 1)
 
             
 

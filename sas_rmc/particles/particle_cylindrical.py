@@ -8,6 +8,8 @@ from scipy import special
 
 from sas_rmc import Vector, vector
 from sas_rmc.array_cache import array_cache
+from sas_rmc.particles import FormResult
+from sas_rmc.particles.particle_form import ParticleArray
 from sas_rmc.shapes import Cylinder, Shape
 from sas_rmc.particles.particle import Particle
 from sas_rmc.form_calculator import q_squared
@@ -101,6 +103,53 @@ class CylindricalParticle(Particle):
         alpha = calculate_alpha_angle(qx_array, qy_array, self.get_orientation())
         return self.form_array_with_orientation(q, alpha)
     
+    @classmethod
+    def gen_from_parameters(cls, radius: float, height: float, orientation: Vector, cylinder_sld: float, solvent_sld: float, magnetization: Vector | None = None):
+        return cls(
+            core_cylinder=Cylinder(
+                radius=radius,
+                height=height,
+                central_position=Vector.null_vector(),
+                orientation=orientation,
+            ),
+            cylinder_sld=cylinder_sld,
+            solvent_sld=solvent_sld,
+            magnetization=magnetization if magnetization is not None else Vector.null_vector()
+        )
+    
+
+@dataclass
+class CylindricalParticleForm(ParticleArray):
+    bound_particle: CylindricalParticle
+
+    def get_bound_particle(self) -> Particle:
+        return self.bound_particle
+    
+    def change_particle(self, particle: Particle) -> Self:
+        if not isinstance(particle, CylindricalParticle):
+            raise TypeError()
+        return type(self)(bound_particle = particle)
+    
+    def form_result(self, qx_array: np.ndarray, qy_array: np.ndarray) -> FormResult:
+        # Temperarily ignore magnetic scattering
+        return FormResult(
+            form_nuclear=self.bound_particle.form_array(qx_array, qy_array),
+            form_magnetic_x= 0 * qx_array,
+            form_magnetic_y=0 * qx_array,
+            form_magnetic_z=0 * qx_array
+        )
+    
+    @classmethod
+    def gen_from_parameters(cls, radius: float, height: float, orientation: Vector, cylinder_sld: float, solvent_sld: float, magnetization: Vector | None = None):
+        bound_particle = CylindricalParticle.gen_from_parameters(
+            radius=radius,
+            height=height,
+            orientation=orientation,
+            cylinder_sld=cylinder_sld,
+            solvent_sld=solvent_sld,
+            magnetization=magnetization
+        )
+        return cls(bound_particle = bound_particle)
 
 
 if __name__ == "__main__":
