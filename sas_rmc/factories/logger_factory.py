@@ -36,6 +36,13 @@ class CallbackFactory(LoggerFactory):
     def create_callbacks(self) -> LogCallback:
         result_folder = self.result_folder
         datetime_string = self.datetime_string
+        if self.output_plot_format.lower() == "none".lower():
+            return loggers.LogEventBus(
+                log_callbacks=[
+                    loggers.CLIckLogger(),
+                    loggers.ExcelCallback(excel_file= result_folder / Path(f'{datetime_string}_{self.simulation_title}.xlsx')),
+                ]
+            )
         return loggers.LogEventBus(
             log_callbacks=[
                 loggers.CLIckLogger(), 

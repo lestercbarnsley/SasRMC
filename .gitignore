@@ -164,6 +164,7 @@ sas_rmc/__pycache__/
 *.xlsx
 !data/CoreShell_Simulation_Input.xlsx
 !data/CoreShell_F20_pol.xlsx
+!templates/CoreShell_Simulation_Image_Input.xlsx
 sas_rmc.egg-info/
 requirements.txt
 tests/__pycache__/

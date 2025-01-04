@@ -33,13 +33,15 @@ def analytical_calculator_from_experimental_detector(detector: DetectorImage, de
     )
 
 def field_direction_from(field_direction_str: str) -> polarizer.FieldDirection:
-    match field_direction_str:
-        case 'X':
+    match field_direction_str.lower():
+        case 'x':
             return polarizer.FieldDirectionX()
-        case 'Y':
+        case 'y':
             return polarizer.FieldDirectionY()
-        case 'Z':
+        case 'z':
             return polarizer.FieldDirectionZ()
+        case 'off':
+            return polarizer.FieldDirectionY()
         case _:
             raise ValueError("This field direction string is not recognized")
 
@@ -140,7 +142,7 @@ class EvaluatorWithSmearingFactory(EvaluatorFactory):
 
 @pydantic_dataclass
 class EvaluatorProfileFactory(EvaluatorFactory):
-    angle_num: int = 91
+    angle_number: int = 91
     field_direction: str = "Y"
 
     def create_evaluator(self) -> Evaluator:
@@ -150,7 +152,7 @@ class EvaluatorProfileFactory(EvaluatorFactory):
                     ProfileFitter(
                         profile_calculator=LocalOrderCalculator(
                             q = np.zeros(100),
-                            angle_num=self.angle_num,
+                            angle_num=self.angle_number,
                             polarizer=polarizer_from(Polarization.UNPOLARIZED, self.field_direction),
                         ),
                         experimental_intensity=np.zeros(100),

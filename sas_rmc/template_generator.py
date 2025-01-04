@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import pandas as pd
+import xlsxwriter as xls
 
 from sas_rmc.particles import CoreShellParticle, DumbbellParticle
 
