@@ -96,7 +96,7 @@ class CylindricalParticle(Particle):
     def form_array_with_orientation(self, q: np.ndarray, alpha: np.ndarray) -> np.ndarray:
         h_arg = q * self.core_cylinder.height * np.cos(alpha)
         r_arg = q * self.core_cylinder.radius * np.sin(alpha)
-        return 2 * (self.cylinder_sld - self.solvent_sld) * self.get_volume() * special.spherical_jn(0, h_arg) * special.j0(r_arg)#np.where(r_arg != 0, special.j0(r_arg) / r_arg, 1)
+        return 2 * (self.cylinder_sld - self.solvent_sld) * self.get_volume() * special.spherical_jn(0, h_arg) * np.where(r_arg == 0, 1/2, special.j1(r_arg) / r_arg)
     
     def form_array(self, qx_array: np.ndarray, qy_array: np.ndarray) -> np.ndarray:
         q = q_magnitude(qx_array, qy_array)
@@ -155,15 +155,15 @@ class CylindricalParticleForm(ParticleArray):
 if __name__ == "__main__":
     from matplotlib import pyplot as plt
     cylinder = CylindricalParticle(
-        core_cylinder=Cylinder(10, 300, 
+        core_cylinder=Cylinder(300, 300, 
             Vector.null_vector(),
-            Vector(1, 2,1)),
+            Vector(0, 0, 1)),
         cylinder_sld=6.9,
         solvent_sld=0
     )
     qx, qy = np.meshgrid(
-        np.linspace(-0.4, 0.4, num = 101),
-        np.linspace(-0.4, 0.4, num = 101)
+        np.linspace(-0.04, 0.04, num = 101),
+        np.linspace(-0.04, 0.04, num = 101)
     )
     f = cylinder.form_array(qx, qy)
 
@@ -171,6 +171,8 @@ if __name__ == "__main__":
     plt.imshow(np.log(np.real((f * f.conj()).astype(np.complex64))))
     plt.show()
 
-
+    plt.semilogy(np.real(f * f.conj()))
+    plt.show()
+    
 
 #%%

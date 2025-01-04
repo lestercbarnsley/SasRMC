@@ -84,10 +84,7 @@ def main() -> None:
         )
     plt.show()
 
-import xlsxwriter
 
-def main() -> None:
-    xlsxwriter.Workbook()
 
 
 if __name__ == "__main__":
