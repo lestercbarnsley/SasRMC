@@ -118,3 +118,21 @@ def test_rotated_basis(vec: Vector):
     assert basis_set[0] * basis_set[2] == approx(0)
     assert basis_set[1] * basis_set[2] == approx(0)
 
+if __name__ == "__main__":
+    from functools import singledispatch
+    from typing import Any
+
+    @singledispatch
+    def test(a: Any, b) -> float | str:
+        return a + b
+    
+    @test.register
+    def test_num(a: int | float, b: int | float) -> float:
+        return a + b
+    
+    @test.register
+    def test_str(a: str, b: str) -> str:
+        print('string overload')
+        return a + b
+    
+    t = test(1, 2)
